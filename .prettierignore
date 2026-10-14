@@ -1,0 +1,11 @@
+node_modules
+LICENSE
+.next
+dist
+coverage
+package-lock.json
+apps/web/next-env.d.ts
+*.tsbuildinfo
+.agents
+.neon
+.data
