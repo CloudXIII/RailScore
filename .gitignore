@@ -1,0 +1,21 @@
+node_modules/
+dist/
+.next/
+*.tsbuildinfo
+
+# Local env. .env.example is the committed template.
+.env*
+!.env.example
+
+*.log
+coverage/
+.vercel/
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+.cursor/
+.agents/
+skills-lock.json
+.neon
+.data/
