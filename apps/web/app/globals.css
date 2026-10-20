@@ -9,8 +9,12 @@
   --hover: #f4f8fb;
   --field: #ffffff;
   --brand: #13294b;
+  /* Visible accent of brand (borders, sample text). Same as --brand in light. */
+  --brand-mark: #13294b;
   --accent: #00703c;
   --accent-dark: #005a30;
+  --disabled: #9aa5ab;
+  --disabled-ink: #ffffff;
   --selected: #e8f1fb;
   --selected-line: #1d70b8;
   --focus: #ffdd00;
@@ -41,8 +45,11 @@
   --hover: #223044;
   --field: #101820;
   --brand: #0c1b33;
-  --accent: #1aa35a;
-  --accent-dark: #148a4b;
+  --brand-mark: #9db8d8;
+  --accent: #127a42;
+  --accent-dark: #0e6436;
+  --disabled: #2a3544;
+  --disabled-ink: #9aa6b4;
   --selected: #1c3148;
   --selected-line: #7eb8ee;
   --warning: #ffd27a;
@@ -51,13 +58,13 @@
   --danger-bg: #4a1a18;
   --on-time-bg: #1e6b42;
   --on-time-ink: #d8f5e6;
-  --late-bg: #8a6418;
-  --late-ink: #ffe7a8;
-  --later-bg: #c45c12;
-  --later-ink: #fff0e0;
+  --late-bg: #6f5010;
+  --late-ink: #ffe9b0;
+  --later-bg: #9a450e;
+  --later-ink: #fff3e6;
   --severe-bg: #a33a2a;
   --severe-ink: #ffffff;
-  --cancelled-bg: #e53935;
+  --cancelled-bg: #b71c1c;
   --cancelled-ink: #ffffff;
 }
 
@@ -378,7 +385,8 @@ button {
 }
 
 .primary:disabled {
-  background: #9aa5ab;
+  background: var(--disabled);
+  color: var(--disabled-ink);
   box-shadow: none;
   cursor: not-allowed;
 }
@@ -568,6 +576,12 @@ legend {
   color: white;
 }
 
+:root[data-theme="dark"] .pill input:checked + span {
+  border-color: var(--selected-line);
+  background: var(--selected);
+  color: var(--ink);
+}
+
 .pill input:focus-visible + span {
   outline: 3px solid var(--focus);
   box-shadow: 0 0 0 6px var(--ink);
@@ -581,7 +595,7 @@ legend {
   align-items: start;
   column-gap: 0.75rem;
   row-gap: 0.25rem;
-  border-left: 6px solid var(--brand);
+  border-left: 6px solid var(--brand-mark);
 }
 
 .journey-route {
@@ -642,7 +656,7 @@ legend {
 .time-shift-chevron {
   width: 1.4rem;
   height: 0.7rem;
-  color: #6b7780;
+  color: var(--muted);
 }
 
 .time-shift.later .time-shift-chevron {
@@ -651,7 +665,7 @@ legend {
 
 .time-shift:hover .time-shift-chevron,
 .time-shift:active .time-shift-chevron {
-  color: var(--brand);
+  color: var(--selected-line);
 }
 
 .service {
@@ -820,7 +834,7 @@ legend {
 .result {
   display: grid;
   gap: 0.75rem;
-  border-top: 6px solid var(--brand);
+  border-top: 6px solid var(--brand-mark);
 }
 
 .result-summary {
@@ -1106,7 +1120,7 @@ legend {
 
 .sample {
   background: var(--selected);
-  color: var(--brand);
+  color: var(--brand-mark);
   font-size: 0.925rem;
 }
 
