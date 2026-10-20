@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useState, type KeyboardEvent } from "react";
+import { keepFieldInView } from "@/features/keep-field-in-view";
 import { searchStations, stationLabel, type Station } from "@/server/stations";
 
 export function StationField({
@@ -9,6 +10,7 @@ export function StationField({
   value,
   onChange,
   autoFocus = false,
+  enterKeyHint = "next",
   stations,
 }: {
   name: string;
@@ -16,6 +18,7 @@ export function StationField({
   value: string;
   onChange: (value: string) => void;
   autoFocus?: boolean;
+  enterKeyHint?: "next" | "go" | "search" | "done";
   stations: readonly Station[];
 }) {
   const inputId = useId();
@@ -63,11 +66,12 @@ export function StationField({
         }
         value={value}
         placeholder="Station name or code"
+        inputMode="search"
         autoComplete="off"
         autoCorrect="off"
         autoCapitalize="words"
         spellCheck={false}
-        enterKeyHint="next"
+        enterKeyHint={enterKeyHint}
         required
         autoFocus={autoFocus}
         onChange={(event) => {
@@ -75,7 +79,10 @@ export function StationField({
           setActive(0);
           setOpen(true);
         }}
-        onFocus={(event) => event.currentTarget.select()}
+        onFocus={(event) => {
+          event.currentTarget.select();
+          keepFieldInView(event.currentTarget);
+        }}
         onBlur={() => setOpen(false)}
         onKeyDown={onKeyDown}
       />

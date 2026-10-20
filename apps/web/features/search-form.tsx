@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { departureWindowHint, timeSearchLabel } from "@/features/format";
+import { keepFieldInView } from "@/features/keep-field-in-view";
 import type { ParsedQuery } from "@/server/query";
 import type { Station } from "@/server/stations";
 import { StationField } from "@/features/station-field";
@@ -29,9 +30,19 @@ export function SearchForm({
   stations: readonly Station[];
 }) {
   const [editing, setEditing] = useState(!collapsed);
+  /** True only after Change, so the home screen does not open the keyboard. */
+  const [openedFromChange, setOpenedFromChange] = useState(false);
   const [from, setFrom] = useState(query.fromText);
   const [to, setTo] = useState(query.toText);
   const [time, setTime] = useState(query.time);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  useEffect(() => {
+    if (!openedFromChange || !editing) {
+      return;
+    }
+    formRef.current?.scrollIntoView({ block: "start" });
+  }, [openedFromChange, editing]);
 
   if (!editing && query.from && query.to) {
     const days = DAY_OPTIONS.find(
@@ -50,7 +61,10 @@ export function SearchForm({
         <button
           type="button"
           className="link-button"
-          onClick={() => setEditing(true)}
+          onClick={() => {
+            setOpenedFromChange(true);
+            setEditing(true);
+          }}
         >
           Change
         </button>
@@ -62,14 +76,20 @@ export function SearchForm({
   }
 
   return (
-    <form className="card planner" method="get" action="/" autoComplete="off">
+    <form
+      ref={formRef}
+      className="card planner"
+      method="get"
+      action="/"
+      autoComplete="off"
+    >
       <div className="stations">
         <StationField
           name="from"
           label="From"
           value={from}
           onChange={setFrom}
-          autoFocus={collapsed}
+          autoFocus={openedFromChange}
           stations={stations}
         />
         <StationField
@@ -99,7 +119,9 @@ export function SearchForm({
           type="time"
           value={time}
           onChange={(event) => setTime(event.target.value)}
+          onFocus={(event) => keepFieldInView(event.currentTarget)}
           aria-describedby="departure-window"
+          enterKeyHint="go"
           required
         />
         <p className="meta" id="departure-window">

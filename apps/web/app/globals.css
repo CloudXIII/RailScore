@@ -353,6 +353,8 @@ input[type="time"],
   border-radius: 4px;
   background: var(--field);
   color: inherit;
+  scroll-margin-top: 4rem;
+  scroll-margin-bottom: 6rem;
 }
 
 button {
@@ -405,6 +407,7 @@ input:focus-visible {
 .planner {
   display: grid;
   gap: 1rem;
+  scroll-margin-top: 1rem;
 }
 
 .planner label,
@@ -755,15 +758,9 @@ legend {
 }
 
 .calculate-bar {
-  position: sticky;
-  bottom: 0;
   display: grid;
   gap: 0.4rem;
-  margin: 0 -1rem;
-  padding: 0.75rem 1rem;
-  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
-  background: var(--page);
-  border-top: 1px solid var(--line);
+  margin: 0.5rem 0 0;
   text-align: center;
 }
 

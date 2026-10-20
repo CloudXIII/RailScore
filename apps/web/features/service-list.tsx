@@ -143,16 +143,10 @@ export function ServiceList({
       </TimeShift>
       {services.length > 0 || retired.length > 0 ? (
         <div className="calculate-bar">
-          {chosen ? null : (
-            <p id="choose-train" className="meta">
-              Choose a train
-            </p>
-          )}
           <button
             type="submit"
             className="primary"
             disabled={!chosen || pending}
-            aria-describedby={chosen ? undefined : "choose-train"}
           >
             {pending ? "Loading…" : "Show arrival history"}
           </button>
