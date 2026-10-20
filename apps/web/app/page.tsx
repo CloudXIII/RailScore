@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { BusyRetry } from "@/features/busy-retry";
 import { ThemeMenu } from "@/features/theme-menu";
 import { CalculationProgress } from "@/features/calculation-progress";
-import { WaitingTrain } from "@/features/waiting-train";
+import { ContentReady, WaitGate } from "@/features/wait-gate";
 import { DataNotice } from "@/features/data-notice";
 import { pageTitle } from "@/features/page-title";
 import { ReliabilityResultView } from "@/features/reliability-result";
@@ -101,29 +101,27 @@ export default async function Home({
           stations={stations}
         />
         {ready ? (
-          <Suspense
+          <WaitGate
             key={panelKey(query)}
-            fallback={
-              <WaitingTrain
-                title={
-                  query.calculate
-                    ? "Checking this train's recent journeys"
-                    : "Finding trains"
-                }
-                detail={
-                  query.calculate
-                    ? "The first check can take up to a minute. Leave this tab open."
-                    : "This usually takes under a minute."
-                }
-                mode={query.calculate ? "calculation" : "search"}
-                periodDays={query.period}
-                days={query.days}
-                serviceKey={query.calculate ? query.serviceKey : undefined}
-              />
+            title={
+              query.calculate
+                ? "Checking this train's recent journeys"
+                : "Finding trains"
             }
+            detail={
+              query.calculate
+                ? "The first check can take up to a minute. Leave this tab open."
+                : "This usually takes under a minute."
+            }
+            mode={query.calculate ? "calculation" : "search"}
+            periodDays={query.period}
+            days={query.days}
+            serviceKey={query.calculate ? query.serviceKey : undefined}
           >
-            <TrainPanel query={query} sample={sample} stations={stations} />
-          </Suspense>
+            <Suspense fallback={null}>
+              <TrainPanel query={query} sample={sample} stations={stations} />
+            </Suspense>
+          </WaitGate>
         ) : null}
       </main>
       <DataNotice sample={sample} />
@@ -141,7 +139,7 @@ async function TrainPanel({
   stations: readonly Station[];
 }) {
   if (!query.from || !query.to) {
-    return null;
+    return <ContentReady>{null}</ContentReady>;
   }
   if (query.calculate && query.serviceKey) {
     clearCalculationProgress(query.serviceKey);
@@ -185,7 +183,7 @@ async function TrainPanel({
     );
 
     return (
-      <>
+      <ContentReady>
         {query.calculate && query.serviceKey && !selected ? (
           <p className="warning" role="status">
             That service was not in the historical results for this search.
@@ -226,30 +224,34 @@ async function TrainPanel({
         ) : (
           trains
         )}
-      </>
+      </ContentReady>
     );
   } catch (error) {
     if (error instanceof HspRequestError && error.kind === "busy") {
       const calculating = query.calculate && Boolean(query.serviceKey);
       return (
-        <BusyRetry
-          title={
-            calculating
-              ? "Checking this train's recent journeys"
-              : "Finding trains"
-          }
-          mode={calculating ? "calculation" : "search"}
-          periodDays={query.period}
-          days={query.days}
-          serviceKey={calculating ? query.serviceKey : undefined}
-          message={error.message}
-        />
+        <ContentReady>
+          <BusyRetry
+            title={
+              calculating
+                ? "Checking this train's recent journeys"
+                : "Finding trains"
+            }
+            mode={calculating ? "calculation" : "search"}
+            periodDays={query.period}
+            days={query.days}
+            serviceKey={calculating ? query.serviceKey : undefined}
+            message={error.message}
+          />
+        </ContentReady>
       );
     }
     return (
-      <p className="errors" role="alert">
-        {errorMessage(error)}
-      </p>
+      <ContentReady>
+        <p className="errors" role="alert">
+          {errorMessage(error)}
+        </p>
+      </ContentReady>
     );
   }
 }
