@@ -292,7 +292,7 @@ describe("findServices", () => {
     expect(found.services[0]?.rids).toHaveLength(4);
   });
 
-  it("shows yesterday's list at once, then fetches it again after the response", async () => {
+  it("waits for a new list when the stored one ends before the period", async () => {
     vi.mocked(postHsp).mockResolvedValue({ Services: [] });
     const tomorrow = new Date("2026-10-09T12:00:00Z");
 
@@ -303,50 +303,29 @@ describe("findServices", () => {
       now: tomorrow,
     });
 
-    expect(postHsp).not.toHaveBeenCalled();
-    expect(next.period).toEqual({ from: "2026-09-08", to: "2026-10-07" });
-    expect(afterResponse).toHaveBeenCalledTimes(1);
-
-    await vi.mocked(afterResponse).mock.calls[0]?.[0]();
+    expect(postHsp).toHaveBeenCalled();
+    expect(afterResponse).not.toHaveBeenCalled();
+    expect(next.period).toEqual({ from: "2026-09-09", to: "2026-10-08" });
     const ranges = [
       ...new Set(bodies().map((body) => `${body.from_date}..${body.to_date}`)),
     ];
     expect(ranges).toEqual(["2026-09-09..2026-10-08"]);
-
-    vi.mocked(postHsp).mockClear();
-    const refreshed = await findServices({
-      ...search("1300", "weekdays"),
-      now: tomorrow,
-    });
-    expect(postHsp).not.toHaveBeenCalled();
-    expect(refreshed.period).toEqual({ from: "2026-09-09", to: "2026-10-08" });
   });
 
-  it("leaves a list a few days old alone while a train is calculated", async () => {
+  it("leaves a period-covering list alone while a train is calculated", async () => {
     vi.mocked(postHsp).mockResolvedValue({ Services: [] });
 
     await findServices({ ...search("1300", "weekdays"), now: NOW });
+    vi.mocked(postHsp).mockClear();
+    vi.mocked(afterResponse).mockClear();
     await findServices({
       ...search("1300", "weekdays"),
-      now: new Date("2026-10-09T12:00:00Z"),
+      now: new Date("2026-10-08T19:00:00Z"),
       refreshStale: false,
     });
 
+    expect(postHsp).not.toHaveBeenCalled();
     expect(afterResponse).not.toHaveBeenCalled();
-  });
-
-  it("waits for a new list when the stored one ends more than a week early", async () => {
-    vi.mocked(postHsp).mockResolvedValue({ Services: [] });
-
-    await findServices({ ...search("1300", "weekdays"), now: NOW });
-    vi.mocked(postHsp).mockClear();
-    const later = await findServices({
-      ...search("1300", "weekdays"),
-      now: new Date("2026-10-17T12:00:00Z"),
-    });
-
-    expect(postHsp).toHaveBeenCalled();
-    expect(later.period).toEqual({ from: "2026-09-17", to: "2026-10-16" });
   });
 
   it("stops calling HSP when the time budget runs out, and the next try carries on", async () => {

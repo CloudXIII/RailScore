@@ -282,6 +282,99 @@ describe("toHistoricalRun", () => {
     expect(run.outcome).toBe("did_not_call");
   });
 
+  it("reads a train that ran through the boarding station as did not call", () => {
+    const run = toHistoricalRun(
+      synthetic(
+        stop("HUL", "0503", "655"),
+        { ...stop("LDS", "", "655"), actual_ta: "0627" },
+        stop("MAN", "0715", "655"),
+      ),
+      leedsToManchester,
+      "ran-through",
+    );
+    expect(run.outcome).toBe("did_not_call");
+  });
+
+  it("reads a passing time at boarding with no actual departure as did not call", () => {
+    const run = toHistoricalRun(
+      {
+        serviceAttributesDetails: {
+          date_of_service: "2026-10-23",
+          locations: [
+            {
+              location: "BSK",
+              gbtt_ptd: "1738",
+              gbtt_pta: "1733",
+              actual_td: "",
+              actual_ta: "1805",
+              late_canc_reason: "655",
+            },
+            {
+              location: "GRT",
+              gbtt_ptd: "1809",
+              gbtt_pta: "1809",
+              actual_td: "1835",
+              actual_ta: "1829",
+              late_canc_reason: "655",
+            },
+          ],
+        },
+      },
+      { boardingCrs: "BSK", destinationCrs: "GRT" },
+      "202610237679424",
+    );
+    expect(run).toEqual({
+      id: "202610237679424",
+      serviceDate: "2026-10-23",
+      outcome: "did_not_call",
+    });
+  });
+
+  it("reads a boarding stop that has an actual departure as an arrival", () => {
+    const run = toHistoricalRun(
+      {
+        serviceAttributesDetails: {
+          date_of_service: "2026-10-23",
+          locations: [
+            {
+              location: "BSK",
+              gbtt_ptd: "1707",
+              gbtt_pta: "1706",
+              actual_td: "1735",
+              actual_ta: "1731",
+              late_canc_reason: "655",
+            },
+            {
+              location: "GRT",
+              gbtt_ptd: "1738",
+              gbtt_pta: "1738",
+              actual_td: "1810",
+              actual_ta: "1803",
+              late_canc_reason: "655",
+            },
+          ],
+        },
+      },
+      { boardingCrs: "BSK", destinationCrs: "GRT" },
+      "202610237679417",
+    );
+    expect(run).toEqual({
+      id: "202610237679417",
+      serviceDate: "2026-10-23",
+      outcome: "arrived",
+      latenessMinutes: 25,
+    });
+  });
+
+  it("reads no actual time anywhere and no reason code as a cancellation", () => {
+    const run = toHistoricalRun(
+      synthetic(stop("HUL", ""), stop("LDS", ""), stop("MAN", "")),
+      leedsToManchester,
+      "silent",
+    );
+    expect(run.outcome).toBe("cancelled");
+  });
+
   it("does not treat a missing actual arrival without a reason code as a cancellation", () => {
     const run = toHistoricalRun(
       synthetic(stop("LDS", "0608"), stop("MAN", "")),

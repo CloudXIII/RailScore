@@ -18,14 +18,14 @@ describe("listState", () => {
     ).toBe("fresh");
   });
 
-  it("shows yesterday's list and asks for a new one", () => {
+  it("waits for a new list when the stored one ends before the period", () => {
     expect(
       listState(
         stored("2026-10-07", "2026-10-08T08:00:00Z"),
         "2026-10-08",
         new Date("2026-10-09T08:00:00Z"),
       ),
-    ).toBe("stale");
+    ).toBe("missing");
   });
 
   it("asks again after six hours, as HSP may still add recent runs", () => {
@@ -38,17 +38,10 @@ describe("listState", () => {
     ).toBe("stale");
   });
 
-  it("waits for a new list when the stored one ends more than a week early", () => {
+  it("waits for a new list when the stored one is absent or ends early", () => {
     expect(
       listState(
         stored("2026-09-30", "2026-10-01T08:00:00Z"),
-        "2026-10-07",
-        new Date("2026-10-08T08:00:00Z"),
-      ),
-    ).toBe("stale");
-    expect(
-      listState(
-        stored("2026-09-29", "2026-09-30T08:00:00Z"),
         "2026-10-07",
         new Date("2026-10-08T08:00:00Z"),
       ),

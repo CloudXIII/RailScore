@@ -89,22 +89,23 @@ type ServiceSearch = {
   services: ScheduledService[];
   /** Trains that ran early in the period and no longer do. */
   retired: ScheduledService[];
-  /** Dates the listed runs cover. Can end a few days early while a newer list loads. */
+  /** Dates the listed runs cover. Matches the search period once every list is current. */
   period: { from: string; to: string };
 };
 
 /**
  * Each quarter-hour of each day type is one list, fetched for the whole period: HSP
  * takes as long for 7 days as for 90, and its counts then describe that period.
- * A list stored in this process or the database is shown at once. One that is a few
- * days old is shown too, and fetched again after the response, so a commuter's daily
- * search does not wait for HSP. Lists that are missing are fetched before the page
- * shows; two calls run side by side, sized from how long the calls before them took.
+ * A list that already covers the period is shown at once; if it was fetched hours ago
+ * it is fetched again after the response, because HSP may still add recent runs. A list
+ * that ends before the period (or is missing) is fetched before the page shows, so the
+ * dates match what the passenger expects. Two calls run side by side, sized from how
+ * long the calls before them took.
  */
 export async function findServices(
   input: Search & {
     now?: Date;
-    /** False leaves lists that are a few days old as they are. */
+    /** False skips the after-response refresh of lists that already cover the period. */
     refreshStale?: boolean;
   },
 ): Promise<ServiceSearch> {

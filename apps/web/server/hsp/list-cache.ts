@@ -14,12 +14,11 @@ export type StoredList = {
   readonly fetchedAt: Date;
 };
 
-/** Days a stored list may lag the period's end and still be shown while a new one loads. */
-const STALE_LIST_DAYS = 7;
-
 /**
- * `fresh` is shown as it is. `stale` is shown, then fetched again after the response.
- * `missing` must be fetched before the list can be shown.
+ * `fresh` is shown as it is. `stale` covers the period but may still gain recent runs,
+ * so it is shown then fetched again after the response. `missing` (no list, or one that
+ * ends before the period) must be fetched before the list can be shown — otherwise the
+ * page would claim "last N days" up to an older date.
  */
 type ListState = "fresh" | "stale" | "missing";
 
@@ -28,16 +27,10 @@ export function listState(
   periodTo: string,
   now: Date,
 ): ListState {
-  if (
-    !stored ||
-    stored.coveredTo < addCalendarDays(periodTo, -STALE_LIST_DAYS)
-  ) {
+  if (!stored || stored.coveredTo < periodTo) {
     return "missing";
   }
-  if (
-    stored.coveredTo >= periodTo &&
-    now.getTime() - stored.fetchedAt.getTime() < RECENT_RUN_REFRESH_MS
-  ) {
+  if (now.getTime() - stored.fetchedAt.getTime() < RECENT_RUN_REFRESH_MS) {
     return "fresh";
   }
   return "stale";

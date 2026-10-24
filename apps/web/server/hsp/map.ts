@@ -28,7 +28,8 @@ export type ScheduledService = {
 /**
  * Runs HSP counts as reaching the destination at most 5, 14 and 29 minutes late, as the list
  * call reports them. A cancelled run is outside every tolerance. HSP also counts a run with no
- * actual time at the boarding stop as outside, where the full calculation may still find an arrival.
+ * actual departure at the boarding stop as outside. The full calculation treats that the same
+ * way: the passenger could not board, so it is a missed call, not an arrival.
  */
 export type ListPunctuality = {
   readonly runs: number;
@@ -536,8 +537,10 @@ export function historicalRunFromDetails(
 }
 
 /**
- * Classifies one run for a passenger boarding at `boardingCrs`. HSP has no cancellation flag:
- * a stop with no actual time and a `late_canc_reason` is a stop the train did not make.
+ * Classifies one run for a passenger boarding at `boardingCrs`. HSP has no cancellation flag.
+ * A public departure with no actual departure is one the passenger could not take, including a
+ * train that ran through and left only a passing time in `actual_ta`. That is a missed call.
+ * A run with no actual time at any stop is cancelled, with or without a reason.
  */
 export function toHistoricalRun(
   payload: unknown,
@@ -566,19 +569,13 @@ export function toHistoricalRun(
   const scheduled = text(destination.gbtt_pta);
   const actual = text(destination.actual_ta);
   if (!scheduled && !actual) {
-    if (!hasReason(destination)) {
-      return { ...base, outcome: "missing_actual" };
-    }
-    return {
-      ...base,
-      outcome: stops.some(hasActual) ? "did_not_call" : "cancelled",
-    };
+    return { ...base, outcome: notArrived(stops, destination) };
   }
   if (!scheduled) {
     return { ...base, outcome: "missing_actual" };
   }
   if (actual) {
-    if (boarding && !hasActual(boarding) && hasReason(boarding)) {
+    if (boarding && !departedFrom(boarding)) {
       return { ...base, outcome: "did_not_call" };
     }
     try {
@@ -591,13 +588,25 @@ export function toHistoricalRun(
       return { ...base, outcome: "missing_actual" };
     }
   }
-  if (!hasReason(destination)) {
-    return { ...base, outcome: "missing_actual" };
+  return { ...base, outcome: notArrived(stops, destination) };
+}
+
+/** Outcome of a run with no actual arrival at the destination. */
+function notArrived(
+  stops: readonly Record<string, unknown>[],
+  destination: Record<string, unknown>,
+): "cancelled" | "did_not_call" | "missing_actual" {
+  if (!stops.some(hasActual)) {
+    return "cancelled";
   }
-  return {
-    ...base,
-    outcome: stops.some(hasActual) ? "did_not_call" : "cancelled",
-  };
+  return hasReason(destination) ? "did_not_call" : "missing_actual";
+}
+
+function departedFrom(stop: Record<string, unknown>): boolean {
+  if (text(stop.gbtt_ptd)) {
+    return Boolean(text(stop.actual_td));
+  }
+  return hasActual(stop) || !hasReason(stop);
 }
 
 function hasActual(stop: Record<string, unknown>): boolean {

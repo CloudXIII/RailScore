@@ -16,9 +16,10 @@ export function DataNotice({ sample }: { sample: boolean }) {
             other compensation.
           </p>
           <p>
-            Cancelled includes trains that did not reach the destination.
-            RailScore works that out from the recorded times. It is not an
-            official cancellation figure.
+            Cancelled includes trains that did not stop at the station you
+            board, and trains that did not reach the destination. RailScore
+            works that out from the recorded times. It is not an official
+            cancellation figure.
           </p>
           <p>
             Historical performance data: Rail Delivery Group. Station names:
