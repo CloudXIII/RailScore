@@ -71,7 +71,7 @@ export async function postHsp(
     const failed = typeof status !== "number" || status >= 300;
     if (logHspCalls() || (attempts > 0 && failed)) {
       const detail = timing.errorDetail
-        ? ` error=${timing.errorDetail.split(connection.apiKey).join("[redacted]")}`
+        ? ` error=${redactSecret(timing.errorDetail, connection.apiKey)}`
         : "";
       console.info(
         `[hsp] ${path} status=${status} attempts=${attempts} waitMs=${timing.waitMs} fetchMs=${timing.fetchMs} totalMs=${Date.now() - timing.started}${detail}`,
@@ -167,7 +167,7 @@ async function sendHsp(
   }
 }
 
-function hspAuth(): { baseUrl: string; headers: Headers } {
+function hspAuth(): { baseUrl: string; headers: Headers; apiKey: string } {
   let connection: ReturnType<typeof hspConnection>;
   try {
     connection = hspConnection();
@@ -182,5 +182,12 @@ function hspAuth(): { baseUrl: string; headers: Headers } {
     Accept: "application/json",
   });
   headers.set(connection.apiKeyHeader, connection.apiKey);
-  return { baseUrl: connection.baseUrl, headers };
+  return { baseUrl: connection.baseUrl, headers, apiKey: connection.apiKey };
+}
+
+function redactSecret(text: string, secret: string): string {
+  if (!secret) {
+    return text;
+  }
+  return text.split(secret).join("[redacted]");
 }
