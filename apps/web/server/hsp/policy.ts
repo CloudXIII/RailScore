@@ -81,8 +81,11 @@ export function takeToken(
 export const LIST_SLOT_COUNT = 2;
 /** List calls that start together all draw 503s. Staggered by this much, two both run. */
 export const LIST_START_GAP_MS = 1_500;
-/** Longer than one list call, so a holder that stopped frees its slot. */
-export const LIST_SLOT_LEASE_MS = 60_000;
+/**
+ * A holder that stopped frees its slot. Short enough that a stuck claim does not
+ * block the next search for a minute, and renewed while a live call is still running.
+ */
+export const LIST_SLOT_LEASE_MS = 35_000;
 
 export type ListSlot = {
   owner?: string;

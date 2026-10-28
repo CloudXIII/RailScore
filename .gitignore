@@ -19,3 +19,7 @@ Thumbs.db
 skills-lock.json
 .neon
 .data/
+
+# Local HSP benchmark and its results. Not part of the app.
+benchmark/
+apps/web/scripts/hsp-bench.mjs

@@ -3,12 +3,14 @@
 import {
   createContext,
   useContext,
+  useEffect,
   useLayoutEffect,
   useRef,
   useState,
   type ReactNode,
 } from "react";
 import { WaitingTrain } from "@/features/waiting-train";
+import { shouldReloadWaitingPage, WAITING_RELOAD_MS } from "@/features/wait-phase";
 import type { DayPattern } from "@/server/query";
 
 const ContentReadyContext = createContext<(() => void) | null>(null);
@@ -37,6 +39,17 @@ export function WaitGate({
   const [ready, setReady] = useState(false);
   const markReady = useRef(() => setReady(true)).current;
 
+  useEffect(() => {
+    if (ready) return;
+    const started = Date.now();
+    const timer = window.setTimeout(() => {
+      if (shouldReloadWaitingPage(false, Date.now() - started)) {
+        window.location.reload();
+      }
+    }, WAITING_RELOAD_MS);
+    return () => window.clearTimeout(timer);
+  }, [ready]);
+
   return (
     <ContentReadyContext.Provider value={markReady}>
       {ready ? null : (
@@ -60,5 +73,10 @@ export function ContentReady({ children }: { children: ReactNode }) {
   useLayoutEffect(() => {
     markReady?.();
   }, [markReady]);
-  return children;
+  return (
+    <>
+      <span data-results-ready="" hidden />
+      {children}
+    </>
+  );
 }

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { CIRCUIT_OPEN_MS, resetHspCircuit } from "./circuit";
 import { postHsp } from "./client";
 import { DailyLimitError, takeDailyCall } from "./daily-limit";
 import { HspResponseError } from "./map";
@@ -41,6 +42,7 @@ describe("postHsp", () => {
         process.env[name] = value;
       }
     }
+    resetHspCircuit();
     vi.unstubAllGlobals();
   });
 
@@ -55,9 +57,9 @@ describe("postHsp", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it("reports auth failure, a login redirect and HTTP 500 without retrying", async () => {
+  it("reports auth failure and a login redirect without retrying", async () => {
     useTestKey();
-    for (const status of [401, 302, 500]) {
+    for (const status of [401, 302]) {
       vi.mocked(fetch).mockClear();
       vi.mocked(fetch).mockResolvedValue(httpResponse(status, ""));
       await expect(postHsp("/serviceMetrics", {})).rejects.toMatchObject({
@@ -90,8 +92,8 @@ describe("postHsp", () => {
   it("stops after the paused retry is busy too", async () => {
     useTestKey();
     vi.useFakeTimers();
-    vi.mocked(fetch).mockResolvedValue(
-      httpResponse(503, "", { "retry-after": "0" }),
+    vi.mocked(fetch).mockImplementation(() =>
+      Promise.resolve(httpResponse(503, "", { "retry-after": "0" })),
     );
 
     const pending = postHsp("/serviceDetails", { rid: "1" });
@@ -111,6 +113,71 @@ describe("postHsp", () => {
       "The daily limit for this demo has been reached. Try again tomorrow.",
     );
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("tries a 500 once more and logs the status", async () => {
+    useTestKey();
+    vi.useFakeTimers();
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(httpResponse(500, "upstream"))
+      .mockResolvedValueOnce(httpResponse(200, JSON.stringify({ rid: "1" })));
+
+    const pending = postHsp("/serviceDetails", { rid: "1" });
+    await vi.advanceTimersByTimeAsync(1_000);
+    await expect(pending).resolves.toEqual({ rid: "1" });
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(info.mock.calls.some((call) => String(call[0]).includes("status=500"))).toBe(
+      true,
+    );
+    info.mockRestore();
+    vi.useRealTimers();
+  });
+
+  it("does not call HSP while the circuit is open", async () => {
+    useTestKey();
+    vi.mocked(fetch).mockImplementation(() =>
+      Promise.resolve(httpResponse(503, "down")),
+    );
+    await expect(
+      postHsp("/serviceMetrics", {}, { retryOverloaded: false }),
+    ).rejects.toMatchObject({ kind: "busy" });
+    await expect(
+      postHsp("/serviceMetrics", {}, { retryOverloaded: false }),
+    ).rejects.toMatchObject({ kind: "busy" });
+    await expect(
+      postHsp("/serviceMetrics", {}, { retryOverloaded: false }),
+    ).rejects.toMatchObject({ kind: "busy" });
+    expect(fetch).toHaveBeenCalledTimes(3);
+    vi.mocked(fetch).mockClear();
+    await expect(postHsp("/serviceMetrics", {})).rejects.toMatchObject({
+      kind: "busy",
+    });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("calls HSP again after the circuit has been open for 45 seconds", async () => {
+    useTestKey();
+    vi.useFakeTimers();
+    try {
+      vi.mocked(fetch).mockImplementation(() =>
+        Promise.resolve(httpResponse(503, "down")),
+      );
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        await expect(
+          postHsp("/serviceMetrics", {}, { retryOverloaded: false }),
+        ).rejects.toMatchObject({ kind: "busy" });
+      }
+      await vi.advanceTimersByTimeAsync(CIRCUIT_OPEN_MS);
+      vi.mocked(fetch).mockReset();
+      vi.mocked(fetch).mockResolvedValue(
+        httpResponse(200, JSON.stringify({ ok: true })),
+      );
+      await expect(postHsp("/serviceMetrics", {})).resolves.toEqual({ ok: true });
+      expect(fetch).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("rejects a 200 that is not JSON", async () => {

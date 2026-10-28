@@ -1,9 +1,13 @@
+import vm from "node:vm";
 import { describe, expect, it } from "vitest";
 import {
   calculationPhase,
   progressMoment,
   retryDelaySeconds,
   searchPhase,
+  shouldReloadWaitingPage,
+  WAITING_RELOAD_MS,
+  waitingReloadScript,
   SLOW_SOURCE_MESSAGE,
 } from "./wait-phase";
 
@@ -74,6 +78,79 @@ describe("progressMoment", () => {
     });
   });
 });
+
+describe("shouldReloadWaitingPage", () => {
+  it("reloads the same search once a minute has passed with no list", () => {
+    expect(shouldReloadWaitingPage(false, WAITING_RELOAD_MS - 1)).toBe(false);
+    expect(shouldReloadWaitingPage(false, WAITING_RELOAD_MS)).toBe(true);
+  });
+
+  it("does not reload once the list is on the page", () => {
+    expect(shouldReloadWaitingPage(true, WAITING_RELOAD_MS + 5_000)).toBe(false);
+  });
+
+  it("arms the same minute from the first HTML, only for a search still waiting", () => {
+    expect(waitingReloadScript).toContain(String(WAITING_RELOAD_MS));
+    expect(waitingReloadScript).toContain('p.get("from")');
+    expect(waitingReloadScript).toContain('p.get("to")');
+    expect(waitingReloadScript).toContain("[data-results-ready]");
+    expect(waitingReloadScript).toContain("location.reload()");
+  });
+
+  it("reloads a search that is still waiting and leaves the home page and a finished result alone", () => {
+    const home = armReload("");
+    expect(home.timers).toHaveLength(0);
+
+    const waiting = armReload("?from=PNZ&to=TRU");
+    expect(waiting.timers).toEqual([{ ms: WAITING_RELOAD_MS }]);
+    waiting.fire();
+    expect(waiting.reloaded()).toBe(true);
+
+    const finished = armReload("?from=PNZ&to=TRU");
+    finished.markReady();
+    finished.fire();
+    expect(finished.reloaded()).toBe(false);
+  });
+});
+
+function armReload(search: string): {
+  timers: { ms: number }[];
+  fire: () => void;
+  markReady: () => void;
+  reloaded: () => boolean;
+} {
+  const timers: { fn: () => void; ms: number }[] = [];
+  let reloaded = false;
+  let ready = false;
+  vm.runInNewContext(waitingReloadScript, {
+    URLSearchParams,
+    location: {
+      search,
+      reload() {
+        reloaded = true;
+      },
+    },
+    document: {
+      querySelector(selector: string) {
+        return ready && selector === "[data-results-ready]" ? { selector } : null;
+      },
+    },
+    setTimeout(fn: () => void, ms: number) {
+      timers.push({ fn, ms });
+      return timers.length;
+    },
+  });
+  return {
+    timers: timers.map(({ ms }) => ({ ms })),
+    fire() {
+      timers[0]?.fn();
+    },
+    markReady() {
+      ready = true;
+    },
+    reloaded: () => reloaded,
+  };
+}
 
 describe("retryDelaySeconds", () => {
   it("grows with each try and levels off", () => {

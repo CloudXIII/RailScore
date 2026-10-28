@@ -88,10 +88,13 @@ describe("findServices", () => {
   });
 
   it("halves a call that timed out and carries on", async () => {
+    let clock = Date.parse("2026-10-08T12:00:00Z");
+    vi.spyOn(Date, "now").mockImplementation(() => clock);
     vi.mocked(postHsp).mockImplementation(async (_path, raw) => {
       const body = raw as HspBody;
       if (body.from_time === "0730" && body.to_time === "0809") {
-        throw new HspRequestError("busy");
+        clock += 25_000;
+        throw new HspRequestError("busy", undefined, 504);
       }
       return {
         Services:
@@ -113,6 +116,35 @@ describe("findServices", () => {
     expect(found.services.map((service) => service.publicDeparture)).toEqual([
       "0750",
     ]);
+    vi.mocked(Date.now).mockRestore();
+  });
+
+  it("retries a wide window after a fast 503 instead of splitting it", async () => {
+    vi.useFakeTimers();
+    try {
+      let refused = false;
+      vi.mocked(postHsp).mockImplementation(async (_path, raw) => {
+        const body = raw as HspBody;
+        if (body.from_time === "0730" && body.to_time === "0809" && !refused) {
+          refused = true;
+          throw new HspRequestError("busy", undefined, 503);
+        }
+        return { Services: [] };
+      });
+
+      const pending = findServices(search("0710", "weekdays"));
+      await vi.runAllTimersAsync();
+      await pending;
+
+      expect(windows()).toEqual([
+        "0710-0714",
+        "0715-0729",
+        "0730-0809",
+        "0730-0809",
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("carries on one call at a time when HSP refuses a second alongside the first", async () => {

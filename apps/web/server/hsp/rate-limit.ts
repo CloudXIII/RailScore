@@ -1,6 +1,6 @@
 import "server-only";
 import { hspMaxRequestsPerSecond } from "../env";
-import { database } from "../db";
+import { database, databaseBudgetMs, isDatabaseTimeout } from "../db";
 import { errorText } from "../error-text";
 import { takeToken, type TokenBucket } from "./policy";
 
@@ -19,7 +19,7 @@ let memoryBucket: TokenBucket | undefined;
 export async function waitForHspSlot(deadline: number): Promise<boolean> {
   const perSecond = hspMaxRequestsPerSecond();
   for (;;) {
-    if (await tryTake(perSecond)) {
+    if (await tryTake(perSecond, deadline)) {
       return true;
     }
     const wait = (1000 / perSecond) * (0.5 + Math.random());
@@ -30,20 +30,26 @@ export async function waitForHspSlot(deadline: number): Promise<boolean> {
   }
 }
 
-async function tryTake(perSecond: number): Promise<boolean> {
+async function tryTake(perSecond: number, deadline: number): Promise<boolean> {
   const sql = database();
   if (sql) {
+    const budgetMs = databaseBudgetMs(deadline);
     try {
-      const rows = await sql`
-        update hsp_rate_limit
-        set tokens = least(${perSecond}::float8, tokens + extract(epoch from clock_timestamp() - updated_at)::float8 * ${perSecond}::float8) - 1,
-            updated_at = clock_timestamp()
-        where id = 1
-          and least(${perSecond}::float8, tokens + extract(epoch from clock_timestamp() - updated_at)::float8 * ${perSecond}::float8) >= 1::float8
-        returning id
-      `;
+      const rows = await sql.begin(async (tx) => {
+        await tx.unsafe(`set local lock_timeout = '${budgetMs}ms'`);
+        await tx.unsafe(`set local statement_timeout = '${budgetMs}ms'`);
+        return await tx`
+          update hsp_rate_limit
+          set tokens = least(${perSecond}::float8, tokens + extract(epoch from clock_timestamp() - updated_at)::float8 * ${perSecond}::float8) - 1,
+              updated_at = clock_timestamp()
+          where id = 1
+            and least(${perSecond}::float8, tokens + extract(epoch from clock_timestamp() - updated_at)::float8 * ${perSecond}::float8) >= 1::float8
+          returning id
+        `;
+      });
       return rows.length > 0;
     } catch (error) {
+      if (isDatabaseTimeout(error)) return false;
       console.error(
         "HSP rate limit table unavailable, using the in-process limit",
         errorText(error),

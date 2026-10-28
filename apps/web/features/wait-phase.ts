@@ -74,6 +74,27 @@ export function progressMoment(
   return { saved, at: now };
 }
 
+/** If the list has not arrived by now, reload the same URL. */
+export const WAITING_RELOAD_MS = 60_000;
+
+/**
+ * Runs from the first HTML, before React. A search that never paints its result
+ * reloads the same URL. A finished result, including a busy message, sets
+ * `[data-results-ready]` and stays put.
+ */
+export const waitingReloadScript = [
+  "(function(){try{",
+  "var p=new URLSearchParams(location.search);",
+  'if(!p.get("from")||!p.get("to"))return;',
+  `setTimeout(function(){if(document.querySelector("[data-results-ready]"))return;location.reload()},${WAITING_RELOAD_MS})`,
+  "}catch(e){}})();",
+].join("");
+
+/** True when the waiting page should reload because the list still has not arrived. */
+export function shouldReloadWaitingPage(ready: boolean, elapsedMs: number): boolean {
+  return !ready && elapsedMs >= WAITING_RELOAD_MS;
+}
+
 /** Seconds before the next automatic try after a busy source. Grows, then levels off. */
 export function retryDelaySeconds(attempt: number): number {
   return Math.min(10 + 5 * Math.max(0, attempt - 1), 30);

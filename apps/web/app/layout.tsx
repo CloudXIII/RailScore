@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import { themeBootstrapScript } from "@/features/theme-bootstrap";
+import { waitingReloadScript } from "@/features/wait-phase";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -25,6 +26,7 @@ export default function RootLayout({
     <html lang="en-GB" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeBootstrapScript }} />
+        <script dangerouslySetInnerHTML={{ __html: waitingReloadScript }} />
       </head>
       <body>
         {children}

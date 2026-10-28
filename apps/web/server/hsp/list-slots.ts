@@ -1,6 +1,6 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
-import { database } from "../db";
+import { database, databaseBudgetMs, isDatabaseTimeout } from "../db";
 import { errorText } from "../error-text";
 import { HspRequestError } from "./client";
 import {
@@ -26,6 +26,8 @@ type Held = { readonly shared: boolean; readonly index: number };
  * by every server instance; without one they only cover this process.
  * Throws "busy" when no slot is free before `deadline`.
  */
+const LEASE_RENEW_MS = 15_000;
+
 export async function withListSlot<T>(
   deadline: number,
   run: () => Promise<T>,
@@ -35,9 +37,15 @@ export async function withListSlot<T>(
   if (!held) {
     throw new HspRequestError("busy");
   }
+  const renew = held.shared
+    ? setInterval(() => {
+        void renewLease(held, owner);
+      }, LEASE_RENEW_MS)
+    : undefined;
   try {
     return await run();
   } finally {
+    if (renew) clearInterval(renew);
     await release(held, owner);
   }
 }
@@ -46,25 +54,28 @@ async function waitForSlot(
   owner: string,
   deadline: number,
 ): Promise<Held | undefined> {
-  for (;;) {
-    const held = await tryTake(owner);
-    if (held) {
-      return held;
-    }
-    const wait = 250 + Math.random() * 250;
-    if (Date.now() + wait > deadline) {
-      return undefined;
-    }
-    await new Promise((resolve) => setTimeout(resolve, wait));
-  }
+  const first = await tryTake(owner, deadline);
+  if (first !== "gap") return first;
+  const wait = Math.min(LIST_START_GAP_MS, deadline - Date.now());
+  if (wait <= 0) return undefined;
+  await new Promise((resolve) => setTimeout(resolve, wait));
+  const second = await tryTake(owner, deadline);
+  return second === "gap" ? undefined : second;
 }
 
-async function tryTake(owner: string): Promise<Held | undefined> {
+async function tryTake(
+  owner: string,
+  deadline: number,
+): Promise<Held | "gap" | undefined> {
   const sql = database();
   if (sql && !databaseSlotsUnavailable) {
+    const budgetMs = databaseBudgetMs(deadline);
     try {
-      // Every slot row is locked, so two instances cannot both see the gap as clear.
+      // SKIP LOCKED: a row another request is claiming is not a queue. If every
+      // slot is already taken, this returns at once instead of waiting.
       const slot = await sql.begin(async (tx) => {
+        await tx.unsafe(`set local lock_timeout = '${budgetMs}ms'`);
+        await tx.unsafe(`set local statement_timeout = '${budgetMs}ms'`);
         const rows = await tx<
           { slot: number; free: boolean; recent: boolean }[]
         >`
@@ -74,15 +85,22 @@ async function tryTake(owner: string): Promise<Held | undefined> {
           from hsp_list_slots
           where slot <= ${LIST_SLOT_COUNT}
           order by slot
-          for update
+          for update skip locked
         `;
-        if (rows.length === 0) {
-          throw new Error("hsp_list_slots has no rows");
+        if (rows.length < LIST_SLOT_COUNT) {
+          const [present] = await tx<{ count: number }[]>`
+            select count(*)::int as count
+            from hsp_list_slots
+            where slot <= ${LIST_SLOT_COUNT}
+          `;
+          if (!present || present.count === 0) {
+            throw new Error("hsp_list_slots has no rows");
+          }
+          if (rows.length === 0) return undefined;
         }
         const free = rows.find((row) => row.free);
-        if (!free || rows.some((row) => row.recent)) {
-          return undefined;
-        }
+        if (!free) return undefined;
+        if (rows.some((row) => row.recent)) return "gap";
         await tx`
           update hsp_list_slots
           set owner = ${owner},
@@ -92,8 +110,10 @@ async function tryTake(owner: string): Promise<Held | undefined> {
         `;
         return free.slot;
       });
+      if (slot === "gap") return "gap";
       return slot === undefined ? undefined : { shared: true, index: slot };
     } catch (error) {
+      if (isDatabaseTimeout(error)) throw new HspRequestError("busy");
       databaseSlotsUnavailable = true;
       console.error(
         "HSP list slots unavailable, using the in-process limit",
@@ -101,14 +121,32 @@ async function tryTake(owner: string): Promise<Held | undefined> {
       );
     }
   }
+  const now = Date.now();
+  if (memorySlots.some((slot) => now - slot.startedAt < LIST_START_GAP_MS)) {
+    return "gap";
+  }
   const index = takeListSlot(
     memorySlots,
     owner,
-    Date.now(),
+    now,
     LIST_START_GAP_MS,
     LIST_SLOT_LEASE_MS,
   );
   return index === undefined ? undefined : { shared: false, index };
+}
+
+async function renewLease(held: Held, owner: string): Promise<void> {
+  const sql = database();
+  if (!sql) return;
+  try {
+    await sql`
+      update hsp_list_slots
+      set leased_until = clock_timestamp() + ${LIST_SLOT_LEASE_MS}::int * interval '1 millisecond'
+      where slot = ${held.index} and owner = ${owner}
+    `;
+  } catch (error) {
+    console.error("An HSP list slot could not be renewed", errorText(error));
+  }
 }
 
 async function release(held: Held, owner: string): Promise<void> {

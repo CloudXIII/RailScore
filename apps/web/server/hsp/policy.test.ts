@@ -4,6 +4,7 @@ import {
   isRetryableStatus,
   isStoredRunReusable,
   isUnreadablePlaceholderReusable,
+  LIST_SLOT_LEASE_MS,
   listBusyRetryMs,
   releaseListSlot,
   retryDelayMs,
@@ -12,6 +13,13 @@ import {
   type ListSlot,
   type TokenBucket,
 } from "./policy";
+
+describe("LIST_SLOT_LEASE_MS", () => {
+  it("frees a stopped holder in 30 to 40 seconds", () => {
+    expect(LIST_SLOT_LEASE_MS).toBeGreaterThanOrEqual(30_000);
+    expect(LIST_SLOT_LEASE_MS).toBeLessThanOrEqual(40_000);
+  });
+});
 
 describe("isRetryableStatus", () => {
   it("retries rate limits and gateway failures only", () => {

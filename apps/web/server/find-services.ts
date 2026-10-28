@@ -44,15 +44,25 @@ const REFRESH_BUDGET_MS = 130_000;
 
 /**
  * A quarter-hour on a busy route can take HSP over 40 s while another list call runs.
- * Its own gateway gives up at 55 s, so a list call may run past the usual 30 s request limit.
+ * Its own gateway gives up at 55 s (measured 504 at 55.1 s). Successes were still
+ * arriving at 53 s, so the client waits long enough to keep those and no longer.
  */
-const LIST_CALL_TIMEOUT_MS = 45_000;
+const LIST_CALL_TIMEOUT_MS = 54_000;
 
 /**
  * Time one HSP call is sized to take, judged from the calls already made in this
- * search. Well under the 30 s request limit, because density varies across the window.
+ * search. A busy hour measured p99 about twice its p50 and touched the 55 s
+ * gateway cutoff, so the target leaves room for that tail.
+ * A quiet hour is about 7 s whatever the day count, and still fits in one call.
  */
-const TARGET_CALL_MS = 20_000;
+const TARGET_CALL_MS = 12_000;
+
+/**
+ * A list failure this slow, or a 504, means the window was too wide for the gateway.
+ * A 503 that comes back in a few hundred milliseconds is the gateway refusing, not a
+ * window that needs splitting.
+ */
+const SLOW_LIST_FAILURE_MS = 20_000;
 
 /** Calls one search keeps in flight. The list slots cap the total across searches. */
 const LIST_WORKERS = 2;
@@ -263,6 +273,7 @@ async function fetchLists(
   let inFlight = 0;
   let running = 0;
   let refusedAlongside = false;
+  let busyStrikes = 0;
   const callsBefore = tally.calls;
 
   const worker = async () => {
@@ -306,7 +317,12 @@ async function fetchLists(
           }
           continue;
         }
-        if (busy && chunk.length > 1) {
+        const elapsedMs = Date.now() - callStarted;
+        const tooWide =
+          busy &&
+          error instanceof HspRequestError &&
+          (error.status === 504 || elapsedMs >= SLOW_LIST_FAILURE_MS);
+        if (tooWide && chunk.length > 1) {
           // At least halve the next call, so a call that was sized too large
           // shrinks to single slices instead of failing again.
           pace.msPerMinute = Math.max(
@@ -319,9 +335,15 @@ async function fetchLists(
           continue;
         }
         if (busy) {
-          // Refused on its own. Wait a few seconds and ask again, so one busy
-          // moment does not hand the page back for a reload.
-          const pause = listBusyRetryMs();
+          // Refused on its own. A single nginx 503 comes back in under a tenth
+          // of a second and the next call usually works, so the first pause
+          // stays short. A run of them backs off, otherwise the retries are
+          // faster than a healthy call and keep the gateway in that state.
+          const pause = Math.min(
+            15_000,
+            listBusyRetryMs() * 2 ** Math.min(busyStrikes, 3),
+          );
+          busyStrikes += 1;
           if (Date.now() + pause >= stopCallsAt) {
             failure = error;
             return;
@@ -338,6 +360,7 @@ async function fetchLists(
       }
       pace.msPerMinute = (Date.now() - callStarted) / minutes;
       tally.calls += 1;
+      busyStrikes = 0;
 
       const bySlice = splitBySlice(
         services,
