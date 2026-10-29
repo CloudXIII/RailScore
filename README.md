@@ -121,7 +121,7 @@ On a host whose filesystem is read-only, the station file under `apps/web/.data/
 
 With more than one instance, memory is not shared. Postgres is what shares stored runs, stored service lists, the HSP rate limit, the list call slots, the calculation lock, and the daily call count.
 
-A calculation stops calling HSP after about 50 seconds and the page reloads the same URL to continue. The host must allow a request of at least about 60 seconds. The home route also sets Next.js `maxDuration` to 180 seconds. Hosts that do not read that Next.js option use their own request limit instead.
+A calculation calls HSP for one slice of about 10 seconds, then the page shows how many journeys are checked and reloads the same URL to continue. The host must allow a request of at least about 60 seconds, because finding the train list can take longer than that slice. The home route also sets Next.js `maxDuration` to 180 seconds. Hosts that do not read that Next.js option use their own request limit instead.
 
 ## Layout
 
@@ -135,7 +135,7 @@ apps/web/db/schema.sql tables for runs, service lists, the rate limit, the list 
 apps/web/scripts/      database migrate
 ```
 
-The home route sets `maxDuration` to 180 seconds. A service list starts no HSP call after 120 seconds; the page then reloads and carries on from the quarter-hours already stored. A refresh after the response starts no call after 130 seconds from the search's start. One calculation chunk stops after 10 seconds. The page repeats that work until about 50 seconds, then reloads the same URL. While it runs, the browser polls `/api/reliability-progress` every 1.2 seconds. That progress map lives on the server instance doing the work.
+The home route sets `maxDuration` to 180 seconds. A service list starts no HSP call after 120 seconds; the page then reloads and carries on from the quarter-hours already stored. A refresh after the response starts no call after 130 seconds from the search's start. One calculation chunk stops after 10 seconds. The page then shows how many journeys are checked and reloads the same URL to fetch the next slice. While a slice runs, the browser polls `/api/reliability-progress` every 1.2 seconds. That progress map lives on the server instance doing the work.
 
 Stored HSP details are one Postgres row per run id. Service lists are stored per quarter-hour, day type and period length, in Postgres and in this process (up to 5000 lists). Each list covers the whole period, because HSP takes as long for 7 days as for 90. A list up to 7 days behind the period is shown at once, and fetched again after the response is sent. A list older than that is fetched before the page shows. Station names are cached in memory, and in `apps/web/.data/stations.json` when the process can write that file, for up to 24 hours. Only name and CRS are kept.
 

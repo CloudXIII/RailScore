@@ -291,33 +291,23 @@ function Intro() {
   );
 }
 
-/** Keep calculating until the result is ready. The loading line stays up for the whole wait. */
+/**
+ * One slice, then the page. A slice that is still working renders the same
+ * progress screen as a slow single-call run, and that screen reloads to continue.
+ * Staying in this request until every run is stored would hide that screen.
+ */
 async function finishCalculation(
   service: NonNullable<ReturnType<typeof findSelectedService>>,
   boardingCrs: string,
   destinationCrs: string,
   progressKey: string | undefined,
 ) {
-  const stopAt = Date.now() + 50_000;
-  let calculation = await calculateService({
+  return calculateService({
     service,
     boardingCrs,
     destinationCrs,
     progressKey,
   });
-  while (calculation.status === "working" && Date.now() < stopAt) {
-    const began = Date.now();
-    calculation = await calculateService({
-      service,
-      boardingCrs,
-      destinationCrs,
-      progressKey,
-    });
-    if (calculation.status === "working" && Date.now() - began < 1_000) {
-      await new Promise((resolve) => setTimeout(resolve, 1_000));
-    }
-  }
-  return calculation;
 }
 
 function panelKey(query: ParsedQuery): string {
