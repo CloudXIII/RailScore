@@ -5,7 +5,7 @@ import {
   type HistoricalRun,
   type ReliabilityResult,
 } from "@railscore/core";
-import { logHspCalls, usesMockData } from "./env";
+import { hspDetailConcurrency, logHspCalls, usesMockData } from "./env";
 import { reliabilityByDayType, type DayTypeResult } from "./day-split";
 import {
   noteCalculationProgress,
@@ -238,7 +238,7 @@ function resolvedCount(
   return rids.filter((rid) => stored.has(rid)).length;
 }
 
-/** Two detail calls in flight draw 503s. One at a time stays clear of that. */
+/** Detail calls in flight. The default is one: two at once draw 503s from HSP. */
 async function fetchChunk(
   rids: readonly string[],
   stations: { boardingCrs: string; destinationCrs: string },
@@ -247,35 +247,45 @@ async function fetchChunk(
 ): Promise<{ saved: number; failure?: unknown }> {
   let saved = 0;
   let failure: unknown;
-  for (const rid of rids) {
-    if (Date.now() >= deadline) {
-      break;
-    }
-    try {
-      const payload = await postHsp("/serviceDetails", { rid }, { deadline });
+  let next = 0;
+  const width = Math.min(hspDetailConcurrency(), rids.length);
+
+  const worker = async () => {
+    while (failure === undefined && Date.now() < deadline) {
+      const index = next;
+      next += 1;
+      if (index >= rids.length) {
+        return;
+      }
+      const rid = rids[index] as string;
       try {
-        toHistoricalRun(payload, stations, rid);
-      } catch (error) {
-        if (!(error instanceof HspResponseError)) {
-          throw error;
+        const payload = await postHsp("/serviceDetails", { rid }, { deadline });
+        try {
+          toHistoricalRun(payload, stations, rid);
+        } catch (error) {
+          if (!(error instanceof HspResponseError)) {
+            throw error;
+          }
+          onSaved(rid, await saveUnreadable(rid));
+          saved += 1;
+          continue;
         }
-        onSaved(rid, await saveUnreadable(rid));
+        await saveRun(rid, payload);
         saved += 1;
-        continue;
+        onSaved(rid, payload);
+      } catch (error) {
+        if (error instanceof HspResponseError) {
+          onSaved(rid, await saveUnreadable(rid));
+          saved += 1;
+          continue;
+        }
+        failure ??= error;
+        return;
       }
-      await saveRun(rid, payload);
-      saved += 1;
-      onSaved(rid, payload);
-    } catch (error) {
-      if (error instanceof HspResponseError) {
-        onSaved(rid, await saveUnreadable(rid));
-        saved += 1;
-        continue;
-      }
-      failure = error;
-      break;
     }
-  }
+  };
+
+  await Promise.all(Array.from({ length: width }, () => worker()));
   return failure === undefined ? { saved } : { saved, failure };
 }
 

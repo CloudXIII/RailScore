@@ -28,7 +28,8 @@ create table if not exists hsp_rate_limit (
 insert into hsp_rate_limit (id, tokens) values (1, 0) on conflict (id) do nothing;
 
 -- serviceMetrics calls in flight, one row per slot, shared by every server instance.
--- Two list calls run side by side; a third, or two that start together, draw 503s.
+-- The app uses the first HSP_LIST_SLOT_COUNT rows (default 2). The insert covers the
+-- highest list-worker count, 12, so two searches share that many calls in flight.
 create table if not exists hsp_list_slots (
   slot smallint primary key,
   owner text,
@@ -36,7 +37,9 @@ create table if not exists hsp_list_slots (
   leased_until timestamptz not null default 'epoch'
 );
 
-insert into hsp_list_slots (slot) values (1), (2) on conflict (slot) do nothing;
+insert into hsp_list_slots (slot)
+select generate_series(1, 12)
+on conflict (slot) do nothing;
 
 -- HSP calls counted for one London calendar day. The row stops growing at the daily limit.
 create table if not exists hsp_daily_calls (

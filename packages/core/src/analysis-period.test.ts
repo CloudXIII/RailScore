@@ -45,18 +45,18 @@ describe("departureWindows", () => {
 });
 
 describe("departureSlices", () => {
-  it("cuts a window that starts on the quarter into four quarter-hours", () => {
+  it("cuts a window that starts on a five-minute mark into twelve blocks", () => {
     const slices = departureSlices("0830");
-    expect(slices).toHaveLength(4);
-    expect(slices[0]).toEqual({ fromTime: "0830", toTime: "0844" });
-    expect(slices.at(-1)).toEqual({ fromTime: "0915", toTime: "0929" });
+    expect(slices).toHaveLength(12);
+    expect(slices[0]).toEqual({ fromTime: "0830", toTime: "0834" });
+    expect(slices.at(-1)).toEqual({ fromTime: "0925", toTime: "0929" });
   });
 
-  it("cuts at clock quarter-hours, so other start minutes share slices", () => {
+  it("cuts every five minutes, so other start minutes share slices", () => {
     const slices = departureSlices("0710");
     expect(slices[0]).toEqual({ fromTime: "0710", toTime: "0714" });
-    expect(slices[1]).toEqual({ fromTime: "0715", toTime: "0729" });
-    expect(slices.at(-1)).toEqual({ fromTime: "0800", toTime: "0809" });
+    expect(slices[1]).toEqual({ fromTime: "0715", toTime: "0719" });
+    expect(slices.at(-1)).toEqual({ fromTime: "0805", toTime: "0809" });
   });
 
   it("covers the same minutes as the departure windows", () => {
@@ -77,8 +77,8 @@ describe("departureSlices", () => {
 
   it("splits at midnight without a slice that wraps", () => {
     const slices = departureSlices("2330");
-    expect(slices[1]).toEqual({ fromTime: "2345", toTime: "2359" });
-    expect(slices[2]).toEqual({ fromTime: "0000", toTime: "0014" });
+    expect(slices[1]).toEqual({ fromTime: "2335", toTime: "2339" });
+    expect(slices[6]).toEqual({ fromTime: "0000", toTime: "0004" });
     expect(slices.every((slice) => slice.fromTime <= slice.toTime)).toBe(true);
   });
 });

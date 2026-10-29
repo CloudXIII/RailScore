@@ -201,8 +201,11 @@ function ServiceRow({
         {formatServiceFacts(service.rids.length, usualDays(service), searched)}
       </span>
       {through ? <span className="meta service-detail">{through}</span> : null}
-      {scheduleNotes(service).map((note) => (
-        <span key={note} className="meta service-detail included-time">
+      {scheduleNotes(service).map((note, index) => (
+        <span
+          key={`${index}:${note}`}
+          className="meta service-detail included-time"
+        >
           {note}
         </span>
       ))}

@@ -41,12 +41,81 @@ export function logHspCalls(): boolean {
 
 /** HSP requests per second. An unset or unusable value stays at 3. */
 export function hspMaxRequestsPerSecond(): number {
-  const raw = read("HSP_MAX_REQUESTS_PER_SECOND");
+  return positiveNumber("HSP_MAX_REQUESTS_PER_SECOND", 3);
+}
+
+/**
+ * List calls one search keeps in flight. An unset or unusable value stays at 2.
+ * The list slots still cap the total across every search.
+ */
+export function hspListWorkers(): number {
+  return positiveInteger("HSP_LIST_WORKERS", 2);
+}
+
+/**
+ * List calls in flight at once, across every server instance.
+ * An unset or unusable value stays at 2. The database needs a row per slot.
+ */
+export function hspListSlotCount(): number {
+  return positiveInteger("HSP_LIST_SLOT_COUNT", 2);
+}
+
+/**
+ * Minimum gap between list-call starts, in milliseconds.
+ * An unset or unusable value stays at 1500. Zero lets them start together.
+ */
+export function hspListStartGapMs(): number {
+  return nonNegativeInteger("HSP_LIST_START_GAP_MS", 1_500);
+}
+
+/**
+ * Detail calls one calculation keeps in flight.
+ * An unset or unusable value stays at 1.
+ */
+export function hspDetailConcurrency(): number {
+  return positiveInteger("HSP_DETAIL_CONCURRENCY", 1);
+}
+
+/**
+ * After HSP refuses a list call that ran beside another, this process keeps to one
+ * list call for this many milliseconds. Zero keeps the worker count. An unset or
+ * unusable value stays at 3 minutes.
+ */
+export function hspSerialAfterRefusalMs(): number {
+  return nonNegativeInteger("HSP_SERIAL_AFTER_REFUSAL_MS", 3 * 60 * 1000);
+}
+
+/** Connections in the Postgres pool. An unset or unusable value stays at 3. */
+export function databasePoolMax(): number {
+  return positiveInteger("DATABASE_POOL_MAX", 3);
+}
+
+function positiveNumber(name: string, fallback: number): number {
+  const value = numericEnv(name);
+  return value !== undefined && value > 0 ? value : fallback;
+}
+
+function positiveInteger(name: string, fallback: number): number {
+  const value = numericEnv(name);
+  return value !== undefined && Number.isInteger(value) && value > 0
+    ? value
+    : fallback;
+}
+
+function nonNegativeInteger(name: string, fallback: number): number {
+  const value = numericEnv(name);
+  return value !== undefined && Number.isInteger(value) && value >= 0
+    ? value
+    : fallback;
+}
+
+function numericEnv(name: string): number | undefined {
+  const raw = read(name);
   if (raw === undefined) {
-    return 3;
+    return undefined;
   }
   const value = Number(raw);
-  return Number.isFinite(value) && value > 0 ? value : 3;
+  return Number.isFinite(value) ? value : undefined;
 }
 
 /**

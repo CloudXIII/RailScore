@@ -26,6 +26,21 @@ let postHsp: typeof import("./hsp/client").postHsp;
 let HspRequestError: typeof import("./hsp/client").HspRequestError;
 let afterResponse: typeof import("./after-response").afterResponse;
 
+describe("listWorkersFor", () => {
+  it("uses four, eight, or twelve list workers from the days selected", async () => {
+    process.env.HSP_LIST_WORKERS = "32";
+    vi.resetModules();
+    const { listWorkersFor: workersFor } = await import("./find-services");
+    expect(workersFor({ days: "sunday" })).toBe(4);
+    expect(workersFor({ days: "saturday" })).toBe(8);
+    expect(workersFor({ days: "weekdays" })).toBe(12);
+    expect(workersFor({ days: "all" })).toBe(12);
+    process.env.HSP_LIST_WORKERS = "2";
+    expect(workersFor({ days: "weekdays" })).toBe(2);
+    delete process.env.HSP_LIST_WORKERS;
+  });
+});
+
 describe("findServices", () => {
   beforeEach(async () => {
     delete process.env.RAILSCORE_DATA;
@@ -59,15 +74,15 @@ describe("findServices", () => {
     }
   });
 
-  it("starts two quarter-hours at once, then asks for the rest of a quiet route's hour in one call", async () => {
+  it("starts two blocks at once, then asks for the rest of a quiet route's hour in one call", async () => {
     vi.mocked(postHsp).mockResolvedValue({ Services: [] });
 
     await findServices(search("0710", "weekdays"));
 
-    expect(windows()).toEqual(["0710-0714", "0715-0729", "0730-0809"]);
+    expect(windows()).toEqual(["0710-0714", "0715-0719", "0720-0809"]);
   });
 
-  it("keeps a busy route to one quarter-hour per call", async () => {
+  it("keeps a busy route to short blocks", async () => {
     let clock = Date.parse("2026-10-08T12:00:00Z");
     vi.spyOn(Date, "now").mockImplementation(() => clock);
     vi.mocked(postHsp).mockImplementation(async (_path, raw) => {
@@ -80,9 +95,11 @@ describe("findServices", () => {
 
     expect(windows().sort()).toEqual([
       "0710-0714",
-      "0715-0729",
-      "0730-0744",
-      "0745-0759",
+      "0715-0719",
+      "0720-0729",
+      "0730-0739",
+      "0740-0749",
+      "0750-0759",
       "0800-0809",
     ]);
   });
@@ -92,7 +109,7 @@ describe("findServices", () => {
     vi.spyOn(Date, "now").mockImplementation(() => clock);
     vi.mocked(postHsp).mockImplementation(async (_path, raw) => {
       const body = raw as HspBody;
-      if (body.from_time === "0730" && body.to_time === "0809") {
+      if (body.from_time === "0720" && body.to_time === "0809") {
         clock += 25_000;
         throw new HspRequestError("busy", undefined, 504);
       }
@@ -108,10 +125,10 @@ describe("findServices", () => {
 
     expect(windows()).toEqual([
       "0710-0714",
-      "0715-0729",
-      "0730-0809",
-      "0730-0744",
-      "0745-0809",
+      "0715-0719",
+      "0720-0809",
+      "0720-0739",
+      "0740-0809",
     ]);
     expect(found.services.map((service) => service.publicDeparture)).toEqual([
       "0750",
@@ -125,7 +142,7 @@ describe("findServices", () => {
       let refused = false;
       vi.mocked(postHsp).mockImplementation(async (_path, raw) => {
         const body = raw as HspBody;
-        if (body.from_time === "0730" && body.to_time === "0809" && !refused) {
+        if (body.from_time === "0720" && body.to_time === "0809" && !refused) {
           refused = true;
           throw new HspRequestError("busy", undefined, 503);
         }
@@ -138,9 +155,9 @@ describe("findServices", () => {
 
       expect(windows()).toEqual([
         "0710-0714",
-        "0715-0729",
-        "0730-0809",
-        "0730-0809",
+        "0715-0719",
+        "0720-0809",
+        "0720-0809",
       ]);
     } finally {
       vi.useRealTimers();
@@ -161,7 +178,7 @@ describe("findServices", () => {
 
     await findServices(search("0710", "weekdays"));
 
-    expect(windows()).toEqual(["0710-0714", "0715-0729", "0715-0809"]);
+    expect(windows()).toEqual(["0710-0714", "0715-0719", "0715-0809"]);
 
     vi.mocked(postHsp).mockClear();
     await findServices(search("0810", "weekdays"));
@@ -185,7 +202,7 @@ describe("findServices", () => {
       await vi.runAllTimersAsync();
       await pending;
 
-      expect(windows().filter((window) => window === "0700-0714")).toHaveLength(
+      expect(windows().filter((window) => window === "0700-0704")).toHaveLength(
         2,
       );
     } finally {
@@ -209,17 +226,17 @@ describe("findServices", () => {
     vi.mocked(postHsp).mockResolvedValue({ Services: [] });
     await findServices(search("0710", "weekdays"));
 
-    expect(windows()).toEqual(["0710-0714", "0715-0729", "0730-0809"]);
+    expect(windows()).toEqual(["0710-0714", "0715-0719", "0720-0809"]);
   });
 
-  it("saves each quarter-hour of a joined call, so a search from another minute reuses it", async () => {
+  it("saves each block of a joined call, so a search from another minute reuses it", async () => {
     vi.mocked(postHsp).mockResolvedValue({ Services: [] });
 
     await findServices(search("0700", "weekdays"));
     vi.mocked(postHsp).mockClear();
     await findServices(search("0730", "weekdays"));
 
-    expect(windows()).toEqual(["0800-0814", "0815-0829"]);
+    expect(windows()).toEqual(["0800-0804", "0805-0809", "0810-0829"]);
   });
 
   it("keeps HSP's count on each listed train", async () => {
@@ -372,14 +389,14 @@ describe("findServices", () => {
       findServices(search("1500", "weekdays")),
     ).rejects.toBeInstanceOf(HspRequestError);
     const firstTry = bodies().map((body) => body.from_time);
-    expect(firstTry).toEqual(["1500", "1515", "1530"]);
+    expect(firstTry).toEqual(["1500", "1505", "1510"]);
 
     vi.mocked(postHsp).mockClear();
     vi.mocked(postHsp).mockResolvedValue({ Services: [] });
     vi.mocked(Date.now).mockRestore();
     await findServices(search("1500", "weekdays"));
 
-    expect(windows()).toEqual(["1545-1559"]);
+    expect(windows()).toEqual(["1515-1519", "1520-1524", "1525-1559"]);
   });
 });
 

@@ -2,12 +2,15 @@ import vm from "node:vm";
 import { describe, expect, it } from "vitest";
 import {
   calculationPhase,
+  claimWaitingReload,
+  clearWaitingReload,
   progressMoment,
   retryDelaySeconds,
   searchPhase,
   shouldReloadWaitingPage,
   WAITING_RELOAD_MS,
   waitingReloadScript,
+  waitingReloadStorageKey,
   SLOW_SOURCE_MESSAGE,
 } from "./wait-phase";
 
@@ -80,7 +83,7 @@ describe("progressMoment", () => {
 });
 
 describe("shouldReloadWaitingPage", () => {
-  it("reloads the same search once a minute has passed with no list", () => {
+  it("reloads a search that is still waiting after the search budget", () => {
     expect(shouldReloadWaitingPage(false, WAITING_RELOAD_MS - 1)).toBe(false);
     expect(shouldReloadWaitingPage(false, WAITING_RELOAD_MS)).toBe(true);
   });
@@ -89,7 +92,7 @@ describe("shouldReloadWaitingPage", () => {
     expect(shouldReloadWaitingPage(true, WAITING_RELOAD_MS + 5_000)).toBe(false);
   });
 
-  it("arms the same minute from the first HTML, only for a search still waiting", () => {
+  it("arms the wait from the first HTML, only for a search still waiting", () => {
     expect(waitingReloadScript).toContain(String(WAITING_RELOAD_MS));
     expect(waitingReloadScript).toContain('p.get("from")');
     expect(waitingReloadScript).toContain('p.get("to")');
@@ -106,6 +109,10 @@ describe("shouldReloadWaitingPage", () => {
     waiting.fire();
     expect(waiting.reloaded()).toBe(true);
 
+    const again = armReload("?from=PNZ&to=TRU", waiting.storage);
+    again.fire();
+    expect(again.reloaded()).toBe(false);
+
     const finished = armReload("?from=PNZ&to=TRU");
     finished.markReady();
     finished.fire();
@@ -113,22 +120,32 @@ describe("shouldReloadWaitingPage", () => {
   });
 });
 
-function armReload(search: string): {
+function armReload(
+  search: string,
+  storage: Map<string, string> = new Map(),
+): {
   timers: { ms: number }[];
   fire: () => void;
   markReady: () => void;
   reloaded: () => boolean;
+  storage: Map<string, string>;
 } {
   const timers: { fn: () => void; ms: number }[] = [];
   let reloaded = false;
   let ready = false;
   vm.runInNewContext(waitingReloadScript, {
     URLSearchParams,
+    Date,
     location: {
+      pathname: "/",
       search,
       reload() {
         reloaded = true;
       },
+    },
+    sessionStorage: {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => storage.set(key, value),
     },
     document: {
       querySelector(selector: string) {
@@ -142,6 +159,7 @@ function armReload(search: string): {
   });
   return {
     timers: timers.map(({ ms }) => ({ ms })),
+    storage,
     fire() {
       timers[0]?.fn();
     },
@@ -151,6 +169,35 @@ function armReload(search: string): {
     reloaded: () => reloaded,
   };
 }
+
+describe("claimWaitingReload", () => {
+  const pathname = "/";
+  const search = "?from=CLJ&to=WAT";
+
+  it("allows one reload and then stops until the mark is cleared", () => {
+    const storage = installStorage();
+    expect(claimWaitingReload(pathname, search, 1_000)).toBe(true);
+    expect(claimWaitingReload(pathname, search, 2_000)).toBe(false);
+    clearWaitingReload(pathname, search);
+    expect(claimWaitingReload(pathname, search, 3_000)).toBe(true);
+    expect(storage.get(waitingReloadStorageKey(pathname, search))).toContain(
+      '"count":1',
+    );
+  });
+
+  function installStorage(): Map<string, string> {
+    const values = new Map<string, string>();
+    Object.defineProperty(globalThis, "sessionStorage", {
+      configurable: true,
+      value: {
+        getItem: (key: string) => values.get(key) ?? null,
+        setItem: (key: string, value: string) => values.set(key, value),
+        removeItem: (key: string) => values.delete(key),
+      },
+    });
+    return values;
+  }
+});
 
 describe("retryDelaySeconds", () => {
   it("grows with each try and levels off", () => {

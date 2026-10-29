@@ -71,10 +71,39 @@ export function scheduleNotes(service: ScheduledService): string[] {
   );
   return [
     ...nearbyGroups(moved).map(differentDepartureNote),
-    ...notable
-      .filter((variant) => !moved.includes(variant))
-      .map(bookedArrivalNote),
+    ...mergeSameArrival(
+      notable.filter((variant) => !moved.includes(variant)),
+    ).map(bookedArrivalNote),
   ];
+}
+
+/**
+ * Arrival notes name the day and the arrival, not the departure. Two schedules
+ * a minute apart would otherwise print the same sentence twice.
+ */
+function mergeSameArrival(
+  variants: readonly ServiceVariant[],
+): ServiceVariant[] {
+  const merged: ServiceVariant[] = [];
+  for (const variant of variants) {
+    const days = dayLabelFor(variant);
+    const home = merged.find(
+      (existing) =>
+        existing.publicArrival === variant.publicArrival &&
+        dayLabelFor(existing) === days,
+    );
+    if (!home) {
+      merged.push({ ...variant, rids: [...variant.rids] });
+      continue;
+    }
+    const index = merged.indexOf(home);
+    merged[index] = {
+      ...home,
+      runCount: home.runCount + variant.runCount,
+      rids: [...home.rids, ...variant.rids],
+    };
+  }
+  return merged;
 }
 
 type TimeGroup = {

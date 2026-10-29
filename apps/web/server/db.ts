@@ -1,6 +1,6 @@
 import "server-only";
 import postgres, { type Sql } from "postgres";
-import { databaseUrl } from "./env";
+import { databasePoolMax, databaseUrl } from "./env";
 
 let client: Sql | undefined;
 
@@ -14,7 +14,7 @@ export function database(): Sql | undefined {
   // connect_timeout bounds how long a new connection may take. A full pool still
   // waits inside the query, which sets its own lock_timeout from the time left.
   client ??= postgres(url, {
-    max: 3,
+    max: databasePoolMax(),
     prepare: false,
     idle_timeout: 20,
     connect_timeout: 10,

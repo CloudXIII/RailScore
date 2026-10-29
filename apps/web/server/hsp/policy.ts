@@ -75,8 +75,9 @@ export function takeToken(
 }
 
 /**
- * List calls in flight at once, across every server instance. Two run side by side;
- * a third draws 503s, and each of the two slows as HSP shares its time.
+ * List calls in flight at once, across every server instance, when
+ * `HSP_LIST_SLOT_COUNT` is unset. Two run side by side; a third draws 503s,
+ * and each of the two slows as HSP shares its time.
  */
 export const LIST_SLOT_COUNT = 2;
 /** List calls that start together all draw 503s. Staggered by this much, two both run. */

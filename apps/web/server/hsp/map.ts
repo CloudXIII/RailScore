@@ -53,7 +53,7 @@ export type ServiceVariant = {
 /** Minutes either way a departure may differ and still be the same train. */
 export const SAME_TRAIN_MINUTES = 2;
 
-/** Minutes a journey may differ in length when matching a departure that runs on other days. */
+/** Minutes a journey may differ in length and still be the same train. */
 const SAME_JOURNEY_MINUTES = 15;
 
 /** Minutes either way a departure may differ when the two trains never share a day type. */
@@ -110,9 +110,9 @@ export function matchesServiceKey(
 
 /**
  * Pools identical schedules across day types, then folds near-identical ones into the
- * most-run schedule. Same operator, departure within two minutes, and no shared run date.
- * Then folds a train that runs on other day types only into the one train it replaces,
- * when the journey is about the same length.
+ * most-run schedule. Same operator, departure within two minutes, journey length within
+ * fifteen minutes, and no shared run date. Then folds a train that runs on other day
+ * types only into the one train it replaces, when the journey is about the same length.
  */
 export function mergeServices(
   groups: readonly ScheduledService[][],
@@ -345,7 +345,23 @@ function isSameTrain(
   ) {
     return false;
   }
+  if (!similarJourney(anchor, service)) {
+    return false;
+  }
   return ![...dates].some((date) => taken.has(date));
+}
+
+/** True when the public journeys differ by at most `SAME_JOURNEY_MINUTES`. */
+function similarJourney(
+  left: Pick<ScheduledService, "publicDeparture" | "publicArrival">,
+  right: Pick<ScheduledService, "publicDeparture" | "publicArrival">,
+): boolean {
+  return !(
+    Math.abs(
+      journeyMinutes(left.publicDeparture, left.publicArrival) -
+        journeyMinutes(right.publicDeparture, right.publicArrival),
+    ) > SAME_JOURNEY_MINUTES
+  );
 }
 
 /**
@@ -405,10 +421,7 @@ function isOtherDaysTrain(
   if (
     minutesApart(home.publicDeparture, service.publicDeparture) >
       OTHER_DAYS_TRAIN_MINUTES ||
-    Math.abs(
-      journeyMinutes(home.publicDeparture, home.publicArrival) -
-        journeyMinutes(service.publicDeparture, service.publicArrival),
-    ) > SAME_JOURNEY_MINUTES
+    !similarJourney(home, service)
   ) {
     return false;
   }

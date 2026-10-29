@@ -45,14 +45,15 @@ export function departureWindows(
 }
 
 /**
- * Clock quarter-hours HSP is asked for one at a time. On a busy route an hour
- * takes HSP longer than its own gateway allows, and a quarter-hour stays well under it.
+ * Five-minute blocks HSP is asked for. On a busy route a quarter-hour can take
+ * longer than the gateway allows, so a shorter block stays under that cutoff
+ * and several blocks run at once.
  */
-const SLICE_MINUTES = 15;
+const SLICE_MINUTES = 5;
 
 /**
- * `departureWindows` cut at each clock quarter-hour, so searches that start at
- * different minutes share the same slices. 07:10 is 0710–0714, 0715–0729, …, 0800–0809.
+ * `departureWindows` cut every five minutes, so searches that start at
+ * different minutes share the same slices. 07:10 is 0710–0714, 0715–0719, …, 0805–0809.
  */
 export function departureSlices(
   timeHhmm: string,

@@ -707,7 +707,7 @@ describe("mergeServices folding the same train", () => {
     ]);
   });
 
-  it("folds slower weekend schedules of one departure into the weekday train", () => {
+  it("folds weekend schedules of one departure when the journey stays about as long", () => {
     const weekday = train(
       "1052",
       "1640",
@@ -735,22 +735,26 @@ describe("mergeServices folding the same train", () => {
       }),
     ];
     const merged = mergeServices([[weekday], saturdays, sundays]);
-    expect(merged).toHaveLength(1);
-    expect(merged[0]?.publicArrival).toBe("1640");
-    expect(merged[0]?.days).toEqual(["weekdays", "saturday", "sunday"]);
-    expect(merged[0]?.variants).toHaveLength(5);
-    expect(merged[0]?.rids).toHaveLength(26);
+    const main = merged.find((service) => service.publicArrival === "1640");
+    const longer = merged.find((service) => service.publicArrival === "1656");
+    expect(main?.days).toEqual(["weekdays", "saturday", "sunday"]);
+    expect(main?.variants).toHaveLength(4);
+    expect(main?.rids).toHaveLength(25);
+    expect(longer?.rids).toHaveLength(1);
   });
 
-  it("folds the same departure even when one day arrived an hour later", () => {
+  it("keeps a same departure apart when the journey is an hour longer", () => {
     const usual = train("0814", "1027", rids("2026-09-14", 12), ["saturday"]);
     const retimed = train("0814", "1137", ["202610104100099"], ["saturday"]);
     const merged = mergeServices([[usual, retimed]]);
-    expect(merged).toHaveLength(1);
-    expect(merged[0]?.publicArrival).toBe("1027");
-    expect(
-      merged[0]?.variants?.map((variant) => variant.publicArrival),
-    ).toEqual(["1137"]);
+    expect(merged).toHaveLength(2);
+    expect(merged.map((service) => service.publicArrival)).toEqual([
+      "1027",
+      "1137",
+    ]);
+    expect(merged.every((service) => service.variants === undefined)).toBe(
+      true,
+    );
   });
 
   it("keeps a retimed run with its own departure rather than a nearby train", () => {
@@ -770,12 +774,17 @@ describe("mergeServices folding the same train", () => {
     const merged = mergeServices([[fast, retimed], [sunday]]);
     expect(merged.map((service) => service.publicDeparture)).toEqual([
       "0814",
+      "0814",
       "0820",
     ]);
+    expect(merged.map((service) => service.publicArrival)).toEqual([
+      "1027",
+      "1137",
+      "1110",
+    ]);
     expect(
-      merged[0]?.variants?.some((variant) => variant.publicArrival === "1137"),
+      merged.every((service) => (service.variants ?? []).length === 0),
     ).toBe(true);
-    expect(merged[1]?.variants ?? []).toEqual([]);
   });
 
   it("does not fold a much longer journey into a nearby departure on other days", () => {

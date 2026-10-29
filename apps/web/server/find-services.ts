@@ -2,7 +2,12 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { clockMinutes, departureSlices, trailingDays } from "@railscore/core";
 import { afterResponse } from "./after-response";
-import { logHspCalls, usesMockData } from "./env";
+import {
+  hspListWorkers,
+  hspSerialAfterRefusalMs,
+  logHspCalls,
+  usesMockData,
+} from "./env";
 import { acquireCalculation, releaseCalculation } from "./hsp/calculation-lock";
 import { HspRequestError, postHsp } from "./hsp/client";
 import { listedPeriod, listState, type StoredList } from "./hsp/list-cache";
@@ -64,15 +69,10 @@ const TARGET_CALL_MS = 12_000;
  */
 const SLOW_LIST_FAILURE_MS = 20_000;
 
-/** Calls one search keeps in flight. The list slots cap the total across searches. */
-const LIST_WORKERS = 2;
-
 /**
  * Some hours HSP takes a second list call alongside another, some hours it answers 503.
- * After a refusal this process makes one call at a time for this long.
+ * After a refusal this process makes one call at a time until `serialUntil`.
  */
-const SERIAL_AFTER_REFUSAL_MS = 3 * 60 * 1000;
-
 let serialUntil = 0;
 
 const memoryLists = new Map<string, StoredList>();
@@ -87,8 +87,19 @@ type Search = {
 
 type Slice = { fromTime: string; toTime: string };
 
-/** One quarter-hour slice of one day type. */
+/** One five-minute slice of one day type. */
 type Task = { day: DayType; slice: number };
+
+/**
+ * List calls kept in flight. Sunday is the light timetable, Saturday the middle,
+ * weekdays and all days the full one. `HSP_LIST_WORKERS` only caps this.
+ */
+export function listWorkersFor(input: { days: DayPattern }): number {
+  const cap = hspListWorkers();
+  const chosen =
+    input.days === "sunday" ? 4 : input.days === "saturday" ? 8 : 12;
+  return Math.min(cap, chosen);
+}
 
 /** Milliseconds HSP took per minute of departures in the last call. Undefined before the first. */
 type Pace = { msPerMinute?: number };
@@ -104,13 +115,13 @@ type ServiceSearch = {
 };
 
 /**
- * Each quarter-hour of each day type is one list, fetched for the whole period: HSP
+ * Each five-minute block of each day type is one list, fetched for the whole period: HSP
  * takes as long for 7 days as for 90, and its counts then describe that period.
  * A list that already covers the period is shown at once; if it was fetched hours ago
  * it is fetched again after the response, because HSP may still add recent runs. A list
  * that ends before the period (or is missing) is fetched before the page shows, so the
- * dates match what the passenger expects. Two calls run side by side, sized from how
- * long the calls before them took.
+ * dates match what the passenger expects. Calls run side by side up to the worker
+ * count, sized from how long the calls before them took.
  */
 export async function findServices(
   input: Search & {
@@ -253,7 +264,7 @@ function refreshLater(
 }
 
 /**
- * Fetches each task's list for the whole period, two calls at a time. Tasks of one
+ * Fetches each task's list for the whole period, several calls at a time. Tasks of one
  * day type that follow on in the clock are asked for in one call, as many as that
  * day's pace says fit in `TARGET_CALL_MS`. Every list is saved as soon as it arrives,
  * so a search that runs out of time carries on from there.
@@ -382,11 +393,15 @@ async function fetchLists(
     }
   };
 
-  const workers = Date.now() < serialUntil ? 1 : LIST_WORKERS;
+  const serialPauseMs = hspSerialAfterRefusalMs();
+  const workers =
+    serialPauseMs > 0 && Date.now() < serialUntil
+      ? 1
+      : listWorkersFor(input);
   await Promise.all(Array.from({ length: workers }, worker));
   // A refusal while HSP answered nothing else is HSP being busy, not a limit on two calls.
-  if (refusedAlongside && tally.calls > callsBefore) {
-    serialUntil = Date.now() + SERIAL_AFTER_REFUSAL_MS;
+  if (refusedAlongside && tally.calls > callsBefore && serialPauseMs > 0) {
+    serialUntil = Date.now() + serialPauseMs;
   }
   if (failure !== undefined) {
     throw failure;

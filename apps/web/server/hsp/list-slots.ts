@@ -1,21 +1,27 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
 import { database, databaseBudgetMs, isDatabaseTimeout } from "../db";
+import { hspListSlotCount, hspListStartGapMs } from "../env";
 import { errorText } from "../error-text";
 import { HspRequestError } from "./client";
 import {
-  LIST_SLOT_COUNT,
   LIST_SLOT_LEASE_MS,
-  LIST_START_GAP_MS,
   releaseListSlot,
   takeListSlot,
   type ListSlot,
 } from "./policy";
 
-const memorySlots: ListSlot[] = Array.from({ length: LIST_SLOT_COUNT }, () => ({
-  startedAt: 0,
-  leasedUntil: 0,
-}));
+const memorySlots: ListSlot[] = [];
+
+/** The in-process slots for the current count. Extra rows from a higher count are dropped. */
+function activeMemorySlots(): ListSlot[] {
+  const count = hspListSlotCount();
+  while (memorySlots.length < count) {
+    memorySlots.push({ startedAt: 0, leasedUntil: 0 });
+  }
+  memorySlots.length = count;
+  return memorySlots;
+}
 
 let databaseSlotsUnavailable = false;
 
@@ -56,7 +62,7 @@ async function waitForSlot(
 ): Promise<Held | undefined> {
   const first = await tryTake(owner, deadline);
   if (first !== "gap") return first;
-  const wait = Math.min(LIST_START_GAP_MS, deadline - Date.now());
+  const wait = Math.min(hspListStartGapMs(), deadline - Date.now());
   if (wait <= 0) return undefined;
   await new Promise((resolve) => setTimeout(resolve, wait));
   const second = await tryTake(owner, deadline);
@@ -81,17 +87,17 @@ async function tryTake(
         >`
           select slot,
             leased_until <= clock_timestamp() as free,
-            started_at > clock_timestamp() - ${LIST_START_GAP_MS}::int * interval '1 millisecond' as recent
+            started_at > clock_timestamp() - ${hspListStartGapMs()}::int * interval '1 millisecond' as recent
           from hsp_list_slots
-          where slot <= ${LIST_SLOT_COUNT}
+          where slot <= ${hspListSlotCount()}
           order by slot
           for update skip locked
         `;
-        if (rows.length < LIST_SLOT_COUNT) {
+        if (rows.length < hspListSlotCount()) {
           const [present] = await tx<{ count: number }[]>`
             select count(*)::int as count
             from hsp_list_slots
-            where slot <= ${LIST_SLOT_COUNT}
+            where slot <= ${hspListSlotCount()}
           `;
           if (!present || present.count === 0) {
             throw new Error("hsp_list_slots has no rows");
@@ -122,16 +128,12 @@ async function tryTake(
     }
   }
   const now = Date.now();
-  if (memorySlots.some((slot) => now - slot.startedAt < LIST_START_GAP_MS)) {
+  const slots = activeMemorySlots();
+  const gapMs = hspListStartGapMs();
+  if (slots.some((slot) => now - slot.startedAt < gapMs)) {
     return "gap";
   }
-  const index = takeListSlot(
-    memorySlots,
-    owner,
-    now,
-    LIST_START_GAP_MS,
-    LIST_SLOT_LEASE_MS,
-  );
+  const index = takeListSlot(slots, owner, now, gapMs, LIST_SLOT_LEASE_MS);
   return index === undefined ? undefined : { shared: false, index };
 }
 

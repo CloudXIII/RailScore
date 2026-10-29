@@ -74,19 +74,110 @@ export function progressMoment(
   return { saved, at: now };
 }
 
-/** If the list has not arrived by now, reload the same URL. */
-export const WAITING_RELOAD_MS = 60_000;
+/**
+ * If the list has not arrived by now, reload the same URL once. A search may run
+ * for 120 s before it answers, so this stays past that. A result, including a
+ * busy message, sets `[data-results-ready]` and the reload does not run.
+ */
+export const WAITING_RELOAD_MS = 150_000;
+
+/** Automatic reloads of a search that never paints a result. */
+export const WAITING_RELOAD_MAX = 1;
+
+/** A remembered reload older than this belongs to an earlier visit. */
+const WAITING_RELOAD_FRESH_MS = 5 * 60 * 1000;
+
+type WaitingReloadMark = { count: number; at: number };
+
+export function waitingReloadStorageKey(pathname: string, search: string): string {
+  return `railscore:wait:${pathname}${search}`;
+}
+
+/**
+ * Records one automatic reload. `false` when this search already reloaded once,
+ * or the count cannot be stored: a reload that cannot be remembered would repeat.
+ */
+export function claimWaitingReload(
+  pathname: string,
+  search: string,
+  now = Date.now(),
+): boolean {
+  const store = browserStorage();
+  if (!store) {
+    return false;
+  }
+  const key = waitingReloadStorageKey(pathname, search);
+  const previous = readWaitingReload(store, key);
+  const count =
+    previous && now - previous.at < WAITING_RELOAD_FRESH_MS ? previous.count : 0;
+  if (count >= WAITING_RELOAD_MAX) {
+    return false;
+  }
+  try {
+    store.setItem(key, JSON.stringify({ count: count + 1, at: now }));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Forgets the automatic reload so a later visit can try once more. */
+export function clearWaitingReload(pathname: string, search: string): void {
+  const store = browserStorage();
+  if (!store) {
+    return;
+  }
+  try {
+    store.removeItem(waitingReloadStorageKey(pathname, search));
+  } catch {
+    // The next visit may still be within the one allowed reload.
+  }
+}
+
+function browserStorage(): Storage | undefined {
+  try {
+    return globalThis.sessionStorage;
+  } catch {
+    return undefined;
+  }
+}
+
+function readWaitingReload(
+  store: Storage,
+  key: string,
+): WaitingReloadMark | undefined {
+  try {
+    const raw = store.getItem(key);
+    const value = raw ? (JSON.parse(raw) as Partial<WaitingReloadMark>) : {};
+    return typeof value.count === "number" && typeof value.at === "number"
+      ? { count: value.count, at: value.at }
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 /**
  * Runs from the first HTML, before React. A search that never paints its result
- * reloads the same URL. A finished result, including a busy message, sets
- * `[data-results-ready]` and stays put.
+ * reloads the same URL once. A second wait stops. A finished result, including a
+ * busy message, sets `[data-results-ready]` and stays put.
  */
 export const waitingReloadScript = [
   "(function(){try{",
   "var p=new URLSearchParams(location.search);",
   'if(!p.get("from")||!p.get("to"))return;',
-  `setTimeout(function(){if(document.querySelector("[data-results-ready]"))return;location.reload()},${WAITING_RELOAD_MS})`,
+  `var key="railscore:wait:"+location.pathname+location.search;`,
+  `var fresh=${WAITING_RELOAD_FRESH_MS};`,
+  `setTimeout(function(){`,
+  'if(document.querySelector("[data-results-ready]"))return;',
+  "var count=0,at=0;",
+  "try{var v=JSON.parse(sessionStorage.getItem(key)||'');",
+  'if(v&&typeof v.count==="number"&&typeof v.at==="number"){count=v.count;at=v.at}}catch(e){}',
+  "if(Date.now()-at>=fresh)count=0;",
+  `if(count>=${WAITING_RELOAD_MAX})return;`,
+  "try{sessionStorage.setItem(key, JSON.stringify({count:count+1, at:Date.now()}))}catch(e){return}",
+  "location.reload();",
+  `},${WAITING_RELOAD_MS})`,
   "}catch(e){}})();",
 ].join("");
 

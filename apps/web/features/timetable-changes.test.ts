@@ -169,6 +169,29 @@ describe("scheduleNotes", () => {
     ]);
   });
 
+  it("joins two Sunday arrivals at the same time into one line", () => {
+    const sunday = (publicDeparture: string, rid: string) => ({
+      originCrs: "CLJ",
+      destinationCrs: "WAT",
+      publicDeparture,
+      publicArrival: "1120",
+      runCount: 1,
+      rids: [rid],
+    });
+    const service: ScheduledService = {
+      ...usual,
+      publicDeparture: "1206",
+      publicArrival: "1316",
+      variants: [
+        sunday("1205", "202609137126391"),
+        sunday("1206", "202609207126391"),
+      ],
+    };
+    expect(scheduleNotes(service)).toEqual([
+      "On 2 Sundays it was scheduled to arrive at 11:20 instead",
+    ]);
+  });
+
   it("names a same departure that was booked to arrive much later", () => {
     const service: ScheduledService = {
       ...usual,

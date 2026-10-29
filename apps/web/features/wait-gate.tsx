@@ -10,7 +10,11 @@ import {
   type ReactNode,
 } from "react";
 import { WaitingTrain } from "@/features/waiting-train";
-import { shouldReloadWaitingPage, WAITING_RELOAD_MS } from "@/features/wait-phase";
+import {
+  claimWaitingReload,
+  clearWaitingReload,
+  WAITING_RELOAD_MS,
+} from "@/features/wait-phase";
 import type { DayPattern } from "@/server/query";
 
 const ContentReadyContext = createContext<(() => void) | null>(null);
@@ -37,22 +41,48 @@ export function WaitGate({
   serviceKey?: string;
 }) {
   const [ready, setReady] = useState(false);
+  const [gaveUp, setGaveUp] = useState(false);
   const markReady = useRef(() => setReady(true)).current;
 
   useEffect(() => {
-    if (ready) return;
-    const started = Date.now();
+    if (ready) {
+      clearWaitingReload(window.location.pathname, window.location.search);
+      return;
+    }
     const timer = window.setTimeout(() => {
-      if (shouldReloadWaitingPage(false, Date.now() - started)) {
-        window.location.reload();
+      if (document.querySelector("[data-results-ready]")) {
+        return;
       }
+      const reload = claimWaitingReload(
+        window.location.pathname,
+        window.location.search,
+      );
+      if (reload) {
+        window.location.reload();
+        return;
+      }
+      setGaveUp(true);
     }, WAITING_RELOAD_MS);
     return () => window.clearTimeout(timer);
   }, [ready]);
 
   return (
     <ContentReadyContext.Provider value={markReady}>
-      {ready ? null : (
+      {ready ? null : gaveUp ? (
+        <div className="errors" role="alert">
+          <p>This search did not finish. Try again later.</p>
+          <button
+            type="button"
+            className="link-button"
+            onClick={() => {
+              clearWaitingReload(window.location.pathname, window.location.search);
+              window.location.reload();
+            }}
+          >
+            Try again
+          </button>
+        </div>
+      ) : (
         <WaitingTrain
           title={title}
           detail={detail}
