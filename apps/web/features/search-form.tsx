@@ -14,6 +14,12 @@ const DAY_OPTIONS = [
   { value: "all", label: "All days" },
 ] as const;
 
+const PERIOD_OPTIONS = [
+  { value: 30, label: "30 days" },
+  { value: 60, label: "60 days" },
+  { value: 90, label: "90 days" },
+] as const;
+
 export function SearchForm({
   query,
   collapsed,
@@ -132,6 +138,22 @@ export function SearchForm({
                 name="days"
                 value={option.value}
                 defaultChecked={query.days === option.value}
+              />
+              <span>{option.label}</span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      <fieldset className="days">
+        <legend>History</legend>
+        <div className="pills">
+          {PERIOD_OPTIONS.map((option) => (
+            <label key={option.value} className="pill">
+              <input
+                type="radio"
+                name="period"
+                value={option.value}
+                defaultChecked={query.period === option.value}
               />
               <span>{option.label}</span>
             </label>
