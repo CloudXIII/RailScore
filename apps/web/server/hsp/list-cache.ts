@@ -1,5 +1,5 @@
 import { addCalendarDays } from "@railscore/core";
-import type { ScheduledService } from "./map";
+import type { ScheduledService } from "../services/map";
 import { RECENT_RUN_REFRESH_MS } from "./policy";
 
 /**

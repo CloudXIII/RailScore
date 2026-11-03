@@ -4,7 +4,7 @@ import {
   type ListPunctuality,
   type ScheduledService,
   type ServiceDay,
-} from "@/server/hsp/map";
+} from "@/server/services/map";
 import type { DayPattern } from "@/server/query";
 import type { Station } from "@/server/stations";
 

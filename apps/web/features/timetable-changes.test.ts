@@ -4,7 +4,7 @@ import {
   timetableChanges,
   usualDays,
 } from "./timetable-changes";
-import type { ScheduledService } from "@/server/hsp/map";
+import type { ScheduledService } from "@/server/services/map";
 
 const usual: ScheduledService = {
   originCrs: "EDB",

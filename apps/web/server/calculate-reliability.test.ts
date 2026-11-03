@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { calculateService } from "./calculate-reliability";
 import { HspRequestError, postHsp } from "./hsp/client";
 import { DailyLimitError } from "./hsp/daily-limit";
-import type { ScheduledService } from "./hsp/map";
+import type { ScheduledService } from "./services/map";
 
 vi.mock("./db", () => ({ database: () => undefined }));
 vi.mock("./hsp/client", async (importOriginal) => ({

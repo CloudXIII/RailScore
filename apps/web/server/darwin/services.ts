@@ -7,7 +7,7 @@ import {
   type ListPunctuality,
   type ScheduledService,
   type ServiceDay,
-} from "../hsp/map";
+} from "../services/map";
 import type { DayPattern } from "../query";
 import { hspPayloadFromDarwin, type DarwinRun } from "./run";
 

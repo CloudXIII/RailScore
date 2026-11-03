@@ -8,7 +8,7 @@ import {
   type ScheduledService,
   type ServiceDay,
   type ServiceVariant,
-} from "@/server/hsp/map";
+} from "@/server/services/map";
 
 /** An arrival this far from the usual one is worth naming. Smaller differences stay quiet. */
 const NOTABLE_ARRIVAL_MINUTES = 15;

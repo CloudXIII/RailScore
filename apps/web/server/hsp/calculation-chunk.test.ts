@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { chunkDecision, createProcessGate } from "./calculation-chunk";
-import { historicalRunFromDetails, unreadableDetails } from "./map";
+import { historicalRunFromDetails, unreadableDetails } from "../services/map";
 
 describe("createProcessGate", () => {
   it("lets one holder through and refuses a second until release", () => {

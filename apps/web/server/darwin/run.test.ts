@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { toHistoricalRun } from "../hsp/map";
+import { toHistoricalRun } from "../services/map";
 import type { DarwinUpdate } from "./push-port";
 import {
   decodeCalls,
