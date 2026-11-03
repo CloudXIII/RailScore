@@ -86,12 +86,46 @@ describe("encodeCalls", () => {
     const calls = [
       { crs: "CLJ", ptd: "0812", atd: "0813" },
       { crs: "VXH", pta: "0817", ptd: "0818", cancelled: true },
-      { crs: "WAT", pta: "0823", ata: "0826" },
+      { crs: "WAT", pta: "0823", ata: "0826", platform: "12" },
     ];
     expect(encodeCalls(calls)).toBe(
-      "CLJ,,0812,,0813,;VXH,0817,0818,,,c;WAT,0823,,0826,,",
+      "CLJ,,0812,,0813,,;VXH,0817,0818,,,c,;WAT,0823,,0826,,,12",
     );
     expect(decodeCalls(encodeCalls(calls))).toEqual(calls);
+  });
+});
+
+describe("mergeUpdate reasons and platforms", () => {
+  it("keeps the newest platform and late reason, and takes the cancel reason from the schedule", () => {
+    const first = mergeUpdate(undefined, {
+      ...schedule,
+      cancelReason: "526",
+    })!;
+    const platformed = mergeUpdate(first, {
+      kind: "status",
+      rid,
+      serviceDate: "2026-11-02",
+      lateReason: "104",
+      calls: [{ tpl: "CLPHMJN", ptd: "0812", platform: "9" }],
+    })!;
+    const moved = mergeUpdate(platformed, {
+      kind: "status",
+      rid,
+      serviceDate: "2026-11-02",
+      calls: [{ tpl: "CLPHMJN", ptd: "0812", atd: "0813", platform: "10" }],
+    })!;
+    const rescheduled = mergeUpdate(moved, schedule)!;
+
+    expect(moved.calls[0]).toEqual({
+      crs: "CLJ",
+      ptd: "0812",
+      atd: "0813",
+      platform: "10",
+    });
+    expect(moved).toMatchObject({ lateReason: "104", cancelReason: "526" });
+    expect(rescheduled.calls[0]?.platform).toBe("10");
+    expect(rescheduled.lateReason).toBe("104");
+    expect(rescheduled.cancelReason).toBeUndefined();
   });
 });
 

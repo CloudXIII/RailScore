@@ -5,7 +5,7 @@ import { decodeMonth, encodeMonthChunk, monthOf } from "./month";
 import type { DarwinUpdate } from "./push-port";
 import { decodeCalls, encodeCalls, mergeUpdate, type DarwinRun } from "./run";
 
-/** Rows per statement. Postgres takes at most 65,535 parameters, five per row here. */
+/** Rows per statement. Postgres takes at most 65,535 parameters, seven per row here. */
 const WRITE_ROWS = 2_000;
 
 /** Month rows per statement. A packed day is a few hundred bytes per row before compression. */
@@ -54,15 +54,18 @@ export async function applyUpdates(
       uid: run.uid,
       toc: run.toc,
       calls: encodeCalls(run.calls),
+      late_reason: run.lateReason ?? "",
+      cancel_reason: run.cancelReason ?? "",
     };
   });
   for (let start = 0; start < rows.length; start += WRITE_ROWS) {
     const slice = rows.slice(start, start + WRITE_ROWS);
     await sql`
-      insert into darwin_runs ${sql(slice, "rid", "service_date", "uid", "toc", "calls")}
+      insert into darwin_runs ${sql(slice, "rid", "service_date", "uid", "toc", "calls", "late_reason", "cancel_reason")}
       on conflict (rid) do update
       set service_date = excluded.service_date, uid = excluded.uid, toc = excluded.toc,
-        calls = excluded.calls, updated_at = now()
+        calls = excluded.calls, late_reason = excluded.late_reason,
+        cancel_reason = excluded.cancel_reason, updated_at = now()
     `;
   }
   return rows.length;
@@ -75,7 +78,7 @@ async function loadRuns(
   const runs = new Map<string, DarwinRun>();
   for (let start = 0; start < rids.length; start += WRITE_ROWS) {
     const rows = await sql<RunRow[]>`
-      select rid, service_date::text as service_date, uid, toc, calls
+      select rid, service_date::text as service_date, uid, toc, calls, late_reason, cancel_reason
       from darwin_runs
       where rid in ${sql(rids.slice(start, start + WRITE_ROWS))}
     `;
@@ -124,7 +127,7 @@ export async function packFinishedDays(
     }
     await sql.begin(async (tx) => {
       const rows = await tx<RunRow[]>`
-        select rid, service_date::text as service_date, uid, toc, calls
+        select rid, service_date::text as service_date, uid, toc, calls, late_reason, cancel_reason
         from darwin_runs where service_date = ${day}::date
       `;
       const byUid = new Map<string, DarwinRun[]>();
@@ -224,6 +227,8 @@ type RunRow = {
   uid: string;
   toc: string;
   calls: string;
+  late_reason: string;
+  cancel_reason: string;
 };
 
 function runOf(row: RunRow): DarwinRun {
@@ -233,6 +238,8 @@ function runOf(row: RunRow): DarwinRun {
     uid: row.uid,
     toc: row.toc,
     calls: decodeCalls(row.calls),
+    ...(row.late_reason ? { lateReason: row.late_reason } : {}),
+    ...(row.cancel_reason ? { cancelReason: row.cancel_reason } : {}),
   };
 }
 
@@ -245,7 +252,7 @@ export async function runsOnDay(
   input: { fromCrs: string; toCrs: string; date: string },
 ): Promise<DarwinRun[]> {
   const rows = await sql<RunRow[]>`
-    select rid, service_date::text as service_date, uid, toc, calls
+    select rid, service_date::text as service_date, uid, toc, calls, late_reason, cancel_reason
     from darwin_runs
     where service_date = ${input.date}::date
       and calls like ${`%${input.fromCrs},%`}
@@ -265,7 +272,7 @@ export async function runsOfTrains(
   const uids = sql([...input.uids]);
   const [open, months] = await Promise.all([
     sql<RunRow[]>`
-      select rid, service_date::text as service_date, uid, toc, calls
+      select rid, service_date::text as service_date, uid, toc, calls, late_reason, cancel_reason
       from darwin_runs
       where uid in ${uids}
         and service_date between ${input.fromDate}::date and ${input.toDate}::date

@@ -4,13 +4,15 @@ import type { DarwinRun, StoredCall } from "./run";
  * Finished days of one schedule UID, packed into one text per calendar month.
  * Each compaction appends one day as a chunk, so a month row is written without reading it:
  *
- *   P<crs>,<pta>,<ptd>;…      the planned calling pattern of the runs below it
- *   <dd>,<rid>,<toc>,<times>  one run: day of month, RID, operator, actual times
+ *   P<crs>,<pta>,<ptd>;…                      planned calling pattern of the runs below it
+ *   <dd>,<rid>,<toc>,<times>[,<late>,<cancel>]  one run
  *
- * A RID that starts with the run's date keeps only its tail. Times give each call's actual arrival and departure as minutes from the
- * planned time ("0", "3", "-1"), one call per space, "a/d" when the two differ, "" when there
- * is none, "=HHMM" when there is no planned time to count from, and a trailing "c" when the
- * call was cancelled. A RID appended again (a late update) replaces the earlier copy.
+ * A run line has the day of month, the RID (only its tail when it starts with the run's date),
+ * the operator, the calls, and Darwin's late and cancellation reason codes when there are any.
+ * Each call, one per space, gives its actual arrival and departure as minutes from the planned
+ * time ("0", "3", "-1"), "a/d" when the two differ, "" when there is none, "=HHMM" when there
+ * is no planned time to count from; then "c" when the call was cancelled, and "@<platform>"
+ * when Darwin gave one. A RID appended again (a late update) replaces the earlier copy.
  * Decoding gives back exactly the stored runs.
  */
 export function encodeMonthChunk(runs: readonly DarwinRun[]): string {
@@ -34,11 +36,18 @@ export function encodeMonthChunk(runs: readonly DarwinRun[]): string {
         const departure = timeText(call.ptd, call.atd);
         return (
           (arrival === departure ? arrival : `${arrival}/${departure}`) +
-          (call.cancelled ? "c" : "")
+          (call.cancelled ? "c" : "") +
+          (call.platform ? `@${call.platform}` : "")
         );
       })
       .join(" ");
-    lines.push([run.serviceDate.slice(8), rid, run.toc, times].join(","));
+    const reasons =
+      run.lateReason || run.cancelReason
+        ? [run.lateReason ?? "", run.cancelReason ?? ""]
+        : [];
+    lines.push(
+      [run.serviceDate.slice(8), rid, run.toc, times, ...reasons].join(","),
+    );
   }
   return lines.join("\n");
 }
@@ -62,12 +71,20 @@ export function decodeMonth(
     if (!line) {
       continue;
     }
-    const [day = "", rid = "", toc = "", times = ""] = line.split(",");
+    const [
+      day = "",
+      rid = "",
+      toc = "",
+      times = "",
+      lateReason = "",
+      cancelReason = "",
+    ] = line.split(",");
     const serviceDate = `${month.slice(0, 8)}${day}`;
     const parts = times.split(" ");
     const calls = pattern.map(
       ([crs = "", pta = "", ptd = ""], index): StoredCall => {
-        let part = parts[index] ?? "";
+        const [timesPart = "", platform = ""] = (parts[index] ?? "").split("@");
+        let part = timesPart;
         const cancelled = part.endsWith("c");
         if (cancelled) {
           part = part.slice(0, -1);
@@ -82,6 +99,7 @@ export function decodeMonth(
           ...(ata ? { ata } : {}),
           ...(atd ? { atd } : {}),
           ...(cancelled ? { cancelled: true } : {}),
+          ...(platform ? { platform } : {}),
         };
       },
     );
@@ -93,6 +111,8 @@ export function decodeMonth(
       uid,
       toc,
       calls,
+      ...(lateReason ? { lateReason } : {}),
+      ...(cancelReason ? { cancelReason } : {}),
     };
     byRid.delete(run.rid);
     byRid.set(run.rid, run);
