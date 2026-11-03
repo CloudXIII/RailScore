@@ -30,6 +30,8 @@ import type { Station } from "@/server/stations";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 180;
+/** Next to Neon (eu-west-2) and HSP. A US region adds an ocean to every database and HSP round trip. */
+export const preferredRegion = "lhr1";
 
 export async function generateMetadata({
   searchParams,
