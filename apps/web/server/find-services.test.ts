@@ -1,447 +1,114 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { DarwinRun } from "./darwin/run";
+import {
+  oldestRunDate,
+  runsOfTrains,
+  runsOnDay,
+  timetableDate,
+} from "./darwin/store";
+import { database } from "./db";
+import { findServices } from "./find-services";
 
-vi.mock("./db", () => ({ database: () => undefined }));
-vi.mock("./hsp/client", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("./hsp/client")>()),
-  postHsp: vi.fn(),
+vi.mock("./db", () => ({ database: vi.fn() }));
+vi.mock("./darwin/store", () => ({
+  oldestRunDate: vi.fn(),
+  runsOfTrains: vi.fn(),
+  runsOnDay: vi.fn(),
+  timetableDate: vi.fn(),
 }));
-vi.mock("./hsp/list-slots", () => ({
-  withListSlot: (_deadline: number, run: () => Promise<unknown>) => run(),
-}));
-vi.mock("./after-response", () => ({ afterResponse: vi.fn() }));
 
-const NOW = new Date("2026-10-08T12:00:00Z");
+/** Wednesday 4 November 2026, after the morning timetable is read. */
+const NOW = new Date("2026-11-04T12:00:00Z");
 
-type HspBody = {
-  days: string;
-  from_time: string;
-  to_time: string;
-  from_date: string;
-  to_date: string;
-  tolerance: string[];
+const search = {
+  fromCrs: "CLJ",
+  toCrs: "WAT",
+  timeHhmm: "0800",
+  days: "weekdays" as const,
+  periodDays: 30,
+  now: NOW,
 };
 
-let findServices: typeof import("./find-services").findServices;
-let postHsp: typeof import("./hsp/client").postHsp;
-let HspRequestError: typeof import("./hsp/client").HspRequestError;
-let afterResponse: typeof import("./after-response").afterResponse;
-
-describe("listWorkersFor", () => {
-  it("uses four, eight, or twelve list workers from the days selected", async () => {
-    process.env.HSP_LIST_WORKERS = "32";
-    vi.resetModules();
-    const { listWorkersFor: workersFor } = await import("./find-services");
-    expect(workersFor({ days: "sunday" })).toBe(4);
-    expect(workersFor({ days: "saturday" })).toBe(8);
-    expect(workersFor({ days: "weekdays" })).toBe(12);
-    expect(workersFor({ days: "all" })).toBe(12);
-    process.env.HSP_LIST_WORKERS = "2";
-    expect(workersFor({ days: "weekdays" })).toBe(2);
-    delete process.env.HSP_LIST_WORKERS;
-  });
-});
+function run(date: string, id: string, actualArrival?: string): DarwinRun {
+  return {
+    rid: `${date.replaceAll("-", "")}${id}`,
+    serviceDate: date,
+    uid: "W12345",
+    toc: "SW",
+    calls: [
+      { crs: "CLJ", pta: "0812", ptd: "0812", atd: "0812" },
+      {
+        crs: "WAT",
+        pta: "0823",
+        ...(actualArrival ? { ata: actualArrival } : {}),
+      },
+    ],
+  };
+}
 
 describe("findServices", () => {
-  beforeEach(async () => {
+  beforeEach(() => {
     delete process.env.RAILSCORE_DATA;
-    vi.useRealTimers();
-    vi.resetModules();
-    ({ findServices } = await import("./find-services"));
-    ({ postHsp, HspRequestError } = await import("./hsp/client"));
-    ({ afterResponse } = await import("./after-response"));
-    vi.mocked(postHsp).mockReset();
-    vi.mocked(afterResponse).mockClear();
+    vi.mocked(database).mockReset();
+    vi.mocked(oldestRunDate).mockReset();
+    vi.mocked(runsOfTrains).mockReset();
+    vi.mocked(runsOnDay).mockReset();
+    vi.mocked(timetableDate).mockReset();
   });
 
-  it("returns an empty list when HSP lists no services", async () => {
-    vi.mocked(postHsp).mockResolvedValue({ Services: [] });
+  it("lists sample trains in mock mode without the database", async () => {
+    process.env.RAILSCORE_DATA = "mock";
 
-    const found = await findServices(search("0700", "weekdays"));
+    const found = await findServices(search);
+
+    expect(found.services.length).toBeGreaterThan(0);
+    expect(database).not.toHaveBeenCalled();
+  });
+
+  it("lists nothing without a database", async () => {
+    vi.mocked(database).mockReturnValue(undefined);
+
+    const found = await findServices(search);
+
+    expect(found).toEqual({
+      services: [],
+      retired: [],
+      period: { from: "2026-10-05", to: "2026-11-03" },
+    });
+  });
+
+  it("lists today's trains with their past runs, from the oldest stored day", async () => {
+    vi.mocked(database).mockReturnValue({} as ReturnType<typeof database>);
+    vi.mocked(oldestRunDate).mockResolvedValue("2026-11-02");
+    vi.mocked(timetableDate).mockResolvedValue("2026-11-04");
+    vi.mocked(runsOnDay).mockResolvedValue([run("2026-11-04", "0000003")]);
+    vi.mocked(runsOfTrains).mockResolvedValue([
+      run("2026-11-02", "0000001", "0823"),
+      run("2026-11-03", "0000002", "0840"),
+      run("2026-11-04", "0000003"),
+    ]);
+
+    const found = await findServices(search);
+
+    expect(found.period).toEqual({ from: "2026-11-02", to: "2026-11-03" });
+    expect(found.services).toHaveLength(1);
+    expect(found.services[0]).toMatchObject({
+      publicDeparture: "0812",
+      rids: ["202611020000001", "202611030000002"],
+      punctuality: { runs: 2, within5: 1, within14: 1, within29: 2 },
+    });
+  });
+
+  it("lists nothing when no timetable day has a train on the route", async () => {
+    vi.mocked(database).mockReturnValue({} as ReturnType<typeof database>);
+    vi.mocked(oldestRunDate).mockResolvedValue("2026-10-01");
+    vi.mocked(timetableDate).mockResolvedValue("2026-11-04");
+    vi.mocked(runsOnDay).mockResolvedValue([]);
+
+    const found = await findServices(search);
 
     expect(found.services).toEqual([]);
-    expect(found.period).toEqual({ from: "2026-09-08", to: "2026-10-07" });
-  });
-
-  it("asks HSP for the whole period with the tolerances of the bands", async () => {
-    vi.mocked(postHsp).mockResolvedValue({ Services: [] });
-
-    await findServices(search("0700", "weekdays"));
-
-    for (const body of bodies()) {
-      expect(body.from_date).toBe("2026-09-08");
-      expect(body.to_date).toBe("2026-10-07");
-      expect(body.tolerance).toEqual(["5", "14", "29"]);
-    }
-  });
-
-  it("starts two blocks at once, then asks for the rest of a quiet route's hour in one call", async () => {
-    vi.mocked(postHsp).mockResolvedValue({ Services: [] });
-
-    await findServices(search("0710", "weekdays"));
-
-    expect(windows()).toEqual(["0710-0714", "0715-0719", "0720-0809"]);
-  });
-
-  it("keeps a busy route to short blocks", async () => {
-    let clock = Date.parse("2026-10-08T12:00:00Z");
-    vi.spyOn(Date, "now").mockImplementation(() => clock);
-    vi.mocked(postHsp).mockImplementation(async (_path, raw) => {
-      clock += minutesOf(raw as HspBody) * 1000;
-      return { Services: [] };
-    });
-
-    await findServices(search("0710", "weekdays"));
-    vi.mocked(Date.now).mockRestore();
-
-    expect(windows().sort()).toEqual([
-      "0710-0714",
-      "0715-0719",
-      "0720-0729",
-      "0730-0739",
-      "0740-0749",
-      "0750-0759",
-      "0800-0809",
-    ]);
-  });
-
-  it("halves a call that timed out and carries on", async () => {
-    let clock = Date.parse("2026-10-08T12:00:00Z");
-    vi.spyOn(Date, "now").mockImplementation(() => clock);
-    vi.mocked(postHsp).mockImplementation(async (_path, raw) => {
-      const body = raw as HspBody;
-      if (body.from_time === "0720" && body.to_time === "0809") {
-        clock += 25_000;
-        throw new HspRequestError("busy", undefined, 504);
-      }
-      return {
-        Services:
-          body.from_time <= "0750" && body.to_time >= "0750"
-            ? [metrics("0750", "0835", ["202610054100001"])]
-            : [],
-      };
-    });
-
-    const found = await findServices(search("0710", "weekdays"));
-
-    expect(windows()).toEqual([
-      "0710-0714",
-      "0715-0719",
-      "0720-0809",
-      "0720-0739",
-      "0740-0809",
-    ]);
-    expect(found.services.map((service) => service.publicDeparture)).toEqual([
-      "0750",
-    ]);
-    vi.mocked(Date.now).mockRestore();
-  });
-
-  it("retries a wide window after a fast 503 instead of splitting it", async () => {
-    vi.useFakeTimers();
-    try {
-      let refused = false;
-      vi.mocked(postHsp).mockImplementation(async (_path, raw) => {
-        const body = raw as HspBody;
-        if (body.from_time === "0720" && body.to_time === "0809" && !refused) {
-          refused = true;
-          throw new HspRequestError("busy", undefined, 503);
-        }
-        return { Services: [] };
-      });
-
-      const pending = findServices(search("0710", "weekdays"));
-      await vi.runAllTimersAsync();
-      await pending;
-
-      expect(windows()).toEqual([
-        "0710-0714",
-        "0715-0719",
-        "0720-0809",
-        "0720-0809",
-      ]);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it("carries on one call at a time when HSP refuses a second alongside the first", async () => {
-    let inFlight = 0;
-    vi.mocked(postHsp).mockImplementation(async () => {
-      if (inFlight > 0) {
-        throw new HspRequestError("busy");
-      }
-      inFlight += 1;
-      await new Promise((resolve) => setTimeout(resolve, 5));
-      inFlight -= 1;
-      return { Services: [] };
-    });
-
-    await findServices(search("0710", "weekdays"));
-
-    expect(windows()).toEqual(["0710-0714", "0715-0719", "0715-0809"]);
-
-    vi.mocked(postHsp).mockClear();
-    await findServices(search("0810", "weekdays"));
-    expect(windows()).toEqual(["0810-0814", "0815-0909"]);
-  });
-
-  it("asks again after a short pause when its only call is refused", async () => {
-    vi.useFakeTimers();
-    try {
-      const refused = new Set<string>();
-      vi.mocked(postHsp).mockImplementation(async (_path, raw) => {
-        const body = raw as HspBody;
-        if (!refused.has(body.from_time)) {
-          refused.add(body.from_time);
-          throw new HspRequestError("busy");
-        }
-        return { Services: [] };
-      });
-
-      const pending = findServices(search("0700", "weekdays"));
-      await vi.runAllTimersAsync();
-      await pending;
-
-      expect(windows().filter((window) => window === "0700-0704")).toHaveLength(
-        2,
-      );
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it("tries two calls again next time when HSP refused every call", async () => {
-    let clock = Date.parse("2026-10-08T12:00:00Z");
-    vi.spyOn(Date, "now").mockImplementation(() => clock);
-    vi.mocked(postHsp).mockImplementation(async () => {
-      clock += 130_000;
-      throw new HspRequestError("busy");
-    });
-    await expect(
-      findServices(search("0710", "weekdays")),
-    ).rejects.toBeInstanceOf(HspRequestError);
-    vi.mocked(Date.now).mockRestore();
-
-    vi.mocked(postHsp).mockReset();
-    vi.mocked(postHsp).mockResolvedValue({ Services: [] });
-    await findServices(search("0710", "weekdays"));
-
-    expect(windows()).toEqual(["0710-0714", "0715-0719", "0720-0809"]);
-  });
-
-  it("saves each block of a joined call, so a search from another minute reuses it", async () => {
-    vi.mocked(postHsp).mockResolvedValue({ Services: [] });
-
-    await findServices(search("0700", "weekdays"));
-    vi.mocked(postHsp).mockClear();
-    await findServices(search("0730", "weekdays"));
-
-    expect(windows()).toEqual(["0800-0804", "0805-0809", "0810-0829"]);
-  });
-
-  it("keeps HSP's count on each listed train", async () => {
-    vi.mocked(postHsp).mockImplementation(async (_path, raw) => {
-      const body = raw as HspBody;
-      return {
-        Services:
-          body.from_time <= "0705" && body.to_time >= "0705"
-            ? [
-                {
-                  ...metrics("0705", "0750", ["202610054100001"]),
-                  Metrics: [
-                    metric("5", 18, 2),
-                    metric("14", 19, 1),
-                    metric("29", 19, 1),
-                  ],
-                },
-              ]
-            : [],
-      };
-    });
-
-    const found = await findServices(search("0700", "weekdays"));
-
-    expect(found.services[0]?.punctuality).toEqual({
-      runs: 20,
-      within5: 18,
-      within14: 19,
-      within29: 19,
-    });
-  });
-
-  it("fails the search when the list JSON is not the expected shape", async () => {
-    vi.mocked(postHsp).mockResolvedValue({ header: {} });
-
-    await expect(findServices(search("0800", "weekdays"))).rejects.toThrow(
-      /service list/,
-    );
-  });
-
-  it("does not return a weekday-only list when a later day type fails", async () => {
-    vi.mocked(postHsp).mockImplementation(async (_path, body) => {
-      if ((body as HspBody).days === "SATURDAY") {
-        throw new Error("Historical data could not be loaded.");
-      }
-      return { Services: [] };
-    });
-
-    await expect(findServices(search("0900", "all"))).rejects.toThrow(
-      /could not be loaded/,
-    );
-    expect(bodies().map((body) => body.days)).toContain("SATURDAY");
-  });
-
-  it("lists one departure once when it runs a minute apart on different day types", async () => {
-    const byDay: Record<
-      string,
-      { departure: string; arrival: string; rids: string[] }
-    > = {
-      WEEKDAY: {
-        departure: "1052",
-        arrival: "1640",
-        rids: ["202610054100001", "202610064100002"],
-      },
-      SATURDAY: {
-        departure: "1052",
-        arrival: "1654",
-        rids: ["202610034100003"],
-      },
-      SUNDAY: { departure: "1051", arrival: "1639", rids: ["202610044100004"] },
-    };
-    vi.mocked(postHsp).mockImplementation(async (_path, raw) => {
-      const body = raw as HspBody;
-      const service = byDay[body.days];
-      const inSlice =
-        service &&
-        service.departure >= body.from_time &&
-        service.departure <= body.to_time;
-      return {
-        Services: inSlice
-          ? [
-              {
-                serviceAttributesMetrics: {
-                  origin_location: "QQQ",
-                  destination_location: "RRR",
-                  gbtt_ptd: service.departure,
-                  gbtt_pta: service.arrival,
-                  toc_code: "VT",
-                  rids: service.rids,
-                },
-              },
-            ]
-          : [],
-      };
-    });
-
-    const found = await findServices(search("1030", "all"));
-
-    expect(found.services).toHaveLength(1);
-    expect(found.services[0]?.publicDeparture).toBe("1052");
-    expect(found.services[0]?.days).toEqual(["weekdays", "saturday", "sunday"]);
-    expect(found.services[0]?.rids).toHaveLength(4);
-  });
-
-  it("waits for a new list when the stored one ends before the period", async () => {
-    vi.mocked(postHsp).mockResolvedValue({ Services: [] });
-    const tomorrow = new Date("2026-10-09T12:00:00Z");
-
-    await findServices({ ...search("1300", "weekdays"), now: NOW });
-    vi.mocked(postHsp).mockClear();
-    const next = await findServices({
-      ...search("1300", "weekdays"),
-      now: tomorrow,
-    });
-
-    expect(postHsp).toHaveBeenCalled();
-    expect(afterResponse).not.toHaveBeenCalled();
-    expect(next.period).toEqual({ from: "2026-09-09", to: "2026-10-08" });
-    const ranges = [
-      ...new Set(bodies().map((body) => `${body.from_date}..${body.to_date}`)),
-    ];
-    expect(ranges).toEqual(["2026-09-09..2026-10-08"]);
-  });
-
-  it("leaves a period-covering list alone while a train is calculated", async () => {
-    vi.mocked(postHsp).mockResolvedValue({ Services: [] });
-
-    await findServices({ ...search("1300", "weekdays"), now: NOW });
-    vi.mocked(postHsp).mockClear();
-    vi.mocked(afterResponse).mockClear();
-    await findServices({
-      ...search("1300", "weekdays"),
-      now: new Date("2026-10-08T19:00:00Z"),
-      refreshStale: false,
-    });
-
-    expect(postHsp).not.toHaveBeenCalled();
-    expect(afterResponse).not.toHaveBeenCalled();
-  });
-
-  it("stops calling HSP when the time budget runs out, and the next try carries on", async () => {
-    let clock = Date.parse("2026-10-08T12:00:00Z");
-    vi.spyOn(Date, "now").mockImplementation(() => clock);
-    vi.mocked(postHsp).mockImplementation(async () => {
-      clock += 50_000;
-      return { Services: [] };
-    });
-
-    await expect(
-      findServices(search("1500", "weekdays")),
-    ).rejects.toBeInstanceOf(HspRequestError);
-    const firstTry = bodies().map((body) => body.from_time);
-    expect(firstTry).toEqual(["1500", "1505", "1510"]);
-
-    vi.mocked(postHsp).mockClear();
-    vi.mocked(postHsp).mockResolvedValue({ Services: [] });
-    vi.mocked(Date.now).mockRestore();
-    await findServices(search("1500", "weekdays"));
-
-    expect(windows()).toEqual(["1515-1519", "1520-1524", "1525-1559"]);
+    expect(found.period).toEqual({ from: "2026-10-05", to: "2026-11-03" });
+    expect(runsOfTrains).not.toHaveBeenCalled();
   });
 });
-
-function bodies(): HspBody[] {
-  return vi.mocked(postHsp).mock.calls.map((call) => call[1] as HspBody);
-}
-
-function windows(): string[] {
-  return bodies().map((body) => `${body.from_time}-${body.to_time}`);
-}
-
-function minutesOf(body: HspBody): number {
-  const clock = (hhmm: string) =>
-    Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(2, 4));
-  return clock(body.to_time) - clock(body.from_time) + 1;
-}
-
-function metrics(departure: string, arrival: string, rids: string[]) {
-  return {
-    serviceAttributesMetrics: {
-      origin_location: "QQQ",
-      destination_location: "RRR",
-      gbtt_ptd: departure,
-      gbtt_pta: arrival,
-      toc_code: "VT",
-      rids,
-    },
-  };
-}
-
-function metric(tolerance: string, within: number, outside: number) {
-  return {
-    tolerance_value: tolerance,
-    num_tolerance: String(within),
-    num_not_tolerance: String(outside),
-  };
-}
-
-function search(timeHhmm: string, days: "weekdays" | "all") {
-  return {
-    fromCrs: "QQQ",
-    toCrs: "RRR",
-    timeHhmm,
-    days,
-    periodDays: 30,
-    now: NOW,
-  };
-}

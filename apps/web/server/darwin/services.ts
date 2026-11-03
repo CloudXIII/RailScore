@@ -9,7 +9,7 @@ import {
   type ServiceDay,
 } from "../services/map";
 import type { DayPattern } from "../query";
-import { hspPayloadFromDarwin, type DarwinRun } from "./run";
+import { detailsPayloadFromDarwin, type DarwinRun } from "./run";
 
 export type DarwinSearch = {
   fromCrs: string;
@@ -32,7 +32,7 @@ const DAY_TYPES: readonly ServiceDay[] = ["weekdays", "saturday", "sunday"];
 
 /**
  * The trains of the latest timetable for the chosen day type, each with its runs in the
- * period. Runs are pooled into trains with the same rules as HSP lists, so a train is the
+ * period. Runs are pooled into trains by the shared folding rules, so a train is the
  * same schedule seen on several days. A train in the period that is not in that timetable
  * no longer runs, and is set apart. Today's runs pick the trains but are not counted,
  * since a run of today may still be under way.
@@ -140,10 +140,10 @@ function legOf(
   };
 }
 
-/** HSP's list counts for one run. A run with no known outcome is not counted. */
+/** The list's counts for one run. A run with no known outcome is not counted. */
 function punctualityOf(run: DarwinRun, search: DarwinSearch): ListPunctuality {
   const outcome = toHistoricalRun(
-    hspPayloadFromDarwin(run),
+    detailsPayloadFromDarwin(run),
     { boardingCrs: search.fromCrs, destinationCrs: search.toCrs },
     run.rid,
   );

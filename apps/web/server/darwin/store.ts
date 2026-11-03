@@ -5,7 +5,7 @@ import type { DarwinUpdate } from "./push-port";
 import {
   decodeCalls,
   encodeCalls,
-  hspPayloadFromDarwin,
+  detailsPayloadFromDarwin,
   mergeUpdate,
   type DarwinRun,
 } from "./run";
@@ -72,8 +72,8 @@ async function loadRuns(
 }
 
 /**
- * Darwin runs for these RIDs in HSP's serviceDetails shape, for days that have finished.
- * A run from today may still be under way, so it is left for HSP or a later import.
+ * Darwin runs for these RIDs in the serviceDetails shape the calculation reads, for days
+ * that have finished. A run from today may still be under way, so it is left out.
  */
 export async function loadSettledDarwinRuns(
   sql: Sql,
@@ -88,7 +88,7 @@ export async function loadSettledDarwinRuns(
   const runs = await loadRuns(sql, rids);
   for (const [rid, run] of runs) {
     if (run.serviceDate < today) {
-      payloads.set(rid, hspPayloadFromDarwin(run));
+      payloads.set(rid, detailsPayloadFromDarwin(run));
     }
   }
   return payloads;

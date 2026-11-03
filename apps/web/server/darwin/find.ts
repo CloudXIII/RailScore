@@ -2,7 +2,6 @@ import "server-only";
 import { addCalendarDays, londonIsoDate, trailingDays } from "@railscore/core";
 import { database } from "../db";
 import { dayTypeOf } from "../day-type";
-import { darwinListMode } from "../env";
 import {
   servicesFromRuns,
   type DarwinSearch,
@@ -14,25 +13,28 @@ import { oldestRunDate, runsOfTrains, runsOnDay, timetableDate } from "./store";
 const TIMETABLE_DAYS_TRIED = 3;
 
 /**
- * The service list from stored Darwin runs, or undefined when HSP should give it instead.
- * The trains come from the latest timetable of the chosen day type: today's once the
- * morning snapshot is read. Their runs in the period come by schedule UID.
- * With `DARWIN_LISTS=auto` Darwin is used once the runs reach back a full day before the
- * period, so the counts describe the whole period. `force` uses whatever is stored.
+ * The service list from stored Darwin runs. The trains come from the latest timetable of
+ * the chosen day type: today's once the morning snapshot is read. Their runs in the period
+ * come by schedule UID. The period starts at the oldest stored day when the import began
+ * later than the period, so the dates shown are the ones the counts cover.
  */
 export async function findDarwinServices(
   search: DarwinSearch,
   now: Date,
-): Promise<DarwinServiceList | undefined> {
-  const mode = darwinListMode();
-  const sql = database();
-  if (mode === "off" || !sql) {
-    return undefined;
-  }
-  const oldest = await oldestRunDate(sql);
+): Promise<Omit<DarwinServiceList, "timetableDate">> {
   const period = trailingDays(search.periodDays, now);
-  if (!oldest || (mode === "auto" && oldest >= period.from)) {
-    return undefined;
+  const sql = database();
+  const oldest = sql ? await oldestRunDate(sql) : undefined;
+  const empty = {
+    services: [],
+    retired: [],
+    period: {
+      from: oldest && oldest > period.from ? oldest : period.from,
+      to: period.to,
+    },
+  };
+  if (!sql || !oldest) {
+    return empty;
   }
   const today = londonIsoDate(now);
   const todayTimetable = (await timetableDate(sql)) === today;
@@ -60,7 +62,7 @@ export async function findDarwinServices(
       return list;
     }
   }
-  return undefined;
+  return empty;
 }
 
 /** Latest dates of the chosen day type, today first when its timetable is loaded. */

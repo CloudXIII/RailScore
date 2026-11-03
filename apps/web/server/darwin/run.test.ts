@@ -4,7 +4,7 @@ import type { DarwinUpdate } from "./push-port";
 import {
   decodeCalls,
   encodeCalls,
-  hspPayloadFromDarwin,
+  detailsPayloadFromDarwin,
   mergeUpdate,
   type DarwinRun,
 } from "./run";
@@ -95,16 +95,18 @@ describe("encodeCalls", () => {
   });
 });
 
-describe("hspPayloadFromDarwin", () => {
+describe("detailsPayloadFromDarwin", () => {
   const stations = { boardingCrs: "CLJ", destinationCrs: "WAT" };
   const scheduled = mergeUpdate(undefined, schedule)!;
 
-  it("classifies an arrival with HSP's rules", () => {
+  it("classifies an arrival with the shared run rules", () => {
     const run = mergeUpdate(
       mergeUpdate(scheduled, arrived({ atd: "0813" })),
       arrived({ ata: "0829" }),
     )!;
-    expect(toHistoricalRun(hspPayloadFromDarwin(run), stations, rid)).toEqual({
+    expect(
+      toHistoricalRun(detailsPayloadFromDarwin(run), stations, rid),
+    ).toEqual({
       id: rid,
       serviceDate: "2026-11-02",
       outcome: "arrived",
@@ -118,7 +120,7 @@ describe("hspPayloadFromDarwin", () => {
       calls: schedule.calls.map((call) => ({ ...call, cancelled: true })),
     })!;
     expect(
-      toHistoricalRun(hspPayloadFromDarwin(run), stations, rid).outcome,
+      toHistoricalRun(detailsPayloadFromDarwin(run), stations, rid).outcome,
     ).toBe("cancelled");
   });
 
@@ -131,7 +133,7 @@ describe("hspPayloadFromDarwin", () => {
     });
     const run = mergeUpdate(shortened, arrived({ atd: "0812" }))!;
     expect(
-      toHistoricalRun(hspPayloadFromDarwin(run), stations, rid).outcome,
+      toHistoricalRun(detailsPayloadFromDarwin(run), stations, rid).outcome,
     ).toBe("did_not_call");
   });
 });
