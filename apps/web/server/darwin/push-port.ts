@@ -5,7 +5,7 @@
  * A snapshot file is several XML documents one after another; that is read the same way.
  */
 
-/** One public call. Times are HHMM, as HSP gives them. */
+/** One public call. Times are HHMM. */
 export type DarwinCall = {
   readonly tpl: string;
   readonly pta?: string;

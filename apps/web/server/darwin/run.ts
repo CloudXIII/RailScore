@@ -147,14 +147,14 @@ export function decodeCalls(text: string): StoredCall[] {
   });
 }
 
-/** Reason text a cancelled call carries, so HSP's rules read it as one. */
+/** Reason text a cancelled call carries, so the run rules read it as one. */
 const CANCELLED_REASON = "DARWIN_CANCELLED";
 
 /**
- * The run in HSP's serviceDetails shape. The calculation then classifies Darwin and HSP runs
- * with the same rules: a cancelled call reads as a call with a late or cancel reason.
+ * The run in the serviceDetails shape `toHistoricalRun` reads (first defined by HSP).
+ * A cancelled call reads as a call with a late or cancel reason.
  */
-export function hspPayloadFromDarwin(run: DarwinRun): unknown {
+export function detailsPayloadFromDarwin(run: DarwinRun): unknown {
   return {
     serviceAttributesDetails: {
       date_of_service: run.serviceDate,

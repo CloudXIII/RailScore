@@ -4,118 +4,13 @@ import {
   listServices,
   matchesServiceKey,
   mergeServices,
-  parseServiceMetrics,
   serviceDateOf,
   serviceKey,
   toHistoricalRun,
   historicalRunFromDetails,
-  isUnreadableDetails,
-  unreadableDetails,
   type ScheduledService,
   type ServiceDay,
 } from "./map";
-
-const syntheticList = {
-  Services: [
-    {
-      serviceAttributesMetrics: {
-        origin_location: "LIV",
-        destination_location: "MIA",
-        gbtt_ptd: "0630",
-        gbtt_pta: "0721",
-        toc_code: "NT",
-        rids: ["run-1", "run-2"],
-      },
-    },
-  ],
-};
-
-describe("parseServiceMetrics", () => {
-  it("reads public times, operator and run identifiers from a synthetic payload", () => {
-    expect(parseServiceMetrics(syntheticList)).toEqual([
-      {
-        originCrs: "LIV",
-        destinationCrs: "MIA",
-        publicDeparture: "0630",
-        publicArrival: "0721",
-        operatorCode: "NT",
-        rids: ["run-1", "run-2"],
-        days: [],
-      },
-    ]);
-  });
-
-  it("rejects a payload without a service list", () => {
-    expect(() => parseServiceMetrics({ header: {} })).toThrow(/service list/);
-  });
-
-  it("keeps a service with no public arrival so its runs can be joined", () => {
-    const listed = parseServiceMetrics({
-      Services: [
-        ...syntheticList.Services,
-        {
-          serviceAttributesMetrics: {
-            origin_location: "KGX",
-            destination_location: "EDB",
-            gbtt_ptd: "1030",
-            gbtt_pta: "",
-            toc_code: "GR",
-            rids: ["202609041030001"],
-          },
-        },
-      ],
-    });
-    expect(listed.map((service) => service.publicDeparture)).toEqual([
-      "0630",
-      "1030",
-    ]);
-    expect(listed[1]?.publicArrival).toBe("");
-  });
-
-  it("reads HSP's count within 5, 14 and 29 minutes", () => {
-    const [service] = parseServiceMetrics({
-      Services: [
-        {
-          ...syntheticList.Services[0],
-          Metrics: [
-            metric("0", 16, 4),
-            metric("5", 19, 1),
-            metric("14", 19, 1),
-            metric("29", 20, 0),
-          ],
-        },
-      ],
-    });
-    expect(service?.punctuality).toEqual({
-      runs: 20,
-      within5: 19,
-      within14: 19,
-      within29: 20,
-    });
-  });
-
-  it("leaves the count out when a tolerance is missing", () => {
-    const [service] = parseServiceMetrics({
-      Services: [
-        {
-          ...syntheticList.Services[0],
-          Metrics: [metric("5", 19, 1)],
-        },
-      ],
-    });
-    expect(service?.punctuality).toBeUndefined();
-  });
-});
-
-function metric(tolerance: string, within: number, outside: number) {
-  return {
-    tolerance_value: tolerance,
-    num_tolerance: String(within),
-    num_not_tolerance: String(outside),
-    percent_tolerance: "0",
-    global_tolerance: false,
-  };
-}
 
 describe("toHistoricalRun", () => {
   const leedsToManchester = { boardingCrs: "LDS", destinationCrs: "MAN" };
@@ -388,19 +283,6 @@ describe("toHistoricalRun", () => {
     });
   });
 
-  it("recognises the placeholder stored for an unreadable run", () => {
-    const unread = unreadableDetails(
-      "202608289999999",
-      new Date("2026-10-09T12:00:00Z"),
-    );
-    expect(isUnreadableDetails(unread.payload)).toBe(true);
-    expect(
-      isUnreadableDetails({
-        serviceAttributesDetails: { locations: [{ location: "MAN" }] },
-      }),
-    ).toBe(false);
-  });
-
   it("treats an actual time that is not HHMM as no data", () => {
     const stations = { boardingCrs: "LDS", destinationCrs: "MAN" };
     const payload = {
@@ -467,10 +349,15 @@ describe("serviceDateOf", () => {
 
 describe("mergeServices", () => {
   it("unions run identifiers and day types for the same public service", () => {
-    const [first] = parseServiceMetrics(syntheticList);
-    if (!first) {
-      throw new Error("expected a service");
-    }
+    const first: ScheduledService = {
+      originCrs: "LIV",
+      destinationCrs: "MIA",
+      publicDeparture: "0630",
+      publicArrival: "0721",
+      operatorCode: "NT",
+      rids: ["run-1", "run-2"],
+      days: [],
+    };
     const weekday = { ...first, days: ["weekdays"] as const };
     const saturday = {
       ...first,
@@ -487,26 +374,21 @@ describe("mergeServices", () => {
   });
 
   it("counts a repeated run identifier once", () => {
-    const [service] = parseServiceMetrics({
-      Services: [
-        {
-          serviceAttributesMetrics: {
-            origin_location: "LIV",
-            destination_location: "MIA",
-            gbtt_ptd: "0630",
-            gbtt_pta: "0721",
-            toc_code: "NT",
-            rids: ["202607120000001", "202607120000001", "202607190000002"],
-          },
-        },
-      ],
-    });
-    const [merged] = mergeServices([[{ ...service!, days: ["weekdays"] }]]);
+    const service: ScheduledService = {
+      originCrs: "LIV",
+      destinationCrs: "MIA",
+      publicDeparture: "0630",
+      publicArrival: "0721",
+      operatorCode: "NT",
+      rids: ["202607120000001", "202607120000001", "202607190000002"],
+      days: ["weekdays"],
+    };
+    const [merged] = mergeServices([[service]]);
 
     expect(merged?.rids).toEqual(["202607120000001", "202607190000002"]);
   });
 
-  it("adds up HSP's counts across day types and folded schedules", () => {
+  it("adds up the counts across day types and folded schedules", () => {
     const base = {
       originCrs: "LIV",
       destinationCrs: "CLE",
