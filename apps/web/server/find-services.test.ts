@@ -10,7 +10,8 @@ import { database } from "./db";
 import { findServices } from "./find-services";
 
 vi.mock("./db", () => ({ database: vi.fn() }));
-vi.mock("./darwin/store", () => ({
+vi.mock("./darwin/store", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./darwin/store")>()),
   oldestRunDate: vi.fn(),
   runsOfTrains: vi.fn(),
   runsOnDay: vi.fn(),
@@ -74,6 +75,7 @@ describe("findServices", () => {
       services: [],
       retired: [],
       period: { from: "2026-10-05", to: "2026-11-03" },
+      runs: new Map(),
     });
   });
 
@@ -97,6 +99,11 @@ describe("findServices", () => {
       rids: ["202611020000001", "202611030000002"],
       punctuality: { runs: 2, within5: 1, within14: 1, within29: 2 },
     });
+    expect([...found.runs.keys()].sort()).toEqual([
+      "202611020000001",
+      "202611030000002",
+      "202611040000003",
+    ]);
   });
 
   it("lists nothing when no timetable day has a train on the route", async () => {

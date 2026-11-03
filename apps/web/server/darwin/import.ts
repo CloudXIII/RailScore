@@ -18,6 +18,7 @@ import {
   noteGapFilled,
   noteProgress,
   noteTimetable,
+  packFinishedDays,
   releaseImport,
   timetableDate,
 } from "./store";
@@ -46,6 +47,8 @@ export type ImportResult =
       gapFound: boolean;
       snapshotHours: string[];
       runsDeleted: number;
+      /** Days moved into month rows by this import. */
+      daysPacked: string[];
       ms: number;
     };
 
@@ -81,6 +84,7 @@ export async function importDarwin(budgetMs: number): Promise<ImportResult> {
       ? await fillGap(deadline)
       : { hours: [], runWrites: 0 };
     const runsDeleted = await deleteOldRuns(sql, darwinKeepDays(), new Date());
+    const daysPacked = await packFinishedDays(sql, new Date(), deadline);
     return {
       status: "done",
       messages: kafka.messages,
@@ -93,6 +97,7 @@ export async function importDarwin(budgetMs: number): Promise<ImportResult> {
       gapFound: kafka.gapFound,
       snapshotHours: filled.hours,
       runsDeleted,
+      daysPacked,
       ms: Date.now() - started,
     };
   } finally {

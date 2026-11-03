@@ -37,3 +37,19 @@ create index if not exists darwin_runs_uid on darwin_runs (uid, service_date);
 -- UTC date whose 05:00 snapshot was read for the day's timetable. Darwin loads the day's
 -- schedules between 02:00 and 04:00, so that snapshot holds about nine in ten of them.
 alter table darwin_import_state add column if not exists timetable_date date;
+
+-- Finished days, packed: one row per schedule UID and calendar month (see server/darwin/month.ts).
+-- A day moves here from darwin_runs once it is a week old, so a search finds the latest day of
+-- any day type still in darwin_runs. Postgres compresses the repeated calling patterns, so a
+-- day costs about a tenth of its darwin_runs rows. first_day is the earliest day in the row.
+create table if not exists darwin_months (
+  uid text not null,
+  month date not null,
+  first_day date not null,
+  runs text not null,
+  primary key (uid, month)
+);
+
+-- Postgres tries to compress only rows over about 2 KB unless told otherwise. A month row
+-- reaches that after about a week, so the threshold is lowered for rows earlier in the month.
+alter table darwin_months set (toast_tuple_target = 128);

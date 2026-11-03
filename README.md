@@ -28,7 +28,7 @@ RailScore shows how a direct UK train has performed on its recent runs: arrivals
 - Punctuality rules live in `packages/core`, a TypeScript package with no framework or database, covered by unit tests.
 - A scheduled import of the Darwin Push Port feed (Kafka) into Postgres, so a search and a calculation are a few database reads with no call to an outside API.
 - Train lists start from today's Darwin timetable and pool each train's past runs by schedule UID.
-- Runs on free tiers only: Vercel Hobby, Neon Free (0.5 GB, about 30 days of runs), and cron-job.org.
+- Runs on free tiers only: Vercel Hobby, Neon Free (0.5 GB: 90 days of the whole network, packed into month rows), and cron-job.org.
 
 Built with AI-assisted development (Cursor).
 
@@ -36,7 +36,7 @@ Built with AI-assisted development (Cursor).
 
 Train performance is from Darwin Real Time Train Information (the Push Port, read over Kafka, and its hourly snapshots) on the Rail Data Marketplace. Station names and CRS codes are from the [Knowledgebase Stations data feed](https://raildata.org.uk/dashboard/dataProduct/P-88ffe920-471c-4fd9-8e0d-95d5b9b7a257/overview).
 
-History starts on the day the import first ran and reaches back at most `DARWIN_KEEP_DAYS` (30). Until 30 days are stored, the list names the days it covers. If the import stops, no new runs arrive: there is no other source.
+History starts on the day the import first ran and reaches back at most `DARWIN_KEEP_DAYS` (90). Until the chosen period is stored, the list names the days it covers. If the import stops, no new runs arrive: there is no other source.
 
 Credit the data publisher when showing this data. This project is not approved by, and is not affiliated with, the publisher or the Rail Data Marketplace.
 
@@ -63,7 +63,7 @@ Every variable is server-only. Do not add a `NEXT_PUBLIC_` prefix.
 | `PORT`                                                | Optional. `npm run dev` uses 3000.                                                                                                                                                                               |
 | `DARWIN_KAFKA_*`                                      | Darwin Push Port on Kafka, for the import below. Required for live data. Bootstrap, SASL mechanism, security protocol, topic, group, username and password, as the Rail Data Marketplace Pub/Sub tab shows them. |
 | `DARWIN_SNAPSHOT_URL`, `DARWIN_SNAPSHOT_CONSUMER_KEY` | Hourly Darwin snapshots, read for each day's timetable and when Kafka dropped messages. Required for live data.                                                                                                  |
-| `DARWIN_KEEP_DAYS`                                    | Optional. Days of Darwin runs kept. Default 30.                                                                                                                                                                  |
+| `DARWIN_KEEP_DAYS`                                    | Optional. Days of Darwin runs kept. Default 90.                                                                                                                                                                  |
 | `CRON_SECRET`                                         | Optional. Turns on `/api/import/darwin`, which needs `Authorization: Bearer <CRON_SECRET>`.                                                                                                                      |
 
 Create the tables when `DATABASE_URL` is set. Point that command at the direct URL, then point the running app at the pooled URL.
@@ -78,11 +78,11 @@ npm run db:migrate
 npm run dev
 ```
 
-Open <http://localhost:3000>. Choose two stations, a departing-after time, and the days. The defaults before a search are 06:30 and weekdays. The period is always the last 30 days. **Find trains** loads the list. Pick one service and press **Calculate reliability**.
+Open <http://localhost:3000>. Choose two stations, a departing-after time, the days, and 30, 60, or 90 days. The defaults before a search are 06:30, weekdays, and 30 days. **Find trains** loads the list. Pick one service and press **Calculate reliability**.
 
 Leave `RAILSCORE_DATA` unset for live trains from the stored Darwin runs. Set it to `mock` for made-up trains, with no database. The station list is still the live feed in both cases.
 
-The same choices are the URL query: `from`, `to`, `time`, `days` (`weekdays`, `saturday`, `sunday`, `all`), `period` (`30`), `service`, and `calculate=1`.
+The same choices are the URL query: `from`, `to`, `time`, `days` (`weekdays`, `saturday`, `sunday`, `all`), `period` (`30`, `60`, `90`), `service`, and `calculate=1`.
 
 ```bash
 npm test
@@ -122,7 +122,7 @@ Postgres holds every run, so instances share nothing else. A search and a calcul
 
 `/api/import/darwin` reads the Darwin Push Port messages since the last import and stores each run (RID) in `darwin_runs`, with its public calls and actual times. A calculation reads a train's finished runs from there. A run with no finished Darwin record, such as one from before the import began, counts as no data.
 
-Once a day, after 05:10 UTC, the import also reads the 05:00 snapshot. Darwin loads the day's schedules between 02:00 and 04:00, so that snapshot holds about nine in ten of the day's passenger trains; trains added later in the day come through Kafka. A search then starts from the timetable: the trains of today (or, for another day type, of its latest day) between the two stations, then each train's runs in the period by schedule UID. That is two database reads. A train that ran in the period but is not in that timetable is shown as no longer running. The period starts at the oldest stored day when the import began less than 30 days ago.
+Once a day, after 05:10 UTC, the import also reads the 05:00 snapshot. Darwin loads the day's schedules between 02:00 and 04:00, so that snapshot holds about nine in ten of the day's passenger trains; trains added later in the day come through Kafka. A search then starts from the timetable: the trains of today (or, for another day type, of its latest day) between the two stations, then each train's runs in the period by schedule UID. That is two database reads. A train that ran in the period but is not in that timetable is shown as no longer running. The period starts at the oldest stored day when the import began after the period would.
 
 Kafka keeps about an hour of messages, so a scheduler calls the route every 15 minutes. Vercel Hobby crons run at most once a day, and GitHub's scheduled workflows stop after 60 days without a commit, so the deployment uses [cron-job.org](https://cron-job.org) (free):
 
@@ -134,6 +134,8 @@ Kafka keeps about an hour of messages, so a scheduler calls the route every 15 m
 cron-job.org closes the connection after 30 seconds. The route answers `202` at once and imports after the response, within the function's 300 seconds, so the job shows success when the import has started. The result is in the deployment's log under `[darwin-import]`. `?wait=1` imports first and answers with the result, for a run by hand.
 
 Offsets are committed only after the runs are written. A second import that starts while one is running finds the lease taken and stops. When Kafka dropped messages before an import read them, later imports fill those hours from the hourly snapshot files, which are kept for 2 to 3 days. A snapshot holds a run until about 30 minutes after it arrives, so a filled hour can miss some arrivals. Runs older than `DARWIN_KEEP_DAYS` are deleted.
+
+A day stays one row per run for a week, so a search can start from the latest day of any day type. After that the import packs it into `darwin_months`: one row per schedule UID and calendar month, appended one day at a time. Each run keeps its RID, date, operator and every call; the planned calling pattern is written once per day and the actual times as minutes from it, and Postgres compresses the rest. Packing is lossless: decoding gives back exactly the stored runs. A simulation of 90 days of the whole network from a real day took about 60 MB packed, against about 970 MB as one row per run. Messages for a day that is already packed are dropped.
 
 `apps/web/server/darwin/tiploc-crs.json` maps Darwin's TIPLOCs to CRS codes. Rebuild it from a Darwin reference file (`PPTimetable_*_ref_v*.xml.gz`, from "Darwin Timetable Files") with `node apps/web/scripts/tiploc-crs.mjs <file>`.
 
@@ -178,7 +180,7 @@ The list folds two schedules into one train when they share the operator, each p
 
 ## Known limits
 
-History covers only the days the import has run, at most 30. Neon Free (0.5 GB) holds about that many days of the whole network. If the import stops, the figures stop at the last day stored.
+History covers only the days the import has run, at most 90. The last week (about 13 MB a day) and the packed days (well under 1 MB a day) fit in Neon Free (0.5 GB). If the import stops, the figures stop at the last day stored.
 
 The 05:00 snapshot holds about nine in ten of the day's trains. A train added to the timetable later in the day appears once Kafka brings it.
 

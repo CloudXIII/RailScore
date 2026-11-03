@@ -1,6 +1,7 @@
 import "server-only";
 import { trailingDays } from "@railscore/core";
 import { findDarwinServices } from "./darwin/find";
+import type { DarwinRun } from "./darwin/run";
 import { usesMockData } from "./env";
 import { mockServices } from "./mock/catalogue";
 import type { DayPattern } from "./query";
@@ -12,6 +13,8 @@ type ServiceSearch = {
   retired: ScheduledService[];
   /** Dates the listed runs cover. Starts at the oldest stored Darwin day when that is later. */
   period: { from: string; to: string };
+  /** Stored runs of the listed trains by RID. Empty for sample trains. */
+  runs: ReadonlyMap<string, DarwinRun>;
 };
 
 /** Trains of today's Darwin timetable with their stored runs, or sample trains in mock mode. */
@@ -29,6 +32,7 @@ export async function findServices(input: {
       services: mockServices(input),
       retired: [],
       period: trailingDays(input.periodDays, now),
+      runs: new Map(),
     };
   }
   const found = await findDarwinServices(input, now);
@@ -36,5 +40,6 @@ export async function findServices(input: {
     services: found.services,
     retired: found.retired,
     period: found.period,
+    runs: found.runs,
   };
 }
