@@ -10,13 +10,14 @@
     "build": "next build",
     "start": "next start",
     "db:migrate": "node --env-file-if-exists=.env.local ./scripts/migrate.mjs",
-    "test": "vitest run"
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@railscore/core": "*",
     "@vercel/analytics": "^2.0.1",
     "kafkajs": "^2.2.4",
-    "next": "^15.5.4",
+    "next": "^15.5.29",
     "postgres": "^3.4.9",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
