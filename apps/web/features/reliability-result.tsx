@@ -189,8 +189,7 @@ function DayTypeTable({ byDay }: { byDay: readonly DayTypeResult[] }) {
                 {DAY_TYPE_LABELS[day]}
                 <span className="meta">
                   {" "}
-                  · {within.total}{" "}
-                  {within.total === 1 ? "journey" : "journeys"}
+                  · {within.total} {within.total === 1 ? "journey" : "journeys"}
                 </span>
               </th>
               <td className="distribution-count">
