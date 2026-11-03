@@ -4,6 +4,9 @@ import { database } from "../db";
 import { dayTypeOf } from "../day-type";
 import {
   servicesFromRuns,
+  trainPage,
+  uidsLeaving,
+  WHOLE_DAY,
   type DarwinSearch,
   type DarwinServiceList,
 } from "./services";
@@ -21,10 +24,12 @@ const TIMETABLE_DAYS_TRIED = 3;
 
 /**
  * The service list from stored Darwin runs. The trains come from the latest timetable of
- * the chosen day type: today's once the morning snapshot is read. Their runs in the period
- * come by schedule UID. The period starts at the oldest stored day when the import began
- * later than the period, so the dates shown are the ones the counts cover. The runs read are
- * returned too, so a calculation for one of the trains needs no second read.
+ * the chosen day type: today's once the morning snapshot is read. The list is the next few
+ * trains from the searched time, and only their runs in the period are read, by schedule
+ * UID, so a busy route costs no more than a quiet one. The period starts at the oldest
+ * stored day when the import began later than the period, so the dates shown are the ones
+ * the counts cover. The runs read are returned too, so a calculation for one of the trains
+ * needs no second read.
  */
 export async function findDarwinServices(
   search: DarwinSearch,
@@ -32,6 +37,10 @@ export async function findDarwinServices(
 ): Promise<
   Omit<DarwinServiceList, "timetableDate"> & {
     runs: ReadonlyMap<string, DarwinRun>;
+    /** Searched time, HHMM, of the trains before these. */
+    earlier?: string;
+    /** Searched time, HHMM, of the trains after these. */
+    later?: string;
   }
 > {
   const period = trailingDays(search.periodDays, now);
@@ -61,8 +70,21 @@ export async function findDarwinServices(
     if (day.length === 0) {
       continue;
     }
+    const input = { today, todayTimetable, oldest };
+    const timetable = servicesFromRuns(day, search, input, WHOLE_DAY);
+    if (!timetable || timetable.services.length === 0) {
+      continue;
+    }
+    const page = trainPage(timetable.services, search.timeHhmm);
+    const links = {
+      ...(page.earlier ? { earlier: page.earlier } : {}),
+      ...(page.later ? { later: page.later } : {}),
+    };
+    if (!page.window) {
+      return { ...empty, ...links };
+    }
     const history = await runsOfTrains(sql, {
-      uids: [...new Set(day.map((run) => run.uid).filter(Boolean))],
+      uids: uidsLeaving(day, search, page.window),
       fromDate: period.from,
       toDate: today,
     });
@@ -70,13 +92,14 @@ export async function findDarwinServices(
     for (const run of history) {
       runs.set(run.rid, run);
     }
-    const list = servicesFromRuns([...runs.values()], search, {
-      today,
-      todayTimetable,
-      oldest,
-    });
-    if (list && list.services.length > 0) {
-      return { ...list, runs };
+    const list = servicesFromRuns(
+      [...runs.values()],
+      search,
+      input,
+      page.window,
+    );
+    if (list) {
+      return { ...list, runs, ...links };
     }
   }
   return empty;

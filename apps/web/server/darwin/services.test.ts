@@ -1,6 +1,13 @@
+import { searchClockRange } from "@railscore/core";
 import { describe, expect, it } from "vitest";
 import type { DarwinRun, StoredCall } from "./run";
-import { servicesFromRuns, type DarwinSearch } from "./services";
+import {
+  servicesFromRuns,
+  trainPage,
+  uidsLeaving,
+  type DarwinSearch,
+} from "./services";
+import type { ScheduledService } from "../services/map";
 
 const search: DarwinSearch = {
   fromCrs: "CLJ",
@@ -53,9 +60,23 @@ function run(
   };
 }
 
+/** The list for the hour from the searched time, as a page of that hour would ask for. */
+function listOf(
+  runs: readonly DarwinRun[],
+  search: DarwinSearch,
+  input: Parameters<typeof servicesFromRuns>[2],
+) {
+  return servicesFromRuns(
+    runs,
+    search,
+    input,
+    searchClockRange(search.timeHhmm),
+  );
+}
+
 describe("servicesFromRuns", () => {
   it("lists today's trains with their past runs, leaving today's run uncounted", () => {
-    const list = servicesFromRuns(
+    const list = listOf(
       [
         run("2026-11-02", "0000001", { actualArrival: "0823" }),
         run("2026-11-03", "0000001", { actualArrival: "0840" }),
@@ -80,7 +101,7 @@ describe("servicesFromRuns", () => {
   });
 
   it("counts a cancelled run as outside every tolerance", () => {
-    const list = servicesFromRuns(
+    const list = listOf(
       [
         run("2026-11-03", "0000001", { cancelled: true }),
         run(today, "0000001"),
@@ -97,7 +118,7 @@ describe("servicesFromRuns", () => {
   });
 
   it("sets apart a train that ran in the period but is not in today's timetable", () => {
-    const list = servicesFromRuns(
+    const list = listOf(
       [
         run("2026-11-03", "0000001", { actualArrival: "0823" }),
         run("2026-11-03", "0000002", {
@@ -120,7 +141,7 @@ describe("servicesFromRuns", () => {
   });
 
   it("keeps to the departure window and the chosen day type", () => {
-    const list = servicesFromRuns(
+    const list = listOf(
       [
         run("2026-11-03", "0000001", { actualArrival: "0823" }),
         run("2026-11-03", "0000002", { departure: "0905", arrival: "0916" }),
@@ -134,7 +155,7 @@ describe("servicesFromRuns", () => {
   });
 
   it("starts from the latest past day of the type while today's timetable is not loaded", () => {
-    const list = servicesFromRuns(
+    const list = listOf(
       [
         run("2026-11-03", "0000001", { actualArrival: "0823" }),
         run(today, "0000009", { departure: "0830", arrival: "0841" }),
@@ -161,7 +182,7 @@ describe("servicesFromRuns", () => {
         { crs: "WAT", pta: "0919" },
       ],
     };
-    const list = servicesFromRuns(
+    const list = listOf(
       [loop, run("2026-11-03", "0000001", { actualArrival: "0823" })],
       search,
       { today, todayTimetable: false, oldest: "2026-11-01" },
@@ -188,7 +209,7 @@ describe("servicesFromRuns", () => {
         { crs: "CTR", pta: "2015" },
       ],
     };
-    const list = servicesFromRuns(
+    const list = listOf(
       [wirral],
       { ...search, fromCrs: "LVC", toCrs: "PSL", timeHhmm: "1900" },
       { today, todayTimetable: false, oldest: "2026-11-01" },
@@ -203,11 +224,81 @@ describe("servicesFromRuns", () => {
 
   it("returns nothing when no stored run fits the search", () => {
     expect(
-      servicesFromRuns([], search, {
+      listOf([], search, {
         today,
         todayTimetable: true,
         oldest: today,
       }),
     ).toBeUndefined();
+  });
+});
+
+describe("trainPage", () => {
+  const train = (departure: string): ScheduledService => ({
+    originCrs: "CLJ",
+    destinationCrs: "WAT",
+    publicDeparture: departure,
+    publicArrival: departure,
+    operatorCode: "SW",
+    rids: [],
+    days: ["weekdays"],
+  });
+  const departures = (page: ReturnType<typeof trainPage>) =>
+    page.services.map((service) => service.publicDeparture);
+
+  it("lists the next trains on a busy route and links to the trains either side", () => {
+    const busy = Array.from({ length: 30 }, (_, index) =>
+      train(`08${String(index * 2).padStart(2, "0")}`),
+    );
+    const page = trainPage(busy, "0820", 4);
+    expect(departures(page)).toEqual(["0820", "0822", "0824", "0826"]);
+    expect(page.window).toEqual({ from: "0820", to: "0826" });
+    expect(page.earlier).toBe("0812");
+    expect(page.later).toBe("0828");
+  });
+
+  it("reaches past the hour on a quiet route", () => {
+    const quiet = ["0615", "0930", "1345", "1810"].map(train);
+    const page = trainPage(quiet, "0700", 2);
+    expect(departures(page)).toEqual(["0930", "1345"]);
+    expect(page.earlier).toBe("0615");
+    expect(page.later).toBe("1810");
+  });
+
+  it("keeps trains that leave at the same minute together", () => {
+    const page = trainPage(
+      ["0800", "0805", "0805", "0810"].map(train),
+      "0800",
+      2,
+    );
+    expect(departures(page)).toEqual(["0800", "0805", "0805"]);
+    expect(page.later).toBe("0810");
+  });
+
+  it("offers no earlier trains at the start of the day and none later at the end", () => {
+    const page = trainPage(["0600", "0700"].map(train), "0500", 8);
+    expect(departures(page)).toEqual(["0600", "0700"]);
+    expect(page.earlier).toBeUndefined();
+    expect(page.later).toBeUndefined();
+  });
+
+  it("lists nothing after the last train, but links back to it", () => {
+    const page = trainPage(["0600", "0700"].map(train), "2300", 8);
+    expect(page.services).toEqual([]);
+    expect(page.window).toBeUndefined();
+    expect(page.earlier).toBe("0600");
+  });
+});
+
+describe("uidsLeaving", () => {
+  it("names only the trains that board in the window", () => {
+    const runs = [
+      run(today, "0000001", { uid: "W00001", departure: "0812" }),
+      run(today, "0000002", { uid: "W00002", departure: "0912" }),
+      run("2026-11-03", "0000003", { uid: "W00001", departure: "0812" }),
+    ];
+    expect(uidsLeaving(runs, search, { from: "0800", to: "0830" })).toEqual([
+      "W00001",
+    ]);
   });
 });
