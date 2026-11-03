@@ -20,7 +20,7 @@ import { findServices } from "@/server/find-services";
 import { clearCalculationProgress } from "@/server/hsp/calculation-progress";
 import { HspRequestError } from "@/server/hsp/client";
 import { DailyLimitError } from "@/server/hsp/daily-limit";
-import { HspResponseError } from "@/server/hsp/map";
+import { HspResponseError } from "@/server/services/map";
 import { parseQuery, timeHhmm, type ParsedQuery } from "@/server/query";
 import {
   loadStationDirectory,

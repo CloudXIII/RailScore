@@ -21,7 +21,7 @@ import {
   listServices,
   parseServiceMetrics,
   type ScheduledService,
-} from "./hsp/map";
+} from "./services/map";
 import { mockServices } from "./mock/catalogue";
 import type { DayPattern } from "./query";
 

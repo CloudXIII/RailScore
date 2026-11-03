@@ -4,7 +4,7 @@ import { addCalendarDays, londonIsoDate } from "@railscore/core";
 import { database } from "../db";
 import { loadSettledDarwinRuns } from "../darwin/store";
 import { errorText } from "../error-text";
-import { isUnreadableDetails, serviceDateOf } from "./map";
+import { isUnreadableDetails, serviceDateOf } from "../services/map";
 import { isStoredRunReusable, isUnreadablePlaceholderReusable } from "./policy";
 
 type MemoryRun = { payload: unknown; serviceDate: string; fetchedAt: Date };

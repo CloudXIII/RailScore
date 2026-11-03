@@ -23,7 +23,7 @@ import {
   toHistoricalRun,
   unreadableDetails,
   type ScheduledService,
-} from "./hsp/map";
+} from "./services/map";
 import { loadStoredRuns, saveRun } from "./hsp/run-store";
 import { mockRuns } from "./mock/catalogue";
 

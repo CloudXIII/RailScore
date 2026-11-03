@@ -24,7 +24,7 @@ import {
   matchesServiceKey,
   serviceKey,
   type ScheduledService,
-} from "@/server/hsp/map";
+} from "@/server/services/map";
 import type { ParsedQuery } from "@/server/query";
 
 export function ServiceList({

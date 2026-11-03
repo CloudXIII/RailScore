@@ -3,7 +3,7 @@ import type { JSONValue } from "postgres";
 import { database } from "../db";
 import { errorText } from "../error-text";
 import type { StoredList } from "./list-cache";
-import type { ScheduledService } from "./map";
+import type { ScheduledService } from "../services/map";
 
 /** Stored lists by key. Whether each one may still be used is decided by the caller. */
 export async function loadStoredLists(

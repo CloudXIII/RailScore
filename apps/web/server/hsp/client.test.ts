@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CIRCUIT_OPEN_MS, resetHspCircuit } from "./circuit";
 import { postHsp } from "./client";
 import { DailyLimitError, takeDailyCall } from "./daily-limit";
-import { HspResponseError } from "./map";
+import { HspResponseError } from "../services/map";
 import { BUSY_PAUSE_MS } from "./policy";
 
 vi.mock("./rate-limit", () => ({

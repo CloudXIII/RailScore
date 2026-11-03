@@ -3,7 +3,7 @@ import type {
   ListPunctuality,
   ScheduledService,
   ServiceDay,
-} from "@/server/hsp/map";
+} from "@/server/services/map";
 
 export const DAY_LABELS: Record<ServiceDay, string> = {
   weekdays: "Weekdays",

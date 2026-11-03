@@ -1,6 +1,6 @@
 import "server-only";
 import { hspConnection, logHspCalls, MissingEnvironmentError } from "../env";
-import { HspResponseError } from "./map";
+import { HspResponseError } from "../services/map";
 import {
   busyPauseMs,
   isRetryableStatus,
