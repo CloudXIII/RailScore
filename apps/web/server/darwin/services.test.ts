@@ -171,6 +171,36 @@ describe("servicesFromRuns", () => {
     ]);
   });
 
+  it("keeps a Wirral line train that called at the destination on its way in", () => {
+    // Merseyrail C08015 of 3 November 2026, cut to the calls that matter.
+    const wirral: DarwinRun = {
+      rid: "202611030000006",
+      serviceDate: "2026-11-03",
+      uid: "C08015",
+      toc: "ME",
+      calls: [
+        { crs: "CTR", ptd: "1842" },
+        { crs: "PSL", pta: "1908", ptd: "1908" },
+        { crs: "LVJ", pta: "1924", ptd: "1924" },
+        { crs: "LVC", pta: "1929", ptd: "1929", atd: "1929" },
+        { crs: "LVJ", pta: "1931", ptd: "1931" },
+        { crs: "PSL", pta: "1946", ptd: "1947", ata: "1946" },
+        { crs: "CTR", pta: "2015" },
+      ],
+    };
+    const list = servicesFromRuns(
+      [wirral],
+      { ...search, fromCrs: "LVC", toCrs: "PSL", timeHhmm: "1900" },
+      { today, todayTimetable: false, oldest: "2026-11-01" },
+    );
+    expect(list?.services).toHaveLength(1);
+    expect(list?.services[0]).toMatchObject({
+      publicDeparture: "1929",
+      publicArrival: "1946",
+      operatorCode: "ME",
+    });
+  });
+
   it("returns nothing when no stored run fits the search", () => {
     expect(
       servicesFromRuns([], search, {
