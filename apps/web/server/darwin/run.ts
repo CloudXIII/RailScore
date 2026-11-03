@@ -9,6 +9,8 @@ export type StoredCall = {
   readonly ata?: string;
   readonly atd?: string;
   readonly cancelled?: boolean;
+  /** Last public platform Darwin gave. */
+  readonly platform?: string;
 };
 
 /** One Darwin run (RID) as the database keeps it. */
@@ -18,6 +20,10 @@ export type DarwinRun = {
   readonly uid: string;
   readonly toc: string;
   readonly calls: readonly StoredCall[];
+  /** Darwin's latest reason code for running late. */
+  readonly lateReason?: string;
+  /** Darwin's reason code for a cancellation, from the latest schedule. */
+  readonly cancelReason?: string;
 };
 
 const CRS_BY_TIPLOC: Readonly<Record<string, string>> = tiplocCrs;
@@ -27,9 +33,10 @@ export function crsOf(tpl: string): string | undefined {
 }
 
 /**
- * Folds one update into a run. A schedule replaces the calling pattern and keeps the actual
- * times already seen at calls it still has. A train status adds actual times, and a call
- * the schedule never gave is added at the end. Undefined when there is still no public call.
+ * Folds one update into a run. A schedule replaces the calling pattern and its cancellation
+ * reason, and keeps the actual times and platforms already seen at calls it still has. A train
+ * status adds actual times, platforms and a late reason, and a call the schedule never gave is
+ * added at the end. Undefined when there is still no public call.
  */
 export function mergeUpdate(
   run: DarwinRun | undefined,
@@ -55,6 +62,8 @@ export function mergeUpdate(
       uid: update.uid || run?.uid || "",
       toc: update.toc || run?.toc || "",
       calls,
+      ...(run?.lateReason ? { lateReason: run.lateReason } : {}),
+      ...(update.cancelReason ? { cancelReason: update.cancelReason } : {}),
     };
   }
   const calls = [...(run?.calls ?? [])];
@@ -69,12 +78,15 @@ export function mergeUpdate(
   if (calls.length === 0) {
     return run;
   }
+  const lateReason = update.lateReason ?? run?.lateReason;
   return {
     rid: update.rid,
     serviceDate: run?.serviceDate ?? update.serviceDate,
     uid: run?.uid ?? "",
     toc: run?.toc ?? "",
     calls,
+    ...(lateReason ? { lateReason } : {}),
+    ...(run?.cancelReason ? { cancelReason: run.cancelReason } : {}),
   };
 }
 
@@ -90,6 +102,7 @@ function toStoredCall(call: DarwinCall): StoredCall | undefined {
     ...(call.ata ? { ata: call.ata } : {}),
     ...(call.atd ? { atd: call.atd } : {}),
     ...(call.cancelled ? { cancelled: true } : {}),
+    ...(call.platform ? { platform: call.platform } : {}),
   };
 }
 
@@ -98,7 +111,7 @@ function callKey(call: StoredCall): string {
   return `${call.crs}|${call.pta ?? ""}|${call.ptd ?? ""}`;
 }
 
-/** `call` with any actual time `from` has and `call` lacks. */
+/** `call` with the actual times and platform of `from`, where `from` has them. */
 function withActuals(
   call: StoredCall,
   from: StoredCall | undefined,
@@ -108,11 +121,17 @@ function withActuals(
   }
   const ata = from.ata ?? call.ata;
   const atd = from.atd ?? call.atd;
-  return { ...call, ...(ata ? { ata } : {}), ...(atd ? { atd } : {}) };
+  const platform = from.platform ?? call.platform;
+  return {
+    ...call,
+    ...(ata ? { ata } : {}),
+    ...(atd ? { atd } : {}),
+    ...(platform ? { platform } : {}),
+  };
 }
 
 /**
- * Calls as one short text: `CRS,pta,ptd,ata,atd,c` per call, joined by `;`.
+ * Calls as one short text: `CRS,pta,ptd,ata,atd,c,platform` per call, joined by `;`.
  * Plain columns would cost a row per call. This keeps a run near 25 bytes a call.
  */
 export function encodeCalls(calls: readonly StoredCall[]): string {
@@ -125,6 +144,7 @@ export function encodeCalls(calls: readonly StoredCall[]): string {
         call.ata ?? "",
         call.atd ?? "",
         call.cancelled ? "c" : "",
+        call.platform ?? "",
       ].join(","),
     )
     .join(";");
@@ -135,7 +155,7 @@ export function decodeCalls(text: string): StoredCall[] {
     return [];
   }
   return text.split(";").map((part) => {
-    const [crs = "", pta, ptd, ata, atd, flag] = part.split(",");
+    const [crs = "", pta, ptd, ata, atd, flag, platform] = part.split(",");
     return {
       crs,
       ...(pta ? { pta } : {}),
@@ -143,6 +163,7 @@ export function decodeCalls(text: string): StoredCall[] {
       ...(ata ? { ata } : {}),
       ...(atd ? { atd } : {}),
       ...(flag === "c" ? { cancelled: true } : {}),
+      ...(platform ? { platform } : {}),
     };
   });
 }

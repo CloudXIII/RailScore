@@ -1,6 +1,7 @@
 /**
  * Reads the parts of a Darwin Push Port v18 XML document this app keeps: each schedule's public
- * calls, and the actual times a train status (TS) reports for them. Namespace prefixes differ
+ * calls and cancellation reason, and the actual times, platforms and late reason a train status
+ * (TS) reports for them. Namespace prefixes differ
  * between the Kafka feed and the snapshot files, so tags are matched with any prefix.
  * A snapshot file is several XML documents one after another; that is read the same way.
  */
@@ -13,6 +14,8 @@ export type DarwinCall = {
   readonly ata?: string;
   readonly atd?: string;
   readonly cancelled?: boolean;
+  /** Platform Darwin gave for public display. A suppressed platform is left out. */
+  readonly platform?: string;
 };
 
 export type DarwinUpdate =
@@ -23,12 +26,16 @@ export type DarwinUpdate =
       readonly uid: string;
       readonly toc: string;
       readonly calls: readonly DarwinCall[];
+      /** Darwin's reason code for a cancellation, as text, e.g. "526". */
+      readonly cancelReason?: string;
     }
   | {
       readonly kind: "status";
       readonly rid: string;
       readonly serviceDate: string;
       readonly calls: readonly DarwinCall[];
+      /** Darwin's reason code for running late, as text, e.g. "895". */
+      readonly lateReason?: string;
     };
 
 const SCHEDULE = /<(?:\w+:)?schedule\b([^>]*)>([\s\S]*?)<\/(?:\w+:)?schedule>/g;
@@ -39,6 +46,9 @@ const STATUS_LOCATION =
   /<(?:\w+:)?Location\b([^>]*?)(?:\/>|>([\s\S]*?)<\/(?:\w+:)?Location>)/g;
 const ARRIVAL = /<(?:\w+:)?arr\b([^>]*?)\/?>/;
 const DEPARTURE = /<(?:\w+:)?dep\b([^>]*?)\/?>/;
+const PLATFORM = /<(?:\w+:)?plat\b([^>]*)>([^<]*)</;
+const CANCEL_REASON = /<(?:\w+:)?cancelReason\b[^>]*>([^<]*)</;
+const LATE_REASON = /<(?:\w+:)?LateReason\b[^>]*>([^<]*)</;
 
 export function parsePushPort(xml: string): DarwinUpdate[] {
   const updates: DarwinUpdate[] = [];
@@ -63,6 +73,7 @@ export function parsePushPort(xml: string): DarwinUpdate[] {
         ...(attribute(call, "can") === "true" ? { cancelled: true } : {}),
       });
     }
+    const cancelReason = CANCEL_REASON.exec(body)?.[1]?.trim();
     updates.push({
       kind: "schedule",
       rid,
@@ -70,6 +81,7 @@ export function parsePushPort(xml: string): DarwinUpdate[] {
       uid: attribute(attributes, "uid") ?? "",
       toc: attribute(attributes, "toc") ?? "",
       calls,
+      ...(cancelReason ? { cancelReason } : {}),
     });
   }
   for (const [, attributes, body] of xml.matchAll(STATUS)) {
@@ -86,17 +98,29 @@ export function parsePushPort(xml: string): DarwinUpdate[] {
       }
       const ata = actualTime(ARRIVAL.exec(children)?.[1]);
       const atd = actualTime(DEPARTURE.exec(children)?.[1]);
-      if (!ata && !atd) {
+      const platform = publicPlatform(children);
+      if (!ata && !atd && !platform) {
         continue;
       }
       calls.push({
         ...planned,
         ...(ata ? { ata } : {}),
         ...(atd ? { atd } : {}),
+        ...(platform ? { platform } : {}),
       });
     }
-    if (calls.length > 0) {
-      updates.push({ kind: "status", rid, serviceDate, calls });
+    // The late reason belongs to the whole train, outside its locations.
+    const lateReason = LATE_REASON.exec(
+      body.replace(STATUS_LOCATION, ""),
+    )?.[1]?.trim();
+    if (calls.length > 0 || lateReason) {
+      updates.push({
+        kind: "status",
+        rid,
+        serviceDate,
+        calls,
+        ...(lateReason ? { lateReason } : {}),
+      });
     }
   }
   return updates;
@@ -121,6 +145,15 @@ function actualTime(attributes: string | undefined): string | undefined {
     return undefined;
   }
   return hhmm(attribute(attributes, "at"));
+}
+
+/** The platform of a status location, unless Darwin marks it suppressed from public display. */
+function publicPlatform(children: string): string | undefined {
+  const match = PLATFORM.exec(children);
+  if (!match || attribute(match[1] ?? "", "platsup") === "true") {
+    return undefined;
+  }
+  return match[2]?.trim() || undefined;
 }
 
 function attribute(attributes: string, name: string): string | undefined {

@@ -38,6 +38,10 @@ create index if not exists darwin_runs_uid on darwin_runs (uid, service_date);
 -- schedules between 02:00 and 04:00, so that snapshot holds about nine in ten of them.
 alter table darwin_import_state add column if not exists timetable_date date;
 
+-- Darwin's reason codes for running late and for a cancellation, as text ("" when none).
+alter table darwin_runs add column if not exists late_reason text not null default '';
+alter table darwin_runs add column if not exists cancel_reason text not null default '';
+
 -- Finished days, packed: one row per schedule UID and calendar month (see server/darwin/month.ts).
 -- A day moves here from darwin_runs once it is a week old, so a search finds the latest day of
 -- any day type still in darwin_runs. Postgres compresses the repeated calling patterns, so a

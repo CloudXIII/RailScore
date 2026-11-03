@@ -33,15 +33,17 @@ describe("month rows", () => {
     expect(decodeMonth("2026-11-01", "W12345", text)).toEqual([onTime, late]);
   });
 
-  it("keeps cancellations, missing actuals, times past midnight and the operator", () => {
+  it("keeps cancellations, missing actuals, times past midnight, platforms, reasons and the operator", () => {
     const odd: DarwinRun = {
       ...run("2026-11-04", "0000001", [
-        { crs: "EUS", ptd: "2355", atd: "2358" },
-        { crs: "WFJ", pta: "0010", ptd: "0011", ata: "0014" },
+        { crs: "EUS", ptd: "2355", atd: "2358", platform: "15" },
+        { crs: "WFJ", pta: "0010", ptd: "0011", ata: "0014", platform: "3B" },
         { crs: "MKC", pta: "0040", cancelled: true },
         { crs: "XXX", ata: "0050" },
       ]),
       toc: "LM",
+      lateReason: "895",
+      cancelReason: "526",
     };
     const text = encodeMonthChunk([odd]);
 

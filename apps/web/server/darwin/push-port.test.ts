@@ -8,14 +8,15 @@ const status = `<?xml version="1.0" encoding="utf-8"?><Pport xmlns="http://www.t
 const snapshot = `<?xml version="1.0" encoding="utf-8"?><pp:Pport xmlns:pp="http://www.thalesgroup.com/rtti/PushPort/v18"><pp:SnapshotId>20261102230000</pp:SnapshotId></pp:Pport><?xml version="1.0" encoding="utf-8"?><Pport xmlns:s5="http://www.thalesgroup.com/rtti/PushPort/Schedules/v5" xmlns="http://www.thalesgroup.com/rtti/PushPort/v18"><sR><schedule rid="202611026782766" uid="C82766" trainId="1E53" ssd="2026-11-02" toc="SN" trainCat="OO"><s5:OR tpl="LNDNBDC" act="TB" ptd="23:07" wtd="23:07" /><s5:PP tpl="LNDNASJ" wtp="23:09" /><s5:IP tpl="ECROYDN" act="T " pta="23:25" ptd="23:26" wta="23:25" wtd="23:26" can="true" /><s5:OPIP tpl="SELHRST" wta="23:28" wtd="23:29" /><s5:DT tpl="BRGHTN" act="TF" pta="00:10" wta="00:10" can="true" /></schedule><schedule rid="202611027000001" uid="Y00001" ssd="2026-11-02" toc="ZZ" isPassengerSvc="false"><s5:OR tpl="BRGHTN" ptd="23:00" wtd="23:00" /></schedule></sR></Pport>`;
 
 describe("parsePushPort", () => {
-  it("keeps public calls of a train status that have an actual time", () => {
+  it("keeps public calls of a train status with an actual time or platform, and its late reason", () => {
     expect(parsePushPort(status)).toEqual([
       {
         kind: "status",
         rid: "202611026792991",
         serviceDate: "2026-11-02",
+        lateReason: "104",
         calls: [
-          { tpl: "PBRO", ptd: "2223", atd: "2222" },
+          { tpl: "PBRO", ptd: "2223", atd: "2222", platform: "2" },
           {
             tpl: "HNTNGDN",
             pta: "2237",
@@ -43,6 +44,36 @@ describe("parsePushPort", () => {
         ],
       },
     ]);
+  });
+
+  it("leaves out a platform Darwin suppresses from public display", () => {
+    const suppressed = status.replace(
+      '<ns5:plat platsrc="A" conf="true">2</ns5:plat>',
+      '<ns5:plat platsup="true" cisPlatsup="true">2</ns5:plat>',
+    );
+    const [update] = parsePushPort(suppressed);
+    expect(update?.calls[0]).toEqual({ tpl: "PBRO", ptd: "2223", atd: "2222" });
+  });
+
+  it("keeps a call that has only a platform so far", () => {
+    const platformOnly = status.replace(
+      '<ns5:dep at="22:22" atClass="Automatic" src="TD" />',
+      '<ns5:dep et="22:23" src="Darwin" />',
+    );
+    const [update] = parsePushPort(platformOnly);
+    expect(update?.calls[0]).toEqual({
+      tpl: "PBRO",
+      ptd: "2223",
+      platform: "2",
+    });
+  });
+
+  it("reads a schedule's cancellation reason", () => {
+    const cancelled = snapshot.replace(
+      '<s5:DT tpl="BRGHTN" act="TF" pta="00:10" wta="00:10" can="true" /></schedule>',
+      '<s5:DT tpl="BRGHTN" act="TF" pta="00:10" wta="00:10" can="true" /><s5:cancelReason tiploc="ECROYDN">526</s5:cancelReason></schedule>',
+    );
+    expect(parsePushPort(cancelled)[0]).toMatchObject({ cancelReason: "526" });
   });
 
   it("leaves out an actual time Darwin removed", () => {
