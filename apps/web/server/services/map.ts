@@ -1,7 +1,6 @@
 import {
   addCalendarDays,
   journeyMinutes,
-  londonIsoDate,
   minutesApart,
   signedLatenessMinutes,
   type HistoricalRun,
@@ -21,15 +20,14 @@ export type ScheduledService = {
   readonly days: readonly ServiceDay[];
   /** Other public schedules folded into this train, with their run counts. Absent when there are none. */
   readonly variants?: readonly ServiceVariant[];
-  /** HSP's own count for these runs. Absent when any part of the train came without one. */
+  /** Counts of these runs by lateness. Absent when any part of the train came without one. */
   readonly punctuality?: ListPunctuality;
 };
 
 /**
- * Runs HSP counts as reaching the destination at most 5, 14 and 29 minutes late, as the list
- * call reports them. A cancelled run is outside every tolerance. HSP also counts a run with no
- * actual departure at the boarding stop as outside. The full calculation treats that the same
- * way: the passenger could not board, so it is a missed call, not an arrival.
+ * Runs reaching the destination at most 5, 14 and 29 minutes late, counted for the list.
+ * A cancelled run is outside every tolerance. So is a run with no actual departure at the
+ * boarding stop. The full calculation treats that the same way: the passenger could not board, so it is a missed call, not an arrival.
  */
 export type ListPunctuality = {
   readonly runs: number;
@@ -37,9 +35,6 @@ export type ListPunctuality = {
   readonly within14: number;
   readonly within29: number;
 };
-
-/** Tolerances the list call asks for. They match the bands of the full calculation. */
-export const LIST_TOLERANCES = ["5", "14", "29"] as const;
 
 export type ServiceVariant = {
   readonly originCrs: string;
@@ -62,7 +57,8 @@ const OTHER_DAYS_TRAIN_MINUTES = 10;
 /** A train with no run in this many days before the period ends no longer runs. Two weeks, as recent days can lag. */
 const RETIRED_AFTER_DAYS = 14;
 
-export class HspResponseError extends Error {}
+/** A run payload not in the serviceDetails shape. */
+export class UnreadableRunError extends Error {}
 
 export function serviceKey(service: {
   publicDeparture: string;
@@ -78,20 +74,6 @@ export function serviceKey(service: {
     service.originCrs,
     service.destinationCrs,
   ].join("-");
-}
-
-/** Reads a synthetic or live serviceMetrics JSON object. Does not call the network. */
-export function parseServiceMetrics(payload: unknown): ScheduledService[] {
-  const root = record(payload);
-  if (!root || !Array.isArray(root.Services)) {
-    throw new HspResponseError(
-      "The service list was not in the expected shape.",
-    );
-  }
-  return root.Services.flatMap((value) => {
-    const service = parseService(value);
-    return service ? [service] : [];
-  });
 }
 
 /** True when `key` names this train or one of the schedules folded into it. */
@@ -152,7 +134,7 @@ function isRetired(service: ScheduledService, periodEnd: string): boolean {
 }
 
 /**
- * Timed schedules are folded first. A row HSP listed with no public arrival, such as a
+ * Timed schedules are folded first. A row listed with no public arrival, such as a
  * cancelled call that only has a departure, then joins the one train with the same operator
  * and a departure within two minutes. Its runs are kept and its blank arrival is not shown.
  */
@@ -464,7 +446,7 @@ function joinOtherDays(
   );
 }
 
-/** Sets the summed HSP count of `parts` on a joined train, or drops it when a part has none. */
+/** Sets the summed count of `parts` on a joined train, or drops it when a part has none. */
 function withPunctuality(
   service: ScheduledService,
   parts: readonly ScheduledService[],
@@ -500,34 +482,6 @@ function runDates(rids: readonly string[]): Set<string> | undefined {
 }
 
 /**
- * A details payload this service could not read. Stored so this calculation can finish.
- * It is not an observation: the store trusts it for a few hours, then asks again.
- */
-export function unreadableDetails(
-  rid: string,
-  now = new Date(),
-): { payload: unknown; serviceDate: string } {
-  const fromRid = serviceDateOf({}, rid);
-  const serviceDate = fromRid ?? addCalendarDays(londonIsoDate(now), -4);
-  const details: Record<string, unknown> = { locations: [] };
-  if (fromRid) {
-    details.date_of_service = fromRid;
-  }
-  return { payload: { serviceAttributesDetails: details }, serviceDate };
-}
-
-/** True for the placeholder `unreadableDetails` stores. A real calling pattern is not one. */
-export function isUnreadableDetails(payload: unknown): boolean {
-  const root = record(payload);
-  const details = root ? record(root.serviceAttributesDetails) : undefined;
-  return (
-    details !== undefined &&
-    Array.isArray(details.locations) &&
-    details.locations.length === 0
-  );
-}
-
-/**
  * Classifies one details payload. An unreadable payload is a run with no data,
  * so one bad response does not fail the whole service.
  */
@@ -539,7 +493,7 @@ export function historicalRunFromDetails(
   try {
     return toHistoricalRun(payload, stations, rid);
   } catch (error) {
-    if (!(error instanceof HspResponseError)) {
+    if (!(error instanceof UnreadableRunError)) {
       throw error;
     }
     const serviceDate = serviceDateOf(payload, rid);
@@ -550,7 +504,7 @@ export function historicalRunFromDetails(
 }
 
 /**
- * Classifies one run for a passenger boarding at `boardingCrs`. HSP has no cancellation flag.
+ * Classifies one run for a passenger boarding at `boardingCrs`. The payload has no cancellation flag.
  * A public departure with no actual departure is one the passenger could not take, including a
  * train that ran through and left only a passing time in `actual_ta`. That is a missed call.
  * A run with no actual time at any stop is cancelled, with or without a reason.
@@ -563,7 +517,7 @@ export function toHistoricalRun(
   const root = record(payload);
   const details = root ? record(root.serviceAttributesDetails) : undefined;
   if (!details || !Array.isArray(details.locations)) {
-    throw new HspResponseError(
+    throw new UnreadableRunError(
       "A historical run was not in the expected shape.",
     );
   }
@@ -643,75 +597,6 @@ export function serviceDateOf(
   }
   const fromRid = /^(\d{4})(\d{2})(\d{2})/.exec(rid);
   return fromRid ? `${fromRid[1]}-${fromRid[2]}-${fromRid[3]}` : undefined;
-}
-
-/**
- * A public arrival may be blank, as on a cancelled call that only has a public departure.
- * That row is kept so its runs can join the matching train. A row with no departure,
- * operator, origin or destination is left out, so one bad row does not fail the list.
- */
-function parseService(value: unknown): ScheduledService | undefined {
-  const service = record(value);
-  const attributes = service
-    ? record(service.serviceAttributesMetrics)
-    : undefined;
-  const departure = text(attributes?.gbtt_ptd);
-  const arrival = text(attributes?.gbtt_pta);
-  const operator = text(attributes?.toc_code);
-  const origin = text(attributes?.origin_location);
-  const destination = text(attributes?.destination_location);
-  if (!departure || !operator || !origin || !destination || !attributes) {
-    return undefined;
-  }
-  const rids = Array.isArray(attributes.rids)
-    ? attributes.rids.filter((rid): rid is string => typeof rid === "string")
-    : [];
-  if (
-    Array.isArray(attributes.rids) &&
-    rids.length !== attributes.rids.length
-  ) {
-    throw new HspResponseError(
-      "A listed service had an unreadable run identifier.",
-    );
-  }
-  const punctuality = parsePunctuality(service?.Metrics);
-  return {
-    originCrs: origin,
-    destinationCrs: destination,
-    publicDeparture: departure,
-    publicArrival: arrival,
-    operatorCode: operator,
-    rids,
-    days: [],
-    ...(punctuality ? { punctuality } : {}),
-  };
-}
-
-/** Undefined unless every tolerance in `LIST_TOLERANCES` is present and readable. */
-function parsePunctuality(value: unknown): ListPunctuality | undefined {
-  if (!Array.isArray(value)) {
-    return undefined;
-  }
-  const counts = LIST_TOLERANCES.map((tolerance) => {
-    const metric = value
-      .map(record)
-      .find((entry) => text(entry?.tolerance_value) === tolerance);
-    const within = Number(text(metric?.num_tolerance) || Number.NaN);
-    const outside = Number(text(metric?.num_not_tolerance) || Number.NaN);
-    return Number.isInteger(within) && Number.isInteger(outside)
-      ? { within, runs: within + outside }
-      : undefined;
-  });
-  const [five, fourteen, twentyNine] = counts;
-  if (!five || !fourteen || !twentyNine) {
-    return undefined;
-  }
-  return {
-    runs: five.runs,
-    within5: five.within,
-    within14: fourteen.within,
-    within29: twentyNine.within,
-  };
 }
 
 function orderedDays(days: readonly ServiceDay[]): ServiceDay[] {

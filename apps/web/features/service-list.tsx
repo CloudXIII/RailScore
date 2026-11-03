@@ -24,22 +24,22 @@ import {
   matchesServiceKey,
   serviceKey,
   type ScheduledService,
-} from "@/server/hsp/map";
+} from "@/server/services/map";
 import type { ParsedQuery } from "@/server/query";
 
 export function ServiceList({
   query,
   services,
   retired = [],
-  listedTo,
+  listed,
   stations,
   sample = false,
 }: {
   query: ParsedQuery;
   services: readonly ScheduledService[];
   retired?: readonly ScheduledService[];
-  /** Last date the listed runs cover. */
-  listedTo?: string;
+  /** Dates the listed runs cover. */
+  listed?: { from: string; to: string };
   stations: readonly Station[];
   sample?: boolean;
 }) {
@@ -99,7 +99,7 @@ export function ServiceList({
       <p>
         {listIntro({
           periodDays: query.period,
-          listedTo,
+          listed,
           sample,
         })}
       </p>

@@ -1,9 +1,6 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
-import { BusyRetry } from "@/features/busy-retry";
 import { ThemeMenu } from "@/features/theme-menu";
-import { CalculationProgress } from "@/features/calculation-progress";
-import { ContentReady, WaitGate } from "@/features/wait-gate";
 import { DataNotice } from "@/features/data-notice";
 import { pageTitle } from "@/features/page-title";
 import { ReliabilityResultView } from "@/features/reliability-result";
@@ -16,11 +13,8 @@ import {
   findSelectedService,
 } from "@/server/calculate-reliability";
 import { usesMockData } from "@/server/env";
+import { errorText } from "@/server/error-text";
 import { findServices } from "@/server/find-services";
-import { clearCalculationProgress } from "@/server/hsp/calculation-progress";
-import { HspRequestError } from "@/server/hsp/client";
-import { DailyLimitError } from "@/server/hsp/daily-limit";
-import { HspResponseError } from "@/server/hsp/map";
 import { parseQuery, timeHhmm, type ParsedQuery } from "@/server/query";
 import {
   loadStationDirectory,
@@ -29,7 +23,8 @@ import {
 import type { Station } from "@/server/stations";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 180;
+/** Next to Neon (eu-west-2). A US region adds an ocean to every database round trip. */
+export const preferredRegion = "lhr1";
 
 export async function generateMetadata({
   searchParams,
@@ -101,27 +96,18 @@ export default async function Home({
           stations={stations}
         />
         {ready ? (
-          <WaitGate
+          <Suspense
             key={panelKey(query)}
-            title={
-              query.calculate
-                ? "Checking this train's recent journeys"
-                : "Finding trains"
+            fallback={
+              <p className="meta" role="status">
+                {query.calculate
+                  ? "Checking this train's recent journeys…"
+                  : "Finding trains…"}
+              </p>
             }
-            detail={
-              query.calculate
-                ? "The first check can take up to a minute. Leave this tab open."
-                : "This usually takes under a minute."
-            }
-            mode={query.calculate ? "calculation" : "search"}
-            periodDays={query.period}
-            days={query.days}
-            serviceKey={query.calculate ? query.serviceKey : undefined}
           >
-            <Suspense fallback={null}>
-              <TrainPanel query={query} sample={sample} stations={stations} />
-            </Suspense>
-          </WaitGate>
+            <TrainPanel query={query} sample={sample} stations={stations} />
+          </Suspense>
         ) : null}
       </main>
       <DataNotice sample={sample} />
@@ -139,10 +125,7 @@ async function TrainPanel({
   stations: readonly Station[];
 }) {
   if (!query.from || !query.to) {
-    return <ContentReady>{null}</ContentReady>;
-  }
-  if (query.calculate && query.serviceKey) {
-    clearCalculationProgress(query.serviceKey);
+    return null;
   }
   try {
     const found = await findServices({
@@ -151,7 +134,6 @@ async function TrainPanel({
       timeHhmm: timeHhmm(query.time),
       days: query.days,
       periodDays: query.period,
-      refreshStale: !query.calculate,
     });
     const selected = query.serviceKey
       ? findSelectedService(
@@ -161,29 +143,26 @@ async function TrainPanel({
       : undefined;
     const calculation =
       query.calculate && selected
-        ? await finishCalculation(
-            selected,
-            query.from.crs,
-            query.to.crs,
-            query.serviceKey,
-          )
+        ? calculateService({
+            service: selected,
+            boardingCrs: query.from.crs,
+            destinationCrs: query.to.crs,
+            runs: found.runs,
+          })
         : undefined;
-    const result =
-      calculation?.status === "complete" ? calculation.result : undefined;
-    const byDay = calculation?.status === "complete" ? calculation.byDay : [];
     const trains = (
       <ServiceList
         query={query}
         services={found.services}
         retired={found.retired}
-        listedTo={found.period.to}
+        listed={found.period}
         stations={stations}
         sample={sample}
       />
     );
 
     return (
-      <ContentReady>
+      <>
         {query.calculate && query.serviceKey && !selected ? (
           <p className="warning" role="status">
             That service was not in the historical results for this search.
@@ -194,16 +173,7 @@ async function TrainPanel({
             Choose a train.
           </p>
         ) : null}
-        {calculation?.status === "working" ? (
-          <CalculationProgress
-            saved={calculation.saved}
-            total={calculation.total}
-            provisional={calculation.provisional}
-            serviceKey={query.serviceKey}
-            periodDays={query.period}
-            days={query.days}
-          />
-        ) : result && selected ? (
+        {calculation && selected ? (
           <TrainDetail
             href={listHref(query)}
             result={
@@ -212,8 +182,8 @@ async function TrainPanel({
                 fromCrs={query.from.crs}
                 toCrs={query.to.crs}
                 period={found.period}
-                result={result}
-                byDay={byDay}
+                result={calculation.result}
+                byDay={calculation.byDay}
                 stations={stations}
                 days={query.days}
                 sample={sample}
@@ -224,47 +194,16 @@ async function TrainPanel({
         ) : (
           trains
         )}
-      </ContentReady>
+      </>
     );
   } catch (error) {
-    if (error instanceof HspRequestError && error.kind === "busy") {
-      const calculating = query.calculate && Boolean(query.serviceKey);
-      return (
-        <ContentReady>
-          <BusyRetry
-            title={
-              calculating
-                ? "Checking this train's recent journeys"
-                : "Finding trains"
-            }
-            mode={calculating ? "calculation" : "search"}
-            periodDays={query.period}
-            days={query.days}
-            serviceKey={calculating ? query.serviceKey : undefined}
-            message={error.message}
-          />
-        </ContentReady>
-      );
-    }
+    console.error("The search failed", errorText(error));
     return (
-      <ContentReady>
-        <p className="errors" role="alert">
-          {errorMessage(error)}
-        </p>
-      </ContentReady>
+      <p className="errors" role="alert">
+        Something went wrong. Try again.
+      </p>
     );
   }
-}
-
-function errorMessage(error: unknown): string {
-  if (
-    error instanceof HspRequestError ||
-    error instanceof HspResponseError ||
-    error instanceof DailyLimitError
-  ) {
-    return error.message;
-  }
-  return "Something went wrong. Try again.";
 }
 
 function SiteHeader() {
@@ -289,25 +228,6 @@ function Intro() {
       </p>
     </header>
   );
-}
-
-/**
- * One slice, then the page. A slice that is still working renders the same
- * progress screen as a slow single-call run, and that screen reloads to continue.
- * Staying in this request until every run is stored would hide that screen.
- */
-async function finishCalculation(
-  service: NonNullable<ReturnType<typeof findSelectedService>>,
-  boardingCrs: string,
-  destinationCrs: string,
-  progressKey: string | undefined,
-) {
-  return calculateService({
-    service,
-    boardingCrs,
-    destinationCrs,
-    progressKey,
-  });
 }
 
 function panelKey(query: ParsedQuery): string {

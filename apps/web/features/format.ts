@@ -1,9 +1,14 @@
-import { counted, journeyMinutes, searchClockRange } from "@railscore/core";
+import {
+  addCalendarDays,
+  counted,
+  journeyMinutes,
+  searchClockRange,
+} from "@railscore/core";
 import type {
   ListPunctuality,
   ScheduledService,
   ServiceDay,
-} from "@/server/hsp/map";
+} from "@/server/services/map";
 
 export const DAY_LABELS: Record<ServiceDay, string> = {
   weekdays: "Weekdays",
@@ -94,7 +99,7 @@ export type ListScore = {
 };
 
 /**
- * HSP's own figure for a listed train. Undefined when HSP gave no count.
+ * The list's own figure for a train. Undefined when it came without a count.
  * Severe journeys are those outside 29 minutes: cancelled or 30 or more minutes late.
  */
 export function listScore(
@@ -188,19 +193,26 @@ export function trainListHeading(time: string): string {
   return `Trains from ${formatClock(range.from)} to ${formatClock(range.to)}`;
 }
 
-/** The sentence under the list heading. Names the period, then what on time means. */
+/**
+ * The sentence under the list heading. Names the period, then what on time means.
+ * Before a full period of runs is stored, it names the days recorded so far.
+ */
 export function listIntro(input: {
   periodDays: number;
-  listedTo?: string;
+  /** Dates the listed runs cover. */
+  listed?: { from: string; to: string };
   sample: boolean;
 }): string {
   const meaning = "On time means it arrived early or less than 5 minutes late.";
   if (input.sample) {
     return `Sample trains for trying the screens. ${meaning}`;
   }
-  const window = input.listedTo
-    ? `in the last ${input.periodDays} days, up to ${formatDate(input.listedTo)}`
-    : `in the last ${input.periodDays} days`;
+  const listed = input.listed;
+  const window = !listed
+    ? `in the last ${input.periodDays} days`
+    : listed.from > addCalendarDays(listed.to, 1 - input.periodDays)
+      ? `from ${formatDate(listed.from)} to ${formatDate(listed.to)}, the days recorded so far`
+      : `in the last ${input.periodDays} days, up to ${formatDate(listed.to)}`;
   return `How often each direct train arrived on time ${window}. ${meaning}`;
 }
 
