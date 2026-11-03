@@ -2,7 +2,8 @@ import { resolveStation, type Station } from "./stations";
 
 export type DayPattern = "weekdays" | "saturday" | "sunday" | "all";
 
-export const PERIOD_LENGTHS = [30, 60, 90] as const;
+/** Days of history. Neon Free (0.5 GB) holds about 30 days of Darwin runs. */
+export const PERIOD_LENGTHS = [30] as const;
 export type PeriodLength = (typeof PERIOD_LENGTHS)[number];
 
 export type ParsedQuery = {
