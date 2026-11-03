@@ -17,14 +17,27 @@ describe("train list copy", () => {
     expect(trainListHeading("07:00")).toBe("Trains from 07:00 to 07:59");
     expect(trainListHeading("23:30")).toBe("Trains from 23:30 to 00:29");
     expect(
-      listIntro({ periodDays: 90, listedTo: "2026-10-18", sample: false }),
+      listIntro({
+        periodDays: 30,
+        listed: { from: "2026-09-19", to: "2026-10-18" },
+        sample: false,
+      }),
     ).toBe(
-      "How often each direct train arrived on time in the last 90 days, up to 18/10/2026. On time means it arrived early or less than 5 minutes late.",
+      "How often each direct train arrived on time in the last 30 days, up to 18/10/2026. On time means it arrived early or less than 5 minutes late.",
+    );
+    expect(
+      listIntro({
+        periodDays: 30,
+        listed: { from: "2026-10-12", to: "2026-10-18" },
+        sample: false,
+      }),
+    ).toBe(
+      "How often each direct train arrived on time from 12/10/2026 to 18/10/2026, the days recorded so far. On time means it arrived early or less than 5 minutes late.",
     );
     expect(listIntro({ periodDays: 30, sample: false })).toBe(
       "How often each direct train arrived on time in the last 30 days. On time means it arrived early or less than 5 minutes late.",
     );
-    expect(listIntro({ periodDays: 90, sample: true })).toBe(
+    expect(listIntro({ periodDays: 30, sample: true })).toBe(
       "Sample trains for trying the screens. On time means it arrived early or less than 5 minutes late.",
     );
   });

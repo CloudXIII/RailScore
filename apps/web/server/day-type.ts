@@ -1,4 +1,4 @@
-import type { ServiceDay } from "./hsp/map";
+import type { ServiceDay } from "./services/map";
 
 /** Day type of a YYYY-MM-DD date, read as written rather than shifted by a timezone. */
 export function dayTypeOf(iso: string): ServiceDay | undefined {

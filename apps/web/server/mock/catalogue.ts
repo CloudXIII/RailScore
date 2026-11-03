@@ -4,7 +4,7 @@ import {
   type ListPunctuality,
   type ScheduledService,
   type ServiceDay,
-} from "@/server/hsp/map";
+} from "@/server/services/map";
 import type { DayPattern } from "@/server/query";
 import type { Station } from "@/server/stations";
 
@@ -127,7 +127,7 @@ export function mockRuns(service: ScheduledService): HistoricalRun[] {
   return runs;
 }
 
-/** The list's HSP-style count for sample runs. Runs with no data are left out, as HSP does. */
+/** The list's count for sample runs. Runs with no data are left out, as for real runs. */
 function mockPunctuality(runs: readonly HistoricalRun[]): ListPunctuality {
   const known = runs.filter((run) => run.outcome !== "missing_actual");
   const within = (minutes: number) =>

@@ -22,7 +22,7 @@ export function DataNotice({ sample }: { sample: boolean }) {
             cancellation figure.
           </p>
           <p>
-            Historical performance data: Rail Delivery Group. Station names:
+            Train running data: Darwin, Rail Delivery Group. Station names:
             National Rail. RailScore is not endorsed by Rail Delivery Group,
             National Rail or train operators.
           </p>

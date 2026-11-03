@@ -16,7 +16,7 @@ import {
 } from "@/features/timetable-changes";
 import type { DayTypeResult } from "@/server/day-split";
 import { stationName, type Station } from "@/server/stations";
-import type { ScheduledService } from "@/server/hsp/map";
+import type { ScheduledService } from "@/server/services/map";
 
 export function ReliabilityResultView({
   service,

@@ -4,7 +4,7 @@ import {
   type ReliabilityResult,
 } from "@railscore/core";
 import { dayTypeOf } from "./day-type";
-import { DAY_ORDER, type ServiceDay } from "./hsp/map";
+import { DAY_ORDER, type ServiceDay } from "./services/map";
 
 export type DayTypeResult = {
   readonly day: ServiceDay;
