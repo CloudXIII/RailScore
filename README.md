@@ -71,6 +71,7 @@ Every variable is server-only. Do not add a `NEXT_PUBLIC_` prefix.
 | `DARWIN_KAFKA_*`                                      | Optional. Darwin Push Port on Kafka, for the import below. Bootstrap, SASL mechanism, security protocol, topic, group, username and password, as the Rail Data Marketplace Pub/Sub tab shows them.         |
 | `DARWIN_SNAPSHOT_URL`, `DARWIN_SNAPSHOT_CONSUMER_KEY` | Optional. Hourly Darwin snapshots, read only when Kafka dropped messages before an import read them.                                                                                                       |
 | `DARWIN_KEEP_DAYS`                                    | Optional. Days of Darwin runs kept. Default 30.                                                                                                                                                            |
+| `DARWIN_LISTS`                                        | Optional. `auto` (default) lists trains from Darwin once its runs cover the period, HSP before. `force` uses Darwin whatever it covers. `off` always asks HSP.                                             |
 | `CRON_SECRET`                                         | Optional. Turns on `/api/import/darwin`, which needs `Authorization: Bearer <CRON_SECRET>`.                                                                                                                |
 
 Create the tables when `DATABASE_URL` is set. Point that command at the direct URL, then point the running app at the pooled URL.
@@ -129,7 +130,9 @@ A calculation calls HSP for one slice of about 10 seconds, then the page shows h
 
 ### Darwin import
 
-`/api/import/darwin` reads the Darwin Push Port messages since the last import and stores each run (RID) in `darwin_runs`, with its public calls and actual times. A calculation then takes a finished day's run from there instead of asking HSP for its details. HSP still gives the service lists.
+`/api/import/darwin` reads the Darwin Push Port messages since the last import and stores each run (RID) in `darwin_runs`, with its public calls and actual times. A calculation then takes a finished day's run from there instead of asking HSP for its details.
+
+Once a day, after 05:10 UTC, the import also reads the 05:00 snapshot. Darwin loads the day's schedules between 02:00 and 04:00, so that snapshot holds about nine in ten of the day's passenger trains; trains added later in the day come through Kafka. A search then starts from the timetable: the trains of today (or, for another day type, of its latest day) between the two stations, then each train's runs in the period by schedule UID. That is two database reads and no HSP call. A train that ran in the period but is not in that timetable is shown as no longer running. With `DARWIN_LISTS=auto`, the default, HSP gives the list until the stored runs reach back over the whole period.
 
 Kafka keeps about an hour of messages, so a scheduler calls the route every 15 minutes. Vercel Hobby crons run at most once a day, and GitHub's scheduled workflows stop after 60 days without a commit, so the deployment uses [cron-job.org](https://cron-job.org) (free):
 
