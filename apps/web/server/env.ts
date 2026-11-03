@@ -144,6 +144,70 @@ export function stationsFeed(): { baseUrl: string; apiKey: string } {
   return { baseUrl: baseUrl.replace(/\/$/, ""), apiKey };
 }
 
+export type DarwinKafka = {
+  brokers: string[];
+  mechanism: "plain";
+  username: string;
+  password: string;
+  groupId: string;
+  topic: string;
+};
+
+/** Darwin Push Port on the Rail Data Marketplace, from the product's Pub/Sub tab. The XML topic. */
+export function darwinKafka(): DarwinKafka {
+  const values = {
+    DARWIN_KAFKA_BOOTSTRAP: read("DARWIN_KAFKA_BOOTSTRAP"),
+    DARWIN_KAFKA_USERNAME: read("DARWIN_KAFKA_USERNAME"),
+    DARWIN_KAFKA_PASSWORD: read("DARWIN_KAFKA_PASSWORD"),
+    DARWIN_KAFKA_GROUP: read("DARWIN_KAFKA_GROUP"),
+    DARWIN_KAFKA_TOPIC: read("DARWIN_KAFKA_TOPIC"),
+  };
+  const absent = Object.entries(values)
+    .filter(([, value]) => value === undefined)
+    .map(([name]) => name);
+  const mechanism = read("DARWIN_KAFKA_SASL_MECHANISM") ?? "PLAIN";
+  if (mechanism.toUpperCase() !== "PLAIN") {
+    throw new Error(`Unsupported DARWIN_KAFKA_SASL_MECHANISM: ${mechanism}`);
+  }
+  if (absent.length > 0) {
+    throw new MissingEnvironmentError(absent.join(", "));
+  }
+  return {
+    brokers: values
+      .DARWIN_KAFKA_BOOTSTRAP!.split(",")
+      .map((broker) => broker.trim()),
+    mechanism: "plain",
+    username: values.DARWIN_KAFKA_USERNAME!,
+    password: values.DARWIN_KAFKA_PASSWORD!,
+    groupId: values.DARWIN_KAFKA_GROUP!,
+    topic: values.DARWIN_KAFKA_TOPIC!,
+  };
+}
+
+/** Hourly Darwin snapshot files, for hours Kafka dropped before an import read them. */
+export function darwinSnapshot(): { url: string; apiKey: string } {
+  const url = read("DARWIN_SNAPSHOT_URL");
+  const apiKey = read("DARWIN_SNAPSHOT_CONSUMER_KEY");
+  const absent = [
+    url ? undefined : "DARWIN_SNAPSHOT_URL",
+    apiKey ? undefined : "DARWIN_SNAPSHOT_CONSUMER_KEY",
+  ].filter((name): name is string => name !== undefined);
+  if (!url || !apiKey) {
+    throw new MissingEnvironmentError(absent.join(", "));
+  }
+  return { url, apiKey };
+}
+
+/** Days of Darwin runs kept. An unset or unusable value stays at 30, the default search period. A day of the whole network is about 10 MB. */
+export function darwinKeepDays(): number {
+  return positiveInteger("DARWIN_KEEP_DAYS", 30);
+}
+
+/** Secret a scheduler sends as `Authorization: Bearer …` to start an import. Undefined turns the route off. */
+export function importSecret(): string | undefined {
+  return read("CRON_SECRET");
+}
+
 export type HspConnection = {
   baseUrl: string;
   apiKey: string;
