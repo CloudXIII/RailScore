@@ -59,27 +59,13 @@ async function loadRuns(
 ): Promise<Map<string, DarwinRun>> {
   const runs = new Map<string, DarwinRun>();
   for (let start = 0; start < rids.length; start += WRITE_ROWS) {
-    const rows = await sql<
-      {
-        rid: string;
-        service_date: string;
-        uid: string;
-        toc: string;
-        calls: string;
-      }[]
-    >`
+    const rows = await sql<RunRow[]>`
       select rid, service_date::text as service_date, uid, toc, calls
       from darwin_runs
       where rid in ${sql(rids.slice(start, start + WRITE_ROWS))}
     `;
     for (const row of rows) {
-      runs.set(row.rid, {
-        rid: row.rid,
-        serviceDate: row.service_date,
-        uid: row.uid,
-        toc: row.toc,
-        calls: decodeCalls(row.calls),
-      });
+      runs.set(row.rid, runOf(row));
     }
   }
   return runs;
@@ -171,6 +157,79 @@ export async function noteGap(sql: Sql, from: Date, to: Date): Promise<void> {
 /** Everything up to `through` has been read from snapshots. */
 export async function noteGapFilled(sql: Sql, through: Date): Promise<void> {
   await sql`update darwin_import_state set gap_from = ${through}::timestamptz where id = 1`;
+}
+
+/** UTC date whose morning snapshot was last read for the timetable. */
+export async function timetableDate(sql: Sql): Promise<string | undefined> {
+  const [row] = await sql<{ timetable_date: string | null }[]>`
+    select timetable_date::text as timetable_date from darwin_import_state where id = 1
+  `;
+  return row?.timetable_date ?? undefined;
+}
+
+export async function noteTimetable(sql: Sql, date: string): Promise<void> {
+  await sql`update darwin_import_state set timetable_date = ${date}::date where id = 1`;
+}
+
+type RunRow = {
+  rid: string;
+  service_date: string;
+  uid: string;
+  toc: string;
+  calls: string;
+};
+
+function runOf(row: RunRow): DarwinRun {
+  return {
+    rid: row.rid,
+    serviceDate: row.service_date,
+    uid: row.uid,
+    toc: row.toc,
+    calls: decodeCalls(row.calls),
+  };
+}
+
+/**
+ * One day's runs calling at both stations, in any order. A CRS only starts a call in the
+ * stored text, so matching `CRS,` finds the station.
+ */
+export async function runsOnDay(
+  sql: Sql,
+  input: { fromCrs: string; toCrs: string; date: string },
+): Promise<DarwinRun[]> {
+  const rows = await sql<RunRow[]>`
+    select rid, service_date::text as service_date, uid, toc, calls
+    from darwin_runs
+    where service_date = ${input.date}::date
+      and calls like ${`%${input.fromCrs},%`}
+      and calls like ${`%${input.toCrs},%`}
+  `;
+  return rows.map(runOf);
+}
+
+/** Runs of these schedule UIDs between two dates, both inclusive. */
+export async function runsOfTrains(
+  sql: Sql,
+  input: { uids: readonly string[]; fromDate: string; toDate: string },
+): Promise<DarwinRun[]> {
+  if (input.uids.length === 0) {
+    return [];
+  }
+  const rows = await sql<RunRow[]>`
+    select rid, service_date::text as service_date, uid, toc, calls
+    from darwin_runs
+    where uid in ${sql([...input.uids])}
+      and service_date between ${input.fromDate}::date and ${input.toDate}::date
+  `;
+  return rows.map(runOf);
+}
+
+/** Oldest service date stored. Undefined when there are no runs yet. */
+export async function oldestRunDate(sql: Sql): Promise<string | undefined> {
+  const [row] = await sql<{ oldest: string | null }[]>`
+    select min(service_date)::text as oldest from darwin_runs
+  `;
+  return row?.oldest ?? undefined;
 }
 
 /** Records the newest message read. Never moves it back. */

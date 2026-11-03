@@ -75,6 +75,14 @@ create table if not exists darwin_import_state (
 
 insert into darwin_import_state (id) values (1) on conflict (id) do nothing;
 
+-- A search reads one day's runs between two stations, then the earlier runs of those trains
+-- by schedule UID. A station index over every run would cost about a third of the stored size.
+create index if not exists darwin_runs_uid on darwin_runs (uid, service_date);
+
+-- UTC date whose 05:00 snapshot was read for the day's timetable. Darwin loads the day's
+-- schedules between 02:00 and 04:00, so that snapshot holds about nine in ten of them.
+alter table darwin_import_state add column if not exists timetable_date date;
+
 -- One in-flight calculation per service. A second request reads stored runs
 -- instead of calling HSP. The lease expires if the holder stops.
 create table if not exists hsp_calculation_lock (

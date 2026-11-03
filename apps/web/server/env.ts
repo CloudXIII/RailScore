@@ -198,6 +198,16 @@ export function darwinSnapshot(): { url: string; apiKey: string } {
   return { url, apiKey };
 }
 
+/**
+ * Where service lists come from. `auto` (the default) uses stored Darwin runs once they reach
+ * back over the whole period, and HSP before that. `force` uses Darwin runs whatever they
+ * cover, for trying it out. `off` always asks HSP.
+ */
+export function darwinListMode(): "auto" | "force" | "off" {
+  const value = read("DARWIN_LISTS");
+  return value === "force" || value === "off" ? value : "auto";
+}
+
 /** Days of Darwin runs kept. An unset or unusable value stays at 30, the default search period. A day of the whole network is about 10 MB. */
 export function darwinKeepDays(): number {
   return positiveInteger("DARWIN_KEEP_DAYS", 30);

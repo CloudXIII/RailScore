@@ -17,7 +17,9 @@ import {
   noteGap,
   noteGapFilled,
   noteProgress,
+  noteTimetable,
   releaseImport,
+  timetableDate,
 } from "./store";
 
 /** Messages folded into one database write and offset commit. */
@@ -26,6 +28,8 @@ const FLUSH_MESSAGES = 5_000;
 const SNAPSHOT_RESERVE_MS = 60_000;
 /** Snapshot files are published a few minutes after the hour. */
 const SNAPSHOT_DELAY_MS = 10 * 60_000;
+/** Snapshot hour read for the day's timetable. */
+const TIMETABLE_HOUR_UTC = 5;
 
 export type ImportResult =
   | { status: "busy" }
@@ -36,6 +40,8 @@ export type ImportResult =
       runWrites: number;
       caughtUp: boolean;
       newestMessageAt?: string;
+      /** UTC date whose timetable this import read from the morning snapshot. */
+      timetableLoaded?: string;
       /** Kafka had dropped messages this import never read. */
       gapFound: boolean;
       snapshotHours: string[];
@@ -68,6 +74,9 @@ export async function importDarwin(budgetMs: number): Promise<ImportResult> {
     if (kafka.gapFound && before.lastMessageAt && kafka.oldestAt) {
       await noteGap(sql, before.lastMessageAt, kafka.oldestAt);
     }
+    const timetable = kafka.caughtUp
+      ? await loadTimetable(deadline)
+      : { runWrites: 0 };
     const filled = kafka.caughtUp
       ? await fillGap(deadline)
       : { hours: [], runWrites: 0 };
@@ -75,8 +84,9 @@ export async function importDarwin(budgetMs: number): Promise<ImportResult> {
     return {
       status: "done",
       messages: kafka.messages,
-      runWrites: kafka.runWrites + filled.runWrites,
+      runWrites: kafka.runWrites + timetable.runWrites + filled.runWrites,
       caughtUp: kafka.caughtUp,
+      ...(timetable.date ? { timetableLoaded: timetable.date } : {}),
       ...(kafka.newestAt
         ? { newestMessageAt: kafka.newestAt.toISOString() }
         : {}),
@@ -255,6 +265,37 @@ function xmlOf(value: Buffer | null): string {
     return typeof wrapper.bytes === "string" ? wrapper.bytes : "";
   } catch {
     return value.toString("utf8");
+  }
+}
+
+/**
+ * Once a day, reads the 05:00 UTC snapshot for the day's timetable. Darwin loads the day's
+ * schedules between 02:00 and 04:00, so that snapshot holds about nine in ten of the day's
+ * passenger trains. Trains added later in the day arrive through Kafka.
+ */
+async function loadTimetable(
+  deadline: number,
+): Promise<{ date?: string; runWrites: number }> {
+  const sql = database()!;
+  const hour = new Date();
+  hour.setUTCHours(TIMETABLE_HOUR_UTC, 0, 0, 0);
+  const date = hour.toISOString().slice(0, 10);
+  if (
+    Date.now() < hour.getTime() + SNAPSHOT_DELAY_MS ||
+    Date.now() > deadline - SNAPSHOT_RESERVE_MS ||
+    (await timetableDate(sql)) === date
+  ) {
+    return { runWrites: 0 };
+  }
+  try {
+    const runWrites = await applyUpdates(sql, await snapshotUpdates(hour));
+    await noteTimetable(sql, date);
+    return { date, runWrites };
+  } catch (error) {
+    if (!(error instanceof SnapshotMissingError)) {
+      console.error("The Darwin timetable could not be read", errorText(error));
+    }
+    return { runWrites: 0 };
   }
 }
 

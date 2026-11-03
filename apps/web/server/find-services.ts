@@ -2,6 +2,8 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { clockMinutes, departureSlices, trailingDays } from "@railscore/core";
 import { afterResponse } from "./after-response";
+import { findDarwinServices } from "./darwin/find";
+import { errorText } from "./error-text";
 import {
   hspListWorkers,
   hspSerialAfterRefusalMs,
@@ -115,6 +117,9 @@ type ServiceSearch = {
 };
 
 /**
+ * Stored Darwin runs give the list when they cover the period (see `findDarwinServices`):
+ * one database read, no HSP call. Otherwise HSP gives it, as follows.
+ *
  * Each five-minute block of each day type is one list, fetched for the whole period: HSP
  * takes as long for 7 days as for 90, and its counts then describe that period.
  * A list that already covers the period is shown at once; if it was fetched hours ago
@@ -134,6 +139,21 @@ export async function findServices(
   const period = trailingDays(input.periodDays, now);
   if (usesMockData()) {
     return { services: mockServices(input), retired: [], period };
+  }
+  try {
+    const darwin = await findDarwinServices(input, now);
+    if (darwin) {
+      return {
+        services: darwin.services,
+        retired: darwin.retired,
+        period: darwin.period,
+      };
+    }
+  } catch (error) {
+    console.error(
+      "Darwin runs could not be listed; asking HSP",
+      errorText(error),
+    );
   }
   const dayTypes = input.days === "all" ? DAY_TYPES : [input.days];
   const slices = departureSlices(input.timeHhmm);
@@ -395,9 +415,7 @@ async function fetchLists(
 
   const serialPauseMs = hspSerialAfterRefusalMs();
   const workers =
-    serialPauseMs > 0 && Date.now() < serialUntil
-      ? 1
-      : listWorkersFor(input);
+    serialPauseMs > 0 && Date.now() < serialUntil ? 1 : listWorkersFor(input);
   await Promise.all(Array.from({ length: workers }, worker));
   // A refusal while HSP answered nothing else is HSP being busy, not a limit on two calls.
   if (refusedAlongside && tally.calls > callsBefore && serialPauseMs > 0) {
