@@ -122,9 +122,13 @@ export function darwinSnapshot(): { url: string; apiKey: string } {
   return { url, apiKey };
 }
 
-/** Days of Darwin runs kept. An unset or unusable value stays at 30, the default search period. A day of the whole network is about 10 MB. */
+/**
+ * Days of Darwin runs kept. An unset or unusable value stays at 90, the longest search period.
+ * Packed into month rows, a day of the whole network is under 1 MB; the last 8 open days are
+ * about 13 MB each.
+ */
 export function darwinKeepDays(): number {
-  return positiveInteger("DARWIN_KEEP_DAYS", 30);
+  return positiveInteger("DARWIN_KEEP_DAYS", 90);
 }
 
 /** Secret a scheduler sends as `Authorization: Bearer …` to start an import. Undefined turns the route off. */

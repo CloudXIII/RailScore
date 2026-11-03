@@ -1,23 +1,38 @@
 import "server-only";
 import type { Sql } from "postgres";
 import { addCalendarDays, londonIsoDate } from "@railscore/core";
+import { decodeMonth, encodeMonthChunk, monthOf } from "./month";
 import type { DarwinUpdate } from "./push-port";
-import {
-  decodeCalls,
-  encodeCalls,
-  detailsPayloadFromDarwin,
-  mergeUpdate,
-  type DarwinRun,
-} from "./run";
+import { decodeCalls, encodeCalls, mergeUpdate, type DarwinRun } from "./run";
 
 /** Rows per statement. Postgres takes at most 65,535 parameters, five per row here. */
 const WRITE_ROWS = 2_000;
 
-/** Folds updates into the stored runs. Returns how many runs changed. */
+/** Month rows per statement. A packed day is a few hundred bytes per row before compression. */
+const MONTH_ROWS = 500;
+
+/**
+ * Days kept as one row per run: today and the 7 before it, so the latest day of every day type
+ * is there for a search to start from. Older days are packed into `darwin_months`.
+ */
+export const OPEN_DAYS = 8;
+
+/** First day still kept as one row per run. Earlier days are packed and no longer change. */
+export function openFrom(now: Date): string {
+  return addCalendarDays(londonIsoDate(now), 1 - OPEN_DAYS);
+}
+
+/**
+ * Folds updates into the stored runs. Returns how many runs changed. An update for a day that
+ * is already packed is dropped: a lone late message would otherwise start a partial copy.
+ */
 export async function applyUpdates(
   sql: Sql,
-  updates: readonly DarwinUpdate[],
+  received: readonly DarwinUpdate[],
+  now = new Date(),
 ): Promise<number> {
+  const from = openFrom(now);
+  const updates = received.filter((update) => update.serviceDate >= from);
   if (updates.length === 0) {
     return 0;
   }
@@ -72,29 +87,9 @@ async function loadRuns(
 }
 
 /**
- * Darwin runs for these RIDs in the serviceDetails shape the calculation reads, for days
- * that have finished. A run from today may still be under way, so it is left out.
+ * Drops runs older than `keepDays`. A month row goes once its whole month is older, so up to a
+ * month more can stay readable; searches never ask for it.
  */
-export async function loadSettledDarwinRuns(
-  sql: Sql,
-  rids: readonly string[],
-  now: Date,
-): Promise<Map<string, unknown>> {
-  const payloads = new Map<string, unknown>();
-  if (rids.length === 0) {
-    return payloads;
-  }
-  const today = londonIsoDate(now);
-  const runs = await loadRuns(sql, rids);
-  for (const [rid, run] of runs) {
-    if (run.serviceDate < today) {
-      payloads.set(rid, detailsPayloadFromDarwin(run));
-    }
-  }
-  return payloads;
-}
-
-/** Drops runs older than `keepDays`. */
 export async function deleteOldRuns(
   sql: Sql,
   keepDays: number,
@@ -103,7 +98,59 @@ export async function deleteOldRuns(
   const oldest = addCalendarDays(londonIsoDate(now), -keepDays);
   const result =
     await sql`delete from darwin_runs where service_date < ${oldest}::date`;
+  await sql`delete from darwin_months where month < ${monthOf(oldest)}::date`;
   return result.count;
+}
+
+/**
+ * Packs the oldest day before `openFrom` into month rows, one day at a time while there is
+ * time. Each day is appended to its rows and taken out of `darwin_runs` in one transaction,
+ * so a run is never in both places or in neither. Returns the days packed.
+ */
+export async function packFinishedDays(
+  sql: Sql,
+  now: Date,
+  deadline: number,
+): Promise<string[]> {
+  const packed: string[] = [];
+  while (Date.now() < deadline) {
+    const [next] = await sql<{ day: string | null }[]>`
+      select min(service_date)::text as day from darwin_runs
+      where service_date < ${openFrom(now)}::date
+    `;
+    const day = next?.day;
+    if (!day) {
+      break;
+    }
+    await sql.begin(async (tx) => {
+      const rows = await tx<RunRow[]>`
+        select rid, service_date::text as service_date, uid, toc, calls
+        from darwin_runs where service_date = ${day}::date
+      `;
+      const byUid = new Map<string, DarwinRun[]>();
+      for (const row of rows) {
+        const run = runOf(row);
+        byUid.set(run.uid, [...(byUid.get(run.uid) ?? []), run]);
+      }
+      const months = [...byUid].map(([uid, runs]) => ({
+        uid,
+        month: monthOf(day),
+        first_day: day,
+        runs: encodeMonthChunk(runs),
+      }));
+      for (let start = 0; start < months.length; start += MONTH_ROWS) {
+        await tx`
+          insert into darwin_months ${tx(months.slice(start, start + MONTH_ROWS), "uid", "month", "first_day", "runs")}
+          on conflict (uid, month) do update
+          set runs = darwin_months.runs || E'\n' || excluded.runs,
+            first_day = least(darwin_months.first_day, excluded.first_day)
+        `;
+      }
+      await tx`delete from darwin_runs where service_date = ${day}::date`;
+    });
+    packed.push(day);
+  }
+  return packed;
 }
 
 /** Takes the import lease for `ms`. False while another import holds it. */
@@ -190,7 +237,7 @@ function runOf(row: RunRow): DarwinRun {
 }
 
 /**
- * One day's runs calling at both stations, in any order. A CRS only starts a call in the
+ * One open day's runs calling at both stations, in any order. Packed days are not searched. A CRS only starts a call in the
  * stored text, so matching `CRS,` finds the station.
  */
 export async function runsOnDay(
@@ -207,7 +254,7 @@ export async function runsOnDay(
   return rows.map(runOf);
 }
 
-/** Runs of these schedule UIDs between two dates, both inclusive. */
+/** Runs of these schedule UIDs between two dates, both inclusive, open and packed. */
 export async function runsOfTrains(
   sql: Sql,
   input: { uids: readonly string[]; fromDate: string; toDate: string },
@@ -215,19 +262,45 @@ export async function runsOfTrains(
   if (input.uids.length === 0) {
     return [];
   }
-  const rows = await sql<RunRow[]>`
-    select rid, service_date::text as service_date, uid, toc, calls
-    from darwin_runs
-    where uid in ${sql([...input.uids])}
-      and service_date between ${input.fromDate}::date and ${input.toDate}::date
-  `;
-  return rows.map(runOf);
+  const uids = sql([...input.uids]);
+  const [open, months] = await Promise.all([
+    sql<RunRow[]>`
+      select rid, service_date::text as service_date, uid, toc, calls
+      from darwin_runs
+      where uid in ${uids}
+        and service_date between ${input.fromDate}::date and ${input.toDate}::date
+    `,
+    sql<{ uid: string; month: string; runs: string }[]>`
+      select uid, month::text as month, runs
+      from darwin_months
+      where uid in ${uids}
+        and month between ${monthOf(input.fromDate)}::date and ${monthOf(input.toDate)}::date
+    `,
+  ]);
+  const runs = new Map<string, DarwinRun>();
+  for (const row of months) {
+    for (const run of decodeMonth(row.month, row.uid, row.runs)) {
+      if (
+        run.serviceDate >= input.fromDate &&
+        run.serviceDate <= input.toDate
+      ) {
+        runs.set(run.rid, run);
+      }
+    }
+  }
+  for (const row of open) {
+    runs.set(row.rid, runOf(row));
+  }
+  return [...runs.values()];
 }
 
-/** Oldest service date stored. Undefined when there are no runs yet. */
+/** Oldest service date stored, open or packed. Undefined when there are no runs yet. */
 export async function oldestRunDate(sql: Sql): Promise<string | undefined> {
   const [row] = await sql<{ oldest: string | null }[]>`
-    select min(service_date)::text as oldest from darwin_runs
+    select least(
+      (select min(service_date) from darwin_runs),
+      (select min(first_day) from darwin_months)
+    )::text as oldest
   `;
   return row?.oldest ?? undefined;
 }

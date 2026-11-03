@@ -67,12 +67,12 @@ describe("numeric settings", () => {
   it("keeps the defaults until a usable value is set", () => {
     clear();
     expect(databasePoolMax()).toBe(3);
-    expect(darwinKeepDays()).toBe(30);
+    expect(darwinKeepDays()).toBe(90);
 
     process.env.DATABASE_POOL_MAX = "0";
     process.env.DARWIN_KEEP_DAYS = "nope";
     expect(databasePoolMax()).toBe(3);
-    expect(darwinKeepDays()).toBe(30);
+    expect(darwinKeepDays()).toBe(90);
 
     process.env.DATABASE_POOL_MAX = "40";
     process.env.DARWIN_KEEP_DAYS = "14";

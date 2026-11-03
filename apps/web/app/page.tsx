@@ -143,10 +143,11 @@ async function TrainPanel({
       : undefined;
     const calculation =
       query.calculate && selected
-        ? await calculateService({
+        ? calculateService({
             service: selected,
             boardingCrs: query.from.crs,
             destinationCrs: query.to.crs,
+            runs: found.runs,
           })
         : undefined;
     const trains = (

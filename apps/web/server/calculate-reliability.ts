@@ -4,8 +4,8 @@ import {
   type HistoricalRun,
   type ReliabilityResult,
 } from "@railscore/core";
-import { loadSettledDarwinRuns } from "./darwin/store";
-import { database } from "./db";
+import { londonIsoDate } from "@railscore/core";
+import { detailsPayloadFromDarwin, type DarwinRun } from "./darwin/run";
 import { reliabilityByDayType, type DayTypeResult } from "./day-split";
 import { usesMockData } from "./env";
 import { mockRuns } from "./mock/catalogue";
@@ -22,34 +22,30 @@ type ServiceCalculation = {
 };
 
 /**
- * Reliability of one train from its stored Darwin runs. A run with no settled Darwin record,
- * such as one from before the import began or lost from the feed, has no known outcome.
+ * Reliability of one train from the Darwin runs its search read. A run of today may still be
+ * under way, and a RID with no stored run (lost from the feed) has no known outcome.
  */
-export async function calculateService(input: {
+export function calculateService(input: {
   service: ScheduledService;
   boardingCrs: string;
   destinationCrs: string;
+  runs: ReadonlyMap<string, DarwinRun>;
   now?: Date;
-}): Promise<ServiceCalculation> {
+}): ServiceCalculation {
   if (usesMockData()) {
     return summarise(mockRuns(input.service));
   }
-  const rids = input.service.rids;
-  const sql = database();
-  const stored =
-    sql && rids.length > 0
-      ? await loadSettledDarwinRuns(sql, rids, input.now ?? new Date())
-      : new Map<string, unknown>();
+  const today = londonIsoDate(input.now ?? new Date());
   const stations = {
     boardingCrs: input.boardingCrs,
     destinationCrs: input.destinationCrs,
   };
   return summarise(
-    rids.map((rid) => {
-      const payload = stored.get(rid);
-      return payload === undefined
-        ? missingRun(rid)
-        : historicalRunFromDetails(payload, stations, rid);
+    input.service.rids.map((rid) => {
+      const run = input.runs.get(rid);
+      return run && run.serviceDate < today
+        ? historicalRunFromDetails(detailsPayloadFromDarwin(run), stations, rid)
+        : missingRun(rid);
     }),
   );
 }

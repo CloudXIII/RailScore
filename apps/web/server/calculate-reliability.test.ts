@@ -1,33 +1,22 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { calculateService } from "./calculate-reliability";
-import { loadSettledDarwinRuns } from "./darwin/store";
-import { database } from "./db";
+import type { DarwinRun } from "./darwin/run";
 import type { ScheduledService } from "./services/map";
 
-vi.mock("./db", () => ({ database: vi.fn() }));
-vi.mock("./darwin/store", () => ({ loadSettledDarwinRuns: vi.fn() }));
+const NOW = new Date("2026-11-04T12:00:00Z");
 
-const details = {
-  serviceAttributesDetails: {
-    date_of_service: "2026-07-17",
-    locations: [
-      {
-        location: "LIV",
-        gbtt_ptd: "0630",
-        gbtt_pta: "",
-        actual_td: "0630",
-        actual_ta: "",
-      },
-      {
-        location: "MIA",
-        gbtt_ptd: "",
-        gbtt_pta: "0721",
-        actual_td: "",
-        actual_ta: "0722",
-      },
+function run(rid: string, date: string, actualArrival: string): DarwinRun {
+  return {
+    rid,
+    serviceDate: date,
+    uid: "W12345",
+    toc: "NT",
+    calls: [
+      { crs: "LIV", ptd: "0630", atd: "0630" },
+      { crs: "MIA", pta: "0721", ata: actualArrival },
     ],
-  },
-};
+  };
+}
 
 const service: ScheduledService = {
   originCrs: "LIV",
@@ -35,7 +24,7 @@ const service: ScheduledService = {
   publicDeparture: "0630",
   publicArrival: "0721",
   operatorCode: "NT",
-  rids: ["202607170000001", "202607180000002"],
+  rids: ["202611020000001", "202611030000002", "202611040000003"],
   days: ["weekdays"],
 };
 
@@ -44,23 +33,20 @@ const stations = { boardingCrs: "LIV", destinationCrs: "MIA" };
 describe("calculateService", () => {
   beforeEach(() => {
     delete process.env.RAILSCORE_DATA;
-    vi.mocked(database).mockReset();
-    vi.mocked(loadSettledDarwinRuns).mockReset();
   });
 
-  it("classifies stored Darwin runs and counts a run with none as no data", async () => {
-    vi.mocked(database).mockReturnValue({} as ReturnType<typeof database>);
-    vi.mocked(loadSettledDarwinRuns).mockResolvedValue(
-      new Map([["202607170000001", details]]),
-    );
+  it("classifies the runs its search read and counts a RID with none as no data", () => {
+    const runs = new Map([
+      ["202611020000001", run("202611020000001", "2026-11-02", "0722")],
+    ]);
 
-    const { result } = await calculateService({ service, ...stations });
+    const { result } = calculateService({
+      service,
+      ...stations,
+      runs,
+      now: NOW,
+    });
 
-    expect(loadSettledDarwinRuns).toHaveBeenCalledWith(
-      expect.anything(),
-      service.rids,
-      expect.any(Date),
-    );
     expect(result.withinFiveMinutes).toEqual({
       count: 1,
       total: 1,
@@ -69,15 +55,22 @@ describe("calculateService", () => {
     expect(result.calendar.map((mark) => mark.kind)).toEqual([
       "on_time",
       "no_data",
+      "no_data",
     ]);
   });
 
-  it("finishes with no known runs when there is no database", async () => {
-    vi.mocked(database).mockReturnValue(undefined);
+  it("leaves today's run out, since it may still be under way", () => {
+    const runs = new Map([
+      ["202611040000003", run("202611040000003", "2026-11-04", "0750")],
+    ]);
 
-    const { result } = await calculateService({ service, ...stations });
+    const { result } = calculateService({
+      service,
+      ...stations,
+      runs,
+      now: NOW,
+    });
 
-    expect(loadSettledDarwinRuns).not.toHaveBeenCalled();
     expect(result.withinFiveMinutes.total).toBe(0);
   });
 });
