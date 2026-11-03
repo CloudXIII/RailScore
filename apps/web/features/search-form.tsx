@@ -125,7 +125,7 @@ export function SearchForm({
           required
         />
         <p className="meta" id="departure-window">
-          {departureWindowHint(time)}
+          {departureWindowHint()}
         </p>
       </div>
       <fieldset className="days">

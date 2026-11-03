@@ -1,9 +1,4 @@
-import {
-  addCalendarDays,
-  counted,
-  journeyMinutes,
-  searchClockRange,
-} from "@railscore/core";
+import { addCalendarDays, counted, journeyMinutes } from "@railscore/core";
 import type {
   ListPunctuality,
   ScheduledService,
@@ -165,32 +160,33 @@ function joinLabels(labels: readonly string[]): string {
   return `${labels.slice(0, -1).join(", ")} and ${labels[labels.length - 1]}`;
 }
 
-/** Collapsed search summary. Names the hour the list covers, not only its start. */
+/** Collapsed search summary. */
 export function timeSearchLabel(time: string): string {
-  return `Departing ${timeWindowLabel(time)}`;
+  return `Departing from ${time}`;
+}
+
+/** Help under the time field. */
+export function departureWindowHint(): string {
+  return "Shows the next direct trains from this time.";
 }
 
 /**
- * Help under the time field. Names the hour that will be listed.
- * A partial clock keeps a general line, because the range needs a valid time.
+ * Heading above the train list. Names the first and last listed departures, since the
+ * list is the next few trains and can span minutes or hours.
  */
-export function departureWindowHint(time: string): string {
-  if (!validClock(time)) {
-    return "Shows direct trains leaving in the hour from this time.";
+export function trainListHeading(
+  time: string,
+  departures: readonly string[],
+): string {
+  const sorted = [...departures].sort();
+  const first = sorted[0];
+  const last = sorted.at(-1);
+  if (!first || !last) {
+    return `Trains from ${time}`;
   }
-  return `Shows direct trains leaving ${timeWindowLabel(time)}.`;
-}
-
-/** The exact minutes this list covers. Departing from 07:00 lists 07:00–07:59. */
-export function timeWindowLabel(time: string): string {
-  const range = clockWindow(time);
-  return `${formatClock(range.from)}–${formatClock(range.to)}`;
-}
-
-/** Heading above the train list. Departing from 07:00 reads "Trains from 07:00 to 07:59". */
-export function trainListHeading(time: string): string {
-  const range = clockWindow(time);
-  return `Trains from ${formatClock(range.from)} to ${formatClock(range.to)}`;
+  return first === last
+    ? `Train at ${formatClock(first)}`
+    : `Trains from ${formatClock(first)} to ${formatClock(last)}`;
 }
 
 /**
@@ -214,18 +210,6 @@ export function listIntro(input: {
       ? `from ${formatDate(listed.from)} to ${formatDate(listed.to)}, the days recorded so far`
       : `in the last ${input.periodDays} days, up to ${formatDate(listed.to)}`;
   return `How often each direct train arrived on time ${window}. ${meaning}`;
-}
-
-function clockWindow(time: string): { from: string; to: string } {
-  return searchClockRange(time.replace(":", ""));
-}
-
-function validClock(time: string): boolean {
-  const match = /^(\d{2}):(\d{2})$/.exec(time);
-  if (!match) {
-    return false;
-  }
-  return Number(match[1]) <= 23 && Number(match[2]) <= 59;
 }
 
 export function formatClock(hhmm: string): string {

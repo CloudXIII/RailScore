@@ -8,14 +8,16 @@ import {
   throughServiceLabel,
   departureWindowHint,
   timeSearchLabel,
-  timeWindowLabel,
   trainListHeading,
 } from "./format";
 
 describe("train list copy", () => {
-  it("names the hour in the heading and explains on time once", () => {
-    expect(trainListHeading("07:00")).toBe("Trains from 07:00 to 07:59");
-    expect(trainListHeading("23:30")).toBe("Trains from 23:30 to 00:29");
+  it("names the listed departures in the heading and explains on time once", () => {
+    expect(trainListHeading("07:00", ["0742", "0712", "0905"])).toBe(
+      "Trains from 07:12 to 09:05",
+    );
+    expect(trainListHeading("07:00", ["0712"])).toBe("Train at 07:12");
+    expect(trainListHeading("23:30", [])).toBe("Trains from 23:30");
     expect(
       listIntro({
         periodDays: 30,
@@ -43,30 +45,11 @@ describe("train list copy", () => {
   });
 });
 
-describe("timeWindowLabel", () => {
-  it("shows 07:00–07:59 when departing from 07:00", () => {
-    expect(timeWindowLabel("07:00")).toBe("07:00–07:59");
-  });
-
-  it("wraps a departure that crosses midnight", () => {
-    expect(timeWindowLabel("23:30")).toBe("23:30–00:29");
-  });
-});
-
-describe("departure window copy", () => {
-  it("names the hour in the collapsed summary and the field hint", () => {
-    expect(timeSearchLabel("07:30")).toBe("Departing 07:30–08:29");
-    expect(departureWindowHint("07:30")).toBe(
-      "Shows direct trains leaving 07:30–08:29.",
-    );
-  });
-
-  it("keeps a general hint until the clock is complete", () => {
-    expect(departureWindowHint("")).toBe(
-      "Shows direct trains leaving in the hour from this time.",
-    );
-    expect(departureWindowHint("07:99")).toBe(
-      "Shows direct trains leaving in the hour from this time.",
+describe("departure time copy", () => {
+  it("names the start time in the collapsed summary and the field hint", () => {
+    expect(timeSearchLabel("07:30")).toBe("Departing from 07:30");
+    expect(departureWindowHint()).toBe(
+      "Shows the next direct trains from this time.",
     );
   });
 });

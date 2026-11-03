@@ -3,7 +3,7 @@ import { trailingDays } from "@railscore/core";
 import { findDarwinServices } from "./darwin/find";
 import type { DarwinRun } from "./darwin/run";
 import { usesMockData } from "./env";
-import { mockServices } from "./mock/catalogue";
+import { mockServices, shiftClock } from "./mock/catalogue";
 import type { DayPattern } from "./query";
 import type { ScheduledService } from "./services/map";
 
@@ -15,9 +15,16 @@ type ServiceSearch = {
   period: { from: string; to: string };
   /** Stored runs of the listed trains by RID. Empty for sample trains. */
   runs: ReadonlyMap<string, DarwinRun>;
+  /** Searched time, HHMM, that lists the trains just before these. None at the start of the day. */
+  earlier?: string;
+  /** Searched time, HHMM, that lists the trains just after these. None at the end of the day. */
+  later?: string;
 };
 
-/** Trains of today's Darwin timetable with their stored runs, or sample trains in mock mode. */
+/**
+ * The next trains of today's Darwin timetable from the searched time, with their stored
+ * runs, or sample trains in mock mode.
+ */
 export async function findServices(input: {
   fromCrs: string;
   toCrs: string;
@@ -33,6 +40,8 @@ export async function findServices(input: {
       retired: [],
       period: trailingDays(input.periodDays, now),
       runs: new Map(),
+      earlier: shiftClock(input.timeHhmm, -60),
+      later: shiftClock(input.timeHhmm, 60),
     };
   }
   const found = await findDarwinServices(input, now);
@@ -41,5 +50,7 @@ export async function findServices(input: {
     retired: found.retired,
     period: found.period,
     runs: found.runs,
+    ...(found.earlier ? { earlier: found.earlier } : {}),
+    ...(found.later ? { later: found.later } : {}),
   };
 }
