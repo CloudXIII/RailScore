@@ -47,6 +47,34 @@ create table if not exists hsp_daily_calls (
   calls integer not null
 );
 
+-- One row per Darwin run (RID), merged from the Push Port feed. `calls` holds the public calls
+-- as compact text (see server/darwin/run.ts), so a run costs one row rather than one per call.
+create table if not exists darwin_runs (
+  rid text primary key,
+  service_date date not null,
+  uid text not null default '',
+  toc text not null default '',
+  calls text not null,
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists darwin_runs_service_date on darwin_runs (service_date);
+
+-- Where the Darwin import got to. Kafka keeps about an hour of messages. When it dropped some
+-- before an import read them, gap_from..gap_to is the time they covered, and later imports
+-- fill it from the hourly snapshot files, moving gap_from on as each hour is read.
+-- The lease keeps two imports from running at once.
+create table if not exists darwin_import_state (
+  id smallint primary key,
+  last_message_at timestamptz,
+  last_finished_at timestamptz,
+  gap_from timestamptz,
+  gap_to timestamptz,
+  leased_until timestamptz not null default 'epoch'
+);
+
+insert into darwin_import_state (id) values (1) on conflict (id) do nothing;
+
 -- One in-flight calculation per service. A second request reads stored runs
 -- instead of calling HSP. The lease expires if the holder stops.
 create table if not exists hsp_calculation_lock (

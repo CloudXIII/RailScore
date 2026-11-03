@@ -52,22 +52,26 @@ Copy `.env.example` to `apps/web/.env.local` and replace the placeholders. Next.
 
 Every variable is server-only. Do not add a `NEXT_PUBLIC_` prefix.
 
-| Variable                                            | Role                                                                                                                                                                                                       |
-| --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `HSP_BASE_URL`, `HSP_API_KEY`, `HSP_API_KEY_HEADER` | Historic Service Performance. Required. The key is sent in the header named by `HSP_API_KEY_HEADER`; the marketplace uses `x-apikey`.                                                                      |
-| `STATIONS_BASE_URL`, `STATIONS_API_KEY`             | Station names and CRS codes. Required, including when `RAILSCORE_DATA=mock`. The server sends the key as `x-apikey`.                                                                                       |
-| `DATABASE_URL`                                      | Optional Postgres. The running app should use a pooled URL. `npm run db:migrate` should use the direct URL. Without it, nothing is stored and the HSP rate limit covers this process only.                 |
-| `HSP_MAX_REQUESTS_PER_SECOND`                       | Optional. Default 3. Shared by every process when `DATABASE_URL` is set.                                                                                                                                   |
-| `HSP_LIST_WORKERS`                                  | Optional. List calls one search keeps in flight. Default 2.                                                                                                                                                |
-| `HSP_LIST_SLOT_COUNT`                               | Optional. List calls in flight across every instance. Default 2. Needs a database row per slot (the schema inserts 1–12).                                                                                    |
-| `HSP_LIST_START_GAP_MS`                             | Optional. Gap between list-call starts. Default 1500. `0` starts them together.                                                                                                                            |
-| `HSP_DETAIL_CONCURRENCY`                            | Optional. Detail calls one calculation keeps in flight. Default 1.                                                                                                                                         |
-| `HSP_SERIAL_AFTER_REFUSAL_MS`                       | Optional. After HSP refuses a list call beside another, that process uses one list call for this long. Default 180000. `0` keeps the worker count.                                                         |
-| `DATABASE_POOL_MAX`                                 | Optional. Postgres connections in this process. Default 3.                                                                                                                                                 |
-| `HSP_DAILY_CALL_LIMIT`                              | Optional. Default 5000 HSP calls per London day, only when `DATABASE_URL` is set. Without a database there is no daily cap. If the database is set and the counter cannot be reached, no HSP call is made. |
-| `RAILSCORE_DATA`                                    | Leave unset for the live feed. `mock` serves made-up trains.                                                                                                                                               |
-| `PORT`                                              | Optional. `npm run dev` uses 3000.                                                                                                                                                                         |
-| `RAILSCORE_LOG_HSP`                                 | Optional. `1` logs each HSP call. Off by default.                                                                                                                                                          |
+| Variable                                              | Role                                                                                                                                                                                                       |
+| ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `HSP_BASE_URL`, `HSP_API_KEY`, `HSP_API_KEY_HEADER`   | Historic Service Performance. Required. The key is sent in the header named by `HSP_API_KEY_HEADER`; the marketplace uses `x-apikey`.                                                                      |
+| `STATIONS_BASE_URL`, `STATIONS_API_KEY`               | Station names and CRS codes. Required, including when `RAILSCORE_DATA=mock`. The server sends the key as `x-apikey`.                                                                                       |
+| `DATABASE_URL`                                        | Optional Postgres. The running app should use a pooled URL. `npm run db:migrate` should use the direct URL. Without it, nothing is stored and the HSP rate limit covers this process only.                 |
+| `HSP_MAX_REQUESTS_PER_SECOND`                         | Optional. Default 3. Shared by every process when `DATABASE_URL` is set.                                                                                                                                   |
+| `HSP_LIST_WORKERS`                                    | Optional. List calls one search keeps in flight. Default 2.                                                                                                                                                |
+| `HSP_LIST_SLOT_COUNT`                                 | Optional. List calls in flight across every instance. Default 2. Needs a database row per slot (the schema inserts 1–12).                                                                                  |
+| `HSP_LIST_START_GAP_MS`                               | Optional. Gap between list-call starts. Default 1500. `0` starts them together.                                                                                                                            |
+| `HSP_DETAIL_CONCURRENCY`                              | Optional. Detail calls one calculation keeps in flight. Default 1.                                                                                                                                         |
+| `HSP_SERIAL_AFTER_REFUSAL_MS`                         | Optional. After HSP refuses a list call beside another, that process uses one list call for this long. Default 180000. `0` keeps the worker count.                                                         |
+| `DATABASE_POOL_MAX`                                   | Optional. Postgres connections in this process. Default 3.                                                                                                                                                 |
+| `HSP_DAILY_CALL_LIMIT`                                | Optional. Default 5000 HSP calls per London day, only when `DATABASE_URL` is set. Without a database there is no daily cap. If the database is set and the counter cannot be reached, no HSP call is made. |
+| `RAILSCORE_DATA`                                      | Leave unset for the live feed. `mock` serves made-up trains.                                                                                                                                               |
+| `PORT`                                                | Optional. `npm run dev` uses 3000.                                                                                                                                                                         |
+| `RAILSCORE_LOG_HSP`                                   | Optional. `1` logs each HSP call. Off by default.                                                                                                                                                          |
+| `DARWIN_KAFKA_*`                                      | Optional. Darwin Push Port on Kafka, for the import below. Bootstrap, SASL mechanism, security protocol, topic, group, username and password, as the Rail Data Marketplace Pub/Sub tab shows them.         |
+| `DARWIN_SNAPSHOT_URL`, `DARWIN_SNAPSHOT_CONSUMER_KEY` | Optional. Hourly Darwin snapshots, read only when Kafka dropped messages before an import read them.                                                                                                       |
+| `DARWIN_KEEP_DAYS`                                    | Optional. Days of Darwin runs kept. Default 30.                                                                                                                                                            |
+| `CRON_SECRET`                                         | Optional. Turns on `/api/import/darwin`, which needs `Authorization: Bearer <CRON_SECRET>`.                                                                                                                |
 
 Create the tables when `DATABASE_URL` is set. Point that command at the direct URL, then point the running app at the pooled URL.
 
@@ -122,6 +126,23 @@ On a host whose filesystem is read-only, the station file under `apps/web/.data/
 With more than one instance, memory is not shared. Postgres is what shares stored runs, stored service lists, the HSP rate limit, the list call slots, the calculation lock, and the daily call count.
 
 A calculation calls HSP for one slice of about 10 seconds, then the page shows how many journeys are checked and reloads the same URL to continue. The host must allow a request of at least about 60 seconds, because finding the train list can take longer than that slice. The home route also sets Next.js `maxDuration` to 180 seconds. Hosts that do not read that Next.js option use their own request limit instead.
+
+### Darwin import
+
+`/api/import/darwin` reads the Darwin Push Port messages since the last import and stores each run (RID) in `darwin_runs`, with its public calls and actual times. A calculation then takes a finished day's run from there instead of asking HSP for its details. HSP still gives the service lists.
+
+Kafka keeps about an hour of messages, so a scheduler calls the route every 15 minutes. Vercel Hobby crons run at most once a day, and GitHub's scheduled workflows stop after 60 days without a commit, so the deployment uses [cron-job.org](https://cron-job.org) (free):
+
+1. Set `CRON_SECRET` (a long random string) and the `DARWIN_*` variables in the deployment, then redeploy.
+2. On cron-job.org, create a job for `https://<deployment>/api/import/darwin`, every 15 minutes, method GET.
+3. Under Advanced, add the header `Authorization` with the value `Bearer <CRON_SECRET>`.
+4. Turn on failure notifications, so a run of failures reaches you by email.
+
+cron-job.org closes the connection after 30 seconds. The route answers `202` at once and imports after the response, within the function's 300 seconds, so the job shows success when the import has started. The result is in the deployment's log under `[darwin-import]`. `?wait=1` imports first and answers with the result, for a run by hand.
+
+Offsets are committed only after the runs are written. A second import that starts while one is running finds the lease taken and stops. When Kafka dropped messages before an import read them, later imports fill those hours from the hourly snapshot files, which are kept for 2 to 3 days. A snapshot holds a run until about 30 minutes after it arrives, so a filled hour can miss some arrivals. Runs older than `DARWIN_KEEP_DAYS` are deleted.
+
+`apps/web/server/darwin/tiploc-crs.json` maps Darwin's TIPLOCs to CRS codes. Rebuild it from a Darwin reference file (`PPTimetable_*_ref_v*.xml.gz`, from "Darwin Timetable Files") with `node apps/web/scripts/tiploc-crs.mjs <file>`.
 
 ## Layout
 

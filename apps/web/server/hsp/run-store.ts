@@ -2,6 +2,7 @@ import "server-only";
 import type { JSONValue } from "postgres";
 import { addCalendarDays, londonIsoDate } from "@railscore/core";
 import { database } from "../db";
+import { loadSettledDarwinRuns } from "../darwin/store";
 import { errorText } from "../error-text";
 import { isUnreadableDetails, serviceDateOf } from "./map";
 import { isStoredRunReusable, isUnreadablePlaceholderReusable } from "./policy";
@@ -11,7 +12,10 @@ type MemoryRun = { payload: unknown; serviceDate: string; fetchedAt: Date };
 /** Same-process copy, so a continuation on this server still sees runs when the database is absent. */
 const memoryRuns = new Map<string, MemoryRun>();
 
-/** Stored serviceDetails payloads that are still trustworthy, keyed by RID. */
+/**
+ * Stored serviceDetails payloads that are still trustworthy, keyed by RID.
+ * A RID HSP has not given is filled from the Darwin import when its day has finished.
+ */
 export async function loadStoredRuns(
   rids: readonly string[],
   now: Date,
@@ -67,6 +71,21 @@ export async function loadStoredRuns(
   } catch (error) {
     console.error(
       "Stored runs could not be read; fetching from HSP",
+      errorText(error),
+    );
+  }
+  const missing = rids.filter((rid) => !stored.has(rid));
+  try {
+    for (const [rid, payload] of await loadSettledDarwinRuns(
+      sql,
+      missing,
+      now,
+    )) {
+      stored.set(rid, payload);
+    }
+  } catch (error) {
+    console.error(
+      "Darwin runs could not be read; fetching from HSP",
       errorText(error),
     );
   }
