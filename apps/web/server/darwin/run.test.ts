@@ -5,6 +5,7 @@ import {
   decodeCalls,
   encodeCalls,
   detailsPayloadFromDarwin,
+  historicalRunFromDarwin,
   mergeUpdate,
   type DarwinRun,
 } from "./run";
@@ -169,5 +170,37 @@ describe("detailsPayloadFromDarwin", () => {
     expect(
       toHistoricalRun(detailsPayloadFromDarwin(run), stations, rid).outcome,
     ).toBe("did_not_call");
+  });
+});
+
+describe("historicalRunFromDarwin", () => {
+  const stations = { boardingCrs: "CLJ", destinationCrs: "WAT" };
+  const scheduled = mergeUpdate(undefined, schedule)!;
+
+  it("leaves a run with no movement seen out, rather than cancelled", () => {
+    expect(historicalRunFromDarwin(scheduled, stations)).toEqual({
+      id: rid,
+      serviceDate: "2026-11-02",
+      outcome: "missing_actual",
+    });
+  });
+
+  it("still reads a run Darwin cancelled as cancelled", () => {
+    const run = mergeUpdate(undefined, {
+      ...schedule,
+      calls: schedule.calls.map((call) => ({ ...call, cancelled: true })),
+    })!;
+    expect(historicalRunFromDarwin(run, stations).outcome).toBe("cancelled");
+  });
+
+  it("classifies a seen run with the shared run rules", () => {
+    const run = mergeUpdate(
+      mergeUpdate(scheduled, arrived({ atd: "0813" })),
+      arrived({ ata: "0829" }),
+    )!;
+    expect(historicalRunFromDarwin(run, stations)).toMatchObject({
+      outcome: "arrived",
+      latenessMinutes: 6,
+    });
   });
 });
