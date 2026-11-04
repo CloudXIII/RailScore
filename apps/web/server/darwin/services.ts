@@ -3,13 +3,12 @@ import { dayTypeOf } from "../day-type";
 import {
   listServices,
   serviceDateOf,
-  toHistoricalRun,
   type ListPunctuality,
   type ScheduledService,
   type ServiceDay,
 } from "../services/map";
 import type { DayPattern } from "../query";
-import { detailsPayloadFromDarwin, type DarwinRun } from "./run";
+import { historicalRunFromDarwin, type DarwinRun } from "./run";
 
 export type DarwinSearch = {
   fromCrs: string;
@@ -230,11 +229,10 @@ function legOf(
 
 /** The list's counts for one run. A run with no known outcome is not counted. */
 function punctualityOf(run: DarwinRun, search: DarwinSearch): ListPunctuality {
-  const outcome = toHistoricalRun(
-    detailsPayloadFromDarwin(run),
-    { boardingCrs: search.fromCrs, destinationCrs: search.toCrs },
-    run.rid,
-  );
+  const outcome = historicalRunFromDarwin(run, {
+    boardingCrs: search.fromCrs,
+    destinationCrs: search.toCrs,
+  });
   if (outcome.outcome === "missing_actual") {
     return NO_RUNS;
   }
