@@ -22,7 +22,8 @@ export function DataNotice({ sample }: { sample: boolean }) {
             cancellation figure.
           </p>
           <p>
-            Train running data: Darwin, Rail Delivery Group. Station names:
+            Train running data: Darwin, and Historic Service Performance for
+            days before 4 November 2026, Rail Delivery Group. Station names:
             National Rail. RailScore is not endorsed by Rail Delivery Group,
             National Rail or train operators.
           </p>

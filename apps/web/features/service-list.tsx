@@ -23,6 +23,12 @@ import {
   type ScheduledService,
 } from "@/server/services/map";
 import type { ParsedQuery } from "@/server/query";
+import { useBacklogState } from "@/features/backlog-context";
+import {
+  backlogTotal,
+  listPunctuality,
+  type TrainBacklog,
+} from "@/features/backlog-figures";
 
 export function ServiceList({
   query,
@@ -65,6 +71,7 @@ export function ServiceList({
   }
   const from = query.from;
   const to = query.to;
+  const backlog = useBacklogState();
   const lastRetired = retired
     .map(lastRunDate)
     .filter((date): date is string => date !== undefined)
@@ -78,6 +85,14 @@ export function ServiceList({
         stationName(crs, stations),
       )}
       searched={query.days}
+      backlog={backlog?.trains.get(serviceKey(service))}
+      waiting={
+        backlog !== undefined &&
+        !backlog.done &&
+        services.includes(service) &&
+        !backlog.trains.has(serviceKey(service)) &&
+        !backlog.missing.has(serviceKey(service))
+      }
       chosen={chosen === serviceKey(service)}
       onChoose={() => setChosen(serviceKey(service))}
     />
@@ -167,16 +182,26 @@ function ServiceRow({
   service,
   through,
   searched,
+  backlog,
+  waiting,
   chosen,
   onChoose,
 }: {
   service: ScheduledService;
   through: string;
   searched: ParsedQuery["days"];
+  /** HSP's counts for the days before Darwin, once they arrive. */
+  backlog: TrainBacklog | undefined;
+  /** HSP has not answered for this train yet. */
+  waiting: boolean;
   chosen: boolean;
   onChoose: () => void;
 }) {
-  const score = listScore(service.punctuality);
+  const score = waiting
+    ? undefined
+    : listScore(listPunctuality(service.punctuality, backlog));
+  const journeys =
+    service.rids.length + (backlog ? backlogTotal(backlog).runs : 0);
   const severe = score ? formatSevereJourneys(score.severe) : "";
   return (
     <label className="card service">
@@ -201,11 +226,24 @@ function ServiceRow({
           <span className="on-time-value">{score.onTimePercent}%</span>
           <span className="on-time-label">on time</span>
         </span>
+      ) : waiting ? (
+        <span className="service-score service-score-waiting" role="status">
+          <span className="score-placeholder" aria-hidden="true" />
+          <span className="meta">Checking earlier journeys…</span>
+        </span>
       ) : null}
       {severe ? <span className="service-severe">{severe}</span> : null}
       <span className="meta service-detail">
-        {operatorName(service.operatorCode)} ·{" "}
-        {formatServiceFacts(service.rids.length, usualDays(service), searched)}
+        {[
+          operatorName(service.operatorCode),
+          formatServiceFacts(
+            waiting ? undefined : journeys,
+            usualDays(service),
+            searched,
+          ),
+        ]
+          .filter(Boolean)
+          .join(" · ")}
       </span>
       {through ? <span className="meta service-detail">{through}</span> : null}
       {scheduleNotes(service).map((note, index) => (

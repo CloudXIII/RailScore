@@ -18,6 +18,8 @@ import {
 type ServiceCalculation = {
   readonly result: ReliabilityResult;
   readonly byDay: readonly DayTypeResult[];
+  /** The classified runs, so the page can add HSP's days before Darwin to them. */
+  readonly runs: readonly HistoricalRun[];
 };
 
 /**
@@ -67,5 +69,6 @@ function summarise(runs: readonly HistoricalRun[]): ServiceCalculation {
   return {
     result: calculateReliability(runs),
     byDay: reliabilityByDayType(runs),
+    runs,
   };
 }

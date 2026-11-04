@@ -1,0 +1,99 @@
+import { clockMinutes } from "@railscore/core";
+import {
+  addCounts,
+  NO_COUNTS,
+  type HspCounts,
+  type HspService,
+} from "./metrics";
+
+/** One public schedule of a listed train: the train itself or a schedule folded into it. */
+export type BacklogLeg = {
+  readonly originCrs: string;
+  readonly destinationCrs: string;
+  /** Departure from the boarding station, HHMM. */
+  readonly publicDeparture: string;
+};
+
+/** A listed Darwin train, as the page asks HSP about it. */
+export type BacklogTrain = {
+  /** The list's service key. */
+  readonly key: string;
+  readonly operatorCode: string;
+  readonly legs: readonly BacklogLeg[];
+};
+
+/** A quarter-hour of departures, both ends inclusive, HHMM. */
+export type Quarter = { readonly fromTime: string; readonly toTime: string };
+
+/** The quarter-hour a departure falls in: 07:07 is 0700–0714. */
+export function quarterOf(hhmm: string): Quarter {
+  const start = Math.floor(clockMinutes(hhmm) / 15) * 15;
+  return { fromTime: clock(start), toTime: clock(start + 14) };
+}
+
+/** Quarter-hours the trains leave in, earliest first, each once. */
+export function quartersOf(trains: readonly BacklogTrain[]): Quarter[] {
+  const starts = new Set(
+    trains.flatMap((train) =>
+      train.legs.map((leg) => quarterOf(leg.publicDeparture).fromTime),
+    ),
+  );
+  return [...starts].sort().map((fromTime) => quarterOf(fromTime));
+}
+
+export type TrainBacklog = {
+  readonly counts: HspCounts;
+  readonly rids: readonly string[];
+};
+
+/**
+ * HSP trains joined to the listed trains. A train is the same when the operator, origin,
+ * departure from the boarding station and destination match the train or a schedule folded
+ * into it. Darwin and HSP read the same timetable, so the times agree to the minute. When
+ * the origin differs, as when Darwin has no station code for the first call, the one listed
+ * train with the same operator, departure and destination is taken. Counts of every HSP
+ * train joined to one listed train are added. An HSP train with no count adds none, and
+ * one that joins no listed train is left out.
+ */
+export function matchBacklog(
+  trains: readonly BacklogTrain[],
+  services: readonly HspService[],
+): Map<string, TrainBacklog> {
+  const joined = new Map<string, { counts: HspCounts; rids: string[] }>();
+  for (const service of services) {
+    const train = matchingTrain(trains, service);
+    if (!train) {
+      continue;
+    }
+    const current = joined.get(train.key) ?? { counts: NO_COUNTS, rids: [] };
+    joined.set(train.key, {
+      counts: addCounts(current.counts, service.counts),
+      rids: [...current.rids, ...service.rids],
+    });
+  }
+  return joined;
+}
+
+function matchingTrain(
+  trains: readonly BacklogTrain[],
+  service: HspService,
+): BacklogTrain | undefined {
+  const sameRun = (leg: BacklogLeg) =>
+    leg.publicDeparture === service.publicDeparture &&
+    leg.destinationCrs === service.destinationCrs;
+  const candidates = trains.filter(
+    (train) =>
+      train.operatorCode === service.operatorCode && train.legs.some(sameRun),
+  );
+  const exact = candidates.find((train) =>
+    train.legs.some(
+      (leg) => sameRun(leg) && leg.originCrs === service.originCrs,
+    ),
+  );
+  return exact ?? (candidates.length === 1 ? candidates[0] : undefined);
+}
+
+function clock(minutes: number): string {
+  const hours = Math.floor(minutes / 60);
+  return `${String(hours).padStart(2, "0")}${String(minutes % 60).padStart(2, "0")}`;
+}

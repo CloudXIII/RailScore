@@ -8,6 +8,7 @@ import {
   type DarwinSearch,
 } from "./services";
 import type { ScheduledService } from "../services/map";
+import { searchPeriods } from "../hsp/period";
 
 const search: DarwinSearch = {
   fromCrs: "CLJ",
@@ -64,12 +65,22 @@ function run(
 function listOf(
   runs: readonly DarwinRun[],
   search: DarwinSearch,
-  input: Parameters<typeof servicesFromRuns>[2],
+  input: { today: string; todayTimetable: boolean; oldest: string },
 ) {
   return servicesFromRuns(
     runs,
     search,
-    input,
+    {
+      today: input.today,
+      todayTimetable: input.todayTimetable,
+      countedFrom: input.oldest,
+      period: searchPeriods(
+        search.periodDays,
+        new Date(`${input.today}T12:00:00Z`),
+        input.oldest,
+        false,
+      ).period,
+    },
     searchClockRange(search.timeHhmm),
   );
 }
@@ -98,6 +109,23 @@ describe("servicesFromRuns", () => {
       punctuality: { runs: 2, within5: 1, within14: 1, within29: 2 },
     });
     expect(list?.period).toEqual({ from: "2026-11-02", to: "2026-11-03" });
+  });
+
+  it("lets a run before the first whole Darwin day pick the train without counting it", () => {
+    const list = listOf(
+      [
+        run("2026-11-02", "0000001", { actualArrival: "0823" }),
+        run("2026-11-03", "0000001", { actualArrival: "0840" }),
+        run(today, "0000001"),
+      ],
+      search,
+      { today, todayTimetable: true, oldest: "2026-11-03" },
+    );
+    expect(list?.services[0]).toMatchObject({
+      rids: ["202611030000001"],
+      punctuality: { runs: 1, within5: 0, within14: 0, within29: 1 },
+    });
+    expect(list?.period).toEqual({ from: "2026-11-03", to: "2026-11-03" });
   });
 
   it("counts a cancelled run as outside every tolerance", () => {
