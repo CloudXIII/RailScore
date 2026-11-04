@@ -156,6 +156,8 @@ async function TrainPanel({
         services={found.services}
         retired={found.retired}
         listed={found.period}
+        earlier={found.earlier}
+        later={found.later}
         stations={stations}
         sample={sample}
       />

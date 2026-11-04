@@ -179,7 +179,7 @@ function otherStation(primary: string, alsoAvoid: string): string {
   return primary;
 }
 
-function shiftClock(hhmm: string, deltaMinutes: number): string {
+export function shiftClock(hhmm: string, deltaMinutes: number): string {
   const wrapped = (clockMinutes(hhmm) + deltaMinutes) % (24 * 60);
   const minutes = wrapped < 0 ? wrapped + 24 * 60 : wrapped;
   const hours = Math.floor(minutes / 60);
