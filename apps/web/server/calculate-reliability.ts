@@ -5,12 +5,11 @@ import {
   type ReliabilityResult,
 } from "@railscore/core";
 import { londonIsoDate } from "@railscore/core";
-import { detailsPayloadFromDarwin, type DarwinRun } from "./darwin/run";
+import { historicalRunFromDarwin, type DarwinRun } from "./darwin/run";
 import { reliabilityByDayType, type DayTypeResult } from "./day-split";
 import { usesMockData } from "./env";
 import { mockRuns } from "./mock/catalogue";
 import {
-  historicalRunFromDetails,
   matchesServiceKey,
   serviceDateOf,
   type ScheduledService,
@@ -44,7 +43,7 @@ export function calculateService(input: {
     input.service.rids.map((rid) => {
       const run = input.runs.get(rid);
       return run && run.serviceDate < today
-        ? historicalRunFromDetails(detailsPayloadFromDarwin(run), stations, rid)
+        ? historicalRunFromDarwin(run, stations)
         : missingRun(rid);
     }),
   );
