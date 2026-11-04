@@ -1,0 +1,126 @@
+import {
+  calculateReliability,
+  type HistoricalRun,
+  type ReliabilityResult,
+} from "@railscore/core";
+import { reliabilityByDayType, type DayTypeResult } from "@/server/day-split";
+import type { HspCounts } from "@/server/hsp/metrics";
+import type { ListPunctuality, ServiceDay } from "@/server/services/map";
+
+/** What HSP has said so far about one train's days before Darwin. */
+export type TrainBacklog = {
+  readonly byDay: Partial<Record<ServiceDay, HspCounts>>;
+  readonly runCount: number;
+};
+
+/** HSP's counts for a train, all day types together. */
+export function backlogTotal(backlog: TrainBacklog): HspCounts {
+  const counts = Object.values(backlog.byDay);
+  const sum = (key: keyof HspCounts) =>
+    counts.reduce((total, count) => total + (count?.[key] ?? 0), 0);
+  return {
+    runs: sum("runs"),
+    within5: sum("within5"),
+    within14: sum("within14"),
+    within29: sum("within29"),
+    arrived: sum("arrived"),
+  };
+}
+
+/**
+ * The list's counts with HSP's added. Darwin's alone while HSP has not answered, and HSP's
+ * alone for a train with no counted Darwin run yet.
+ */
+export function listPunctuality(
+  darwin: ListPunctuality | undefined,
+  backlog: TrainBacklog | undefined,
+): ListPunctuality | undefined {
+  if (!backlog) {
+    return darwin;
+  }
+  const hsp = backlogTotal(backlog);
+  return {
+    runs: (darwin?.runs ?? 0) + hsp.runs,
+    within5: (darwin?.within5 ?? 0) + hsp.within5,
+    within14: (darwin?.within14 ?? 0) + hsp.within14,
+    within29: (darwin?.within29 ?? 0) + hsp.within29,
+  };
+}
+
+/** A date of each day type, for runs known only by count. They are never shown on the calendar. */
+const DAY_OF_TYPE: Record<ServiceDay, string> = {
+  weekdays: "2026-11-02",
+  saturday: "2026-10-31",
+  sunday: "2026-11-01",
+};
+
+/**
+ * Runs standing in for HSP's counts: one per counted run, at a lateness inside its band.
+ * They give the totals and the bands before each run has been fetched.
+ */
+export function runsFromCounts(byDay: TrainBacklog["byDay"]): HistoricalRun[] {
+  return (Object.entries(byDay) as [ServiceDay, HspCounts][]).flatMap(
+    ([day, counts]) => {
+      const serviceDate = DAY_OF_TYPE[day];
+      const bands: [number, number | undefined][] = [
+        [counts.within5, 0],
+        [counts.within14 - counts.within5, 10],
+        [counts.within29 - counts.within14, 20],
+        [counts.arrived - counts.within29, 30],
+        [counts.runs - counts.arrived, undefined],
+      ];
+      return bands.flatMap(([count, lateness], band) =>
+        Array.from({ length: Math.max(0, count) }, (_, index) =>
+          lateness === undefined
+            ? {
+                id: `count:${day}:${band}:${index}`,
+                serviceDate,
+                outcome: "cancelled" as const,
+              }
+            : {
+                id: `count:${day}:${band}:${index}`,
+                serviceDate,
+                outcome: "arrived" as const,
+                latenessMinutes: lateness,
+              },
+        ),
+      );
+    },
+  );
+}
+
+export type HistoryFigures = {
+  readonly result: ReliabilityResult;
+  readonly byDay: readonly DayTypeResult[];
+  /** True once every HSP run has been fetched and the figures come from the runs alone. */
+  readonly complete: boolean;
+};
+
+/**
+ * The arrival history from Darwin's runs and HSP's. Until every HSP run has been fetched the
+ * figures use HSP's counts, and the calendar shows the runs fetched so far. Then the figures
+ * come from the runs, as for Darwin.
+ */
+export function historyFigures(input: {
+  darwinRuns: readonly HistoricalRun[];
+  backlog: TrainBacklog | undefined;
+  hspRuns: readonly HistoricalRun[];
+}): HistoryFigures {
+  const fetched = [...input.darwinRuns, ...input.hspRuns];
+  if (!input.backlog || input.hspRuns.length >= input.backlog.runCount) {
+    return {
+      result: calculateReliability(fetched),
+      byDay: reliabilityByDayType(fetched),
+      complete: true,
+    };
+  }
+  const counted = [...input.darwinRuns, ...runsFromCounts(input.backlog.byDay)];
+  return {
+    result: {
+      ...calculateReliability(counted),
+      calendar: calculateReliability(fetched).calendar,
+    },
+    byDay: reliabilityByDayType(counted),
+    complete: false,
+  };
+}

@@ -1,4 +1,4 @@
-import { clockMinutes, journeyMinutes, trailingDays } from "@railscore/core";
+import { clockMinutes, journeyMinutes } from "@railscore/core";
 import { dayTypeOf } from "../day-type";
 import {
   listServices,
@@ -98,16 +98,24 @@ export function uidsLeaving(
  * period. Runs are pooled into trains by the shared folding rules, so a train is the
  * same schedule seen on several days. A train in the period that is not in that timetable
  * no longer runs, and is set apart. Today's runs pick the trains but are not counted,
- * since a run of today may still be under way.
+ * since a run of today may still be under way. Nor are runs before `countedFrom`, the first
+ * day Darwin saw whole: they can pick the trains, but their times are partial.
  */
 export function servicesFromRuns(
   runs: readonly DarwinRun[],
   search: DarwinSearch,
-  input: { today: string; todayTimetable: boolean; oldest: string },
+  input: {
+    today: string;
+    todayTimetable: boolean;
+    countedFrom: string;
+    period: { from: string; to: string };
+  },
   window: ClockWindow,
 ): DarwinServiceList | undefined {
   const dayTypes = search.days === "all" ? DAY_TYPES : [search.days];
-  const period = trailingDays(search.periodDays, dateAt(input.today));
+  const period = input.period;
+  const counted = (date: string) =>
+    date >= input.countedFrom && date < input.today;
   const legs = runs.flatMap((run) => {
     const day = dayTypeOf(run.serviceDate);
     const leg = legOf(run, search.fromCrs, search.toCrs);
@@ -156,25 +164,21 @@ export function servicesFromRuns(
         operatorCode: leg.run.toc,
         rids: [leg.run.rid],
         days: [day],
-        punctuality:
-          leg.run.serviceDate < input.today
-            ? punctualityOf(leg.run, search)
-            : NO_RUNS,
+        punctuality: counted(leg.run.serviceDate)
+          ? punctualityOf(leg.run, search)
+          : NO_RUNS,
       })),
   );
   const listed = listServices(groups, period.to);
   const runsOn = (service: ScheduledService) =>
     service.rids.some((rid) => serviceDateOf({}, rid) === timetableDate);
   return {
-    services: listed.services.filter(runsOn).map(withoutToday(input.today)),
+    services: listed.services.filter(runsOn).map(countedOnly(counted)),
     retired: [
       ...listed.retired,
       ...listed.services.filter((service) => !runsOn(service)),
-    ].map(withoutToday(input.today)),
-    period: {
-      from: input.oldest > period.from ? input.oldest : period.from,
-      to: period.to,
-    },
+    ].map(countedOnly(counted)),
+    period,
     timetableDate,
   };
 }
@@ -246,10 +250,13 @@ function punctualityOf(run: DarwinRun, search: DarwinSearch): ListPunctuality {
   };
 }
 
-/** Today's runs leave the train: the calculation only counts days that have finished. */
-function withoutToday(today: string) {
+/**
+ * Uncounted runs leave the train: the calculation only counts days that have finished,
+ * from the first day Darwin saw whole.
+ */
+function countedOnly(counted: (date: string) => boolean) {
   const earlier = (rids: readonly string[]) =>
-    rids.filter((rid) => (serviceDateOf({}, rid) ?? "") < today);
+    rids.filter((rid) => counted(serviceDateOf({}, rid) ?? ""));
   return (service: ScheduledService): ScheduledService => ({
     ...service,
     rids: earlier(service.rids),
@@ -272,9 +279,4 @@ function inWindow(hhmm: string, window: ClockWindow): boolean {
   return from <= to
     ? minute >= from && minute <= to
     : minute >= from || minute <= to;
-}
-
-/** Noon UTC on a London date, so `trailingDays` reads that same date. */
-function dateAt(iso: string): Date {
-  return new Date(`${iso}T12:00:00Z`);
 }

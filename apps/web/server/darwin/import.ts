@@ -1,4 +1,5 @@
 import "server-only";
+import { deleteOldBacklog } from "../hsp/store";
 import { Kafka, logLevel, type Consumer } from "kafkajs";
 import { database } from "../db";
 import { darwinKafka, darwinKeepDays } from "../env";
@@ -84,6 +85,11 @@ export async function importDarwin(budgetMs: number): Promise<ImportResult> {
       ? await fillGap(deadline)
       : { hours: [], runWrites: 0 };
     const runsDeleted = await deleteOldRuns(sql, darwinKeepDays(), new Date());
+    await deleteOldBacklog(sql, darwinKeepDays(), new Date()).catch(
+      (error: unknown) => {
+        console.error("Old HSP rows could not be deleted", errorText(error));
+      },
+    );
     const daysPacked = await packFinishedDays(sql, new Date(), deadline);
     return {
       status: "done",
