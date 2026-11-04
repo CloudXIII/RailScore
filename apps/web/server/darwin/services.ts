@@ -1,4 +1,9 @@
-import { clockMinutes, searchClockRange, trailingDays } from "@railscore/core";
+import {
+  clockMinutes,
+  journeyMinutes,
+  searchClockRange,
+  trailingDays,
+} from "@railscore/core";
 import { dayTypeOf } from "../day-type";
 import {
   listServices,
@@ -60,7 +65,21 @@ export function servicesFromRuns(
     }
     return [{ run, day, ...leg }];
   });
-  const timetableDate = legs
+  const fastest = Math.min(
+    ...legs
+      .map((leg) => journeyMinutes(leg.departure, leg.arrival))
+      .filter(Number.isFinite),
+  );
+  // An unreadable length keeps the train rather than dropping it unseen.
+  const direct = legs.filter(
+    (leg) =>
+      !leg.passedDestination ||
+      !(
+        journeyMinutes(leg.departure, leg.arrival) >
+        LONG_WAY_ROUND_FACTOR * fastest
+      ),
+  );
+  const timetableDate = direct
     .map((leg) => leg.run.serviceDate)
     .sort()
     .at(-1);
@@ -69,7 +88,7 @@ export function servicesFromRuns(
   }
 
   const groups = dayTypes.map((day) =>
-    legs
+    direct
       .filter((leg) => leg.day === day)
       .map((leg): ScheduledService => ({
         originCrs: leg.run.calls[0]!.crs,
@@ -102,6 +121,12 @@ export function servicesFromRuns(
   };
 }
 
+/**
+ * A train that already called at the destination before boarding is on a loop. It is the
+ * long way round when it takes more than this many times the fastest train of the search.
+ */
+const LONG_WAY_ROUND_FACTOR = 2;
+
 const NO_RUNS: ListPunctuality = {
   runs: 0,
   within5: 0,
@@ -111,21 +136,22 @@ const NO_RUNS: ListPunctuality = {
 
 /**
  * The leg from boarding to destination: a public departure, then a later public arrival.
- * A train that called at the destination before boarding is on a loop back to it, the long
- * way round, so it is not a train for this journey.
+ * A train that called at the destination before boarding is on a loop. That is the only way
+ * on a circular line such as the Wirral line through Liverpool Central, but the long way
+ * round on a loop such as Waterloo to Waterloo via Hounslow, so the caller compares its
+ * length with the other trains.
  */
 function legOf(
   run: DarwinRun,
   fromCrs: string,
   toCrs: string,
-): { departure: string; arrival: string } | undefined {
+):
+  | { departure: string; arrival: string; passedDestination: boolean }
+  | undefined {
   const boarding = run.calls.findIndex(
     (call) => call.crs === fromCrs && call.ptd,
   );
-  if (
-    boarding === -1 ||
-    run.calls.slice(0, boarding).some((call) => call.crs === toCrs)
-  ) {
+  if (boarding === -1) {
     return undefined;
   }
   const destination = run.calls
@@ -137,6 +163,9 @@ function legOf(
   return {
     departure: run.calls[boarding]!.ptd!,
     arrival: destination.pta!,
+    passedDestination: run.calls
+      .slice(0, boarding)
+      .some((call) => call.crs === toCrs),
   };
 }
 
