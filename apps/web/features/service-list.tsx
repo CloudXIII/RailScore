@@ -10,12 +10,9 @@ import {
   listIntro,
   listScore,
   operatorName,
-  shiftTime,
   throughServiceLabel,
-  timeWindowLabel,
   trainListHeading,
 } from "@/features/format";
-import { DEPARTURE_WINDOW_MINUTES } from "@railscore/core";
 import { stationName, type Station } from "@/server/stations";
 import { scheduleNotes, usualDays } from "@/features/timetable-changes";
 import { listHref } from "@/features/search-href";
@@ -32,6 +29,8 @@ export function ServiceList({
   services,
   retired = [],
   listed,
+  earlier,
+  later,
   stations,
   sample = false,
 }: {
@@ -40,6 +39,10 @@ export function ServiceList({
   retired?: readonly ScheduledService[];
   /** Dates the listed runs cover. */
   listed?: { from: string; to: string };
+  /** HHMM time that lists the trains before these. None at the start of the day. */
+  earlier?: string;
+  /** HHMM time that lists the trains after these. None at the end of the day. */
+  later?: string;
   stations: readonly Station[];
   sample?: boolean;
 }) {
@@ -94,7 +97,10 @@ export function ServiceList({
       <input type="hidden" name="period" value={query.period} />
       <input type="hidden" name="calculate" value="1" />
       <h2 id="trains-heading" tabIndex={-1}>
-        {trainListHeading(query.time)}
+        {trainListHeading(
+          query.time,
+          services.map((service) => service.publicDeparture),
+        )}
       </h2>
       <p>
         {listIntro({
@@ -103,15 +109,17 @@ export function ServiceList({
           sample,
         })}
       </p>
-      <TimeShift
-        href={listHref(query, shiftTime(query.time, -DEPARTURE_WINDOW_MINUTES))}
-        direction="earlier"
-      >
-        Earlier trains
-      </TimeShift>
+      {earlier ? (
+        <TimeShift
+          href={listHref(query, formatClock(earlier))}
+          direction="earlier"
+        >
+          Earlier trains
+        </TimeShift>
+      ) : null}
       {services.length === 0 ? (
         <p className="card" role="status">
-          {emptyTrains(from.name, to.name, query.time)}
+          {emptyTrains(from.name, to.name, query.time, Boolean(earlier))}
         </p>
       ) : null}
       {services.length > 0 || retired.length > 0 ? (
@@ -135,12 +143,11 @@ export function ServiceList({
           ) : null}
         </fieldset>
       ) : null}
-      <TimeShift
-        href={listHref(query, shiftTime(query.time, DEPARTURE_WINDOW_MINUTES))}
-        direction="later"
-      >
-        Later trains
-      </TimeShift>
+      {later ? (
+        <TimeShift href={listHref(query, formatClock(later))} direction="later">
+          Later trains
+        </TimeShift>
+      ) : null}
       {services.length > 0 || retired.length > 0 ? (
         <div className="calculate-bar">
           <button
@@ -243,6 +250,13 @@ function TimeShift({
   );
 }
 
-function emptyTrains(from: string, to: string, time: string): string {
-  return `No direct trains from ${from} to ${to} departing ${timeWindowLabel(time)}. Journeys with a change are not included.`;
+function emptyTrains(
+  from: string,
+  to: string,
+  time: string,
+  earlier: boolean,
+): string {
+  return earlier
+    ? `No more direct trains from ${from} to ${to} after ${time}. Journeys with a change are not included.`
+    : `No direct trains from ${from} to ${to} in the recorded timetable. Journeys with a change are not included.`;
 }

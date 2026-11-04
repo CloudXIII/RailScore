@@ -1,9 +1,4 @@
-import {
-  clockMinutes,
-  journeyMinutes,
-  searchClockRange,
-  trailingDays,
-} from "@railscore/core";
+import { clockMinutes, journeyMinutes, trailingDays } from "@railscore/core";
 import { dayTypeOf } from "../day-type";
 import {
   listServices,
@@ -35,6 +30,70 @@ export type DarwinServiceList = {
 
 const DAY_TYPES: readonly ServiceDay[] = ["weekdays", "saturday", "sunday"];
 
+/** Departure times a list covers, HHMM, both inclusive. */
+export type ClockWindow = { from: string; to: string };
+
+export const WHOLE_DAY: ClockWindow = { from: "0000", to: "2359" };
+
+/** Trains a list shows from the searched time. */
+export const LIST_SIZE = 8;
+
+export type TrainPage = {
+  services: ScheduledService[];
+  /** Departures the page covers, from the searched time to its last train. */
+  window?: ClockWindow;
+  /** Searched time, HHMM, that lists the trains just before this page. */
+  earlier?: string;
+  /** Searched time, HHMM, that lists the trains just after this page. */
+  later?: string;
+};
+
+/**
+ * The first `size` trains leaving at or after `timeHhmm`, in clock order within the day,
+ * plus any that leave at the same minute as the last one. The neighbouring pages start at
+ * a train's own departure, so following them never skips or repeats a train.
+ */
+export function trainPage(
+  services: readonly ScheduledService[],
+  timeHhmm: string,
+  size = LIST_SIZE,
+): TrainPage {
+  const sorted = [...services].sort((left, right) =>
+    left.publicDeparture.localeCompare(right.publicDeparture),
+  );
+  const before = sorted.filter((service) => service.publicDeparture < timeHhmm);
+  const after = sorted.filter((service) => service.publicDeparture >= timeHhmm);
+  const last = after[Math.min(size, after.length) - 1]?.publicDeparture;
+  const shown = last
+    ? after.filter((service) => service.publicDeparture <= last)
+    : [];
+  return {
+    services: shown,
+    ...(last ? { window: { from: timeHhmm, to: last } } : {}),
+    ...(before.length > 0
+      ? {
+          earlier: before[Math.max(0, before.length - size)]!.publicDeparture,
+        }
+      : {}),
+    ...(after.length > shown.length
+      ? { later: after[shown.length]!.publicDeparture }
+      : {}),
+  };
+}
+
+/** Schedule UIDs of the runs that board in `window` on this search. */
+export function uidsLeaving(
+  runs: readonly DarwinRun[],
+  search: Pick<DarwinSearch, "fromCrs" | "toCrs">,
+  window: ClockWindow,
+): string[] {
+  const uids = runs.flatMap((run) => {
+    const leg = legOf(run, search.fromCrs, search.toCrs);
+    return leg && run.uid && inWindow(leg.departure, window) ? [run.uid] : [];
+  });
+  return [...new Set(uids)];
+}
+
 /**
  * The trains of the latest timetable for the chosen day type, each with its runs in the
  * period. Runs are pooled into trains by the shared folding rules, so a train is the
@@ -46,9 +105,9 @@ export function servicesFromRuns(
   runs: readonly DarwinRun[],
   search: DarwinSearch,
   input: { today: string; todayTimetable: boolean; oldest: string },
+  window: ClockWindow,
 ): DarwinServiceList | undefined {
   const dayTypes = search.days === "all" ? DAY_TYPES : [search.days];
-  const window = searchClockRange(search.timeHhmm);
   const period = trailingDays(search.periodDays, dateAt(input.today));
   const legs = runs.flatMap((run) => {
     const day = dayTypeOf(run.serviceDate);
@@ -208,7 +267,7 @@ function withoutToday(today: string) {
   });
 }
 
-function inWindow(hhmm: string, window: { from: string; to: string }): boolean {
+function inWindow(hhmm: string, window: ClockWindow): boolean {
   const minute = clockMinutes(hhmm);
   const from = clockMinutes(window.from);
   const to = clockMinutes(window.to);
