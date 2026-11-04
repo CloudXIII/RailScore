@@ -26,7 +26,7 @@ RailScore shows how a direct UK train has performed on its recent runs: arrivals
 **Highlights**
 
 - Punctuality rules live in `packages/core`, a TypeScript package with no framework or database, covered by unit tests.
-- A scheduled import of the Darwin Push Port feed (Kafka) into Postgres, so a search and a calculation are a few database reads with no call to an outside API.
+- A scheduled import of the Darwin Push Port feed (Kafka) into Postgres, so a search and a calculation are a few database reads with no call to an outside API. Days before the import began are filled from HSP after the page is shown, and stored.
 - Train lists start from today's Darwin timetable and pool each train's past runs by schedule UID.
 - Runs on free tiers only: Vercel Hobby, Neon Free (0.5 GB: 90 days of the whole network, packed into month rows), and cron-job.org.
 
@@ -36,7 +36,7 @@ Built with AI-assisted development (Cursor).
 
 Train performance is from Darwin Real Time Train Information (the Push Port, read over Kafka, and its hourly snapshots) on the Rail Data Marketplace. Station names and CRS codes are from the [Knowledgebase Stations data feed](https://raildata.org.uk/dashboard/dataProduct/P-88ffe920-471c-4fd9-8e0d-95d5b9b7a257/overview).
 
-History starts on the day the import first ran and reaches back at most `DARWIN_KEEP_DAYS` (90). Until the chosen period is stored, the list names the days it covers. If the import stops, no new runs arrive: there is no other source.
+Darwin history starts on the first day the import saw whole, 4 November 2026 (`DARWIN_FIRST_DAY`), and reaches back at most `DARWIN_KEEP_DAYS` (90). The days of a period before that come from [Historic Service Performance](https://raildata.org.uk) (HSP) on the Rail Data Marketplace, asked after the page is shown and stored (see [Days before Darwin](#days-before-darwin-hsp)). Without HSP, the list names the days it covers. If the import stops, no new runs arrive.
 
 Credit the data publisher when showing this data. This project is not approved by, and is not affiliated with, the publisher or the Rail Data Marketplace.
 
@@ -64,6 +64,9 @@ Every variable is server-only. Do not add a `NEXT_PUBLIC_` prefix.
 | `DARWIN_KAFKA_*`                                      | Darwin Push Port on Kafka, for the import below. Required for live data. Bootstrap, SASL mechanism, security protocol, topic, group, username and password, as the Rail Data Marketplace Pub/Sub tab shows them. |
 | `DARWIN_SNAPSHOT_URL`, `DARWIN_SNAPSHOT_CONSUMER_KEY` | Hourly Darwin snapshots, read for each day's timetable and when Kafka dropped messages. Required for live data.                                                                                                  |
 | `DARWIN_KEEP_DAYS`                                    | Optional. Days of Darwin runs kept. Default 90.                                                                                                                                                                  |
+| `DARWIN_FIRST_DAY`                                    | Optional. First day the Darwin import saw whole, `YYYY-MM-DD`. Default `2026-11-04`. Earlier stored days are not counted.                                                                                        |
+| `HSP_BASE_URL`, `HSP_API_KEY_HEADER`, `HSP_API_KEY`   | Optional. Historic Service Performance, for the days of a period before `DARWIN_FIRST_DAY`. Without them the period starts at that day.                                                                          |
+| `HSP_DAILY_CALL_LIMIT`                                | Optional. HSP calls a day across every visitor. Default 5000. Past it the figures are Darwin's alone until midnight.                                                                                             |
 | `CRON_SECRET`                                         | Optional. Turns on `/api/import/darwin`, which needs `Authorization: Bearer <CRON_SECRET>`.                                                                                                                      |
 
 Create the tables when `DATABASE_URL` is set. Point that command at the direct URL, then point the running app at the pooled URL.
@@ -122,7 +125,7 @@ Postgres holds every run, so instances share nothing else. A search and a calcul
 
 `/api/import/darwin` reads the Darwin Push Port messages since the last import and stores each run (RID) in `darwin_runs`, with its public calls, actual times and platforms, and Darwin's late and cancellation reason codes. The app does not show platforms or reasons yet; they are kept because Darwin's history cannot be fetched later. A platform Darwin marks as suppressed from public display is not stored. A calculation reads a train's finished runs from there. A run with no finished Darwin record, such as one from before the import began, counts as no data.
 
-Once a day, after 05:10 UTC, the import also reads the 05:00 snapshot. Darwin loads the day's schedules between 02:00 and 04:00, so that snapshot holds about nine in ten of the day's passenger trains; trains added later in the day come through Kafka. A search then starts from the timetable: the trains of today (or, for another day type, of its latest day) between the two stations, then each train's runs in the period by schedule UID. That is two database reads. A train that ran in the period but is not in that timetable is shown as no longer running. The period starts at the oldest stored day when the import began after the period would.
+Once a day, after 05:10 UTC, the import also reads the 05:00 snapshot. Darwin loads the day's schedules between 02:00 and 04:00, so that snapshot holds about nine in ten of the day's passenger trains; trains added later in the day come through Kafka. A search then starts from the timetable: the trains of today (or, for another day type, of its latest day) between the two stations, then each train's runs in the period by schedule UID. That is two database reads. A train that ran in the period but is not in that timetable is shown as no longer running. Darwin counts from `DARWIN_FIRST_DAY`; the days of the period before it are HSP's.
 
 Kafka keeps about an hour of messages, so a scheduler calls the route every 15 minutes. Vercel Hobby crons run at most once a day, and GitHub's scheduled workflows stop after 60 days without a commit, so the deployment uses [cron-job.org](https://cron-job.org) (free):
 
@@ -137,18 +140,30 @@ Offsets are committed only after the runs are written. A second import that star
 
 A day stays one row per run for a week, so a search can start from the latest day of any day type. After that the import packs it into `darwin_months`: one row per schedule UID and calendar month, appended one day at a time. Each run keeps its RID, date, operator, reason codes and every call with its platform; the planned calling pattern is written once per day and the actual times as minutes from it, and Postgres compresses the rest. Packing is lossless: decoding gives back exactly the stored runs. A simulation of 90 days of the whole network from a real day took about 60 MB packed, against about 970 MB as one row per run. Messages for a day that is already packed are dropped.
 
+### Days before Darwin (HSP)
+
+Until Darwin covers the whole period (30 days from about 4 December 2026, 90 days from about 2 February 2027), the page fills the days before 4 November from HSP. The list and the history are first shown from Darwin; the page then reads `/api/backlog`, which answers one line of JSON per result as it arrives:
+
+- **List figures.** One `serviceMetrics` call per quarter-hour the listed trains leave in (and per day type), for the dates from the start of the period to 3 November, with tolerances of 5, 14, 29 and 999 minutes. HSP trains join the listed train with the same operator, origin, departure from the boarding station and destination (or the one listed train with the same operator, departure and destination), and their counts are added to Darwin's. A row shows a placeholder until its quarter-hours are in.
+- **Arrival history.** The figures come from those counts at once. The calendar then fills from `serviceDetails`, one run at a time, newest first. A run is stored in `hsp_backlog_runs` in the `darwin_runs` text form and classified by the same rules, except that a run HSP recorded with no actual time anywhere is cancelled (for Darwin it only means no movement was seen). Once every run is in, the figures come from the runs.
+- **Pacing.** HSP refuses a third call in flight, list or detail alike, so every server shares two slots in `hsp_slots`: a list call holds one for its call, a history holds one for its whole run of detail calls, retrying a refused one after about 300 ms. Two searches of the same quarter-hour share one call through a claim on its `hsp_metrics` row. Calls are counted once per answer in `hsp_usage`.
+- **Storage.** List answers depend on the day the period starts, so they are deleted after two days by the Darwin import. Runs never change, so a second visit makes no HSP call; they age out with `DARWIN_KEEP_DAYS`. A run is about 0.6 KB.
+
+If HSP is down or refuses after its retries, the trains keep Darwin's figures and the history says the earlier journeys could not be loaded.
+
 `apps/web/server/darwin/tiploc-crs.json` maps Darwin's TIPLOCs to CRS codes. Rebuild it from a Darwin reference file (`PPTimetable_*_ref_v*.xml.gz`, from "Darwin Timetable Files") with `node apps/web/scripts/tiploc-crs.mjs <file>`.
 
 ## Layout
 
 ```text
 packages/core/src/          punctuality rules and London dates, no Next.js or database
-apps/web/app/               home page and /api/import/darwin
+apps/web/app/               home page, /api/import/darwin and /api/backlog
 apps/web/features/          search, list, result, day grid
 apps/web/server/            search, calculation, station list
 apps/web/server/darwin/     Push Port parsing, run merge, store, import, lists from runs
+apps/web/server/hsp/        HSP for the days before Darwin: periods, list counts, matching, runs, store
 apps/web/server/services/   train folding and run classification shared by lists and calculations
-apps/web/db/schema.sql      tables for Darwin runs and the import state
+apps/web/db/schema.sql      tables for Darwin runs, the import state and HSP's answers
 apps/web/scripts/           database migrate, TIPLOC to CRS map
 ```
 
@@ -180,7 +195,7 @@ The list folds two schedules into one train when they share the operator, each p
 
 ## Known limits
 
-History covers only the days the import has run, at most 90. The last week (about 13 MB a day) and the packed days (well under 1 MB a day) fit in Neon Free (0.5 GB). If the import stops, the figures stop at the last day stored.
+Darwin history covers only the days the import has run, at most 90; HSP fills the days before it while a period reaches back that far. At the 13 December 2026 timetable change some trains may no longer match their HSP rows, and keep Darwin's figures. HSP is often slow at the UK peak and sometimes refuses most calls for a while. The last week (about 13 MB a day) and the packed days (well under 1 MB a day) fit in Neon Free (0.5 GB). If the import stops, the figures stop at the last day stored.
 
 The 05:00 snapshot holds about nine in ten of the day's trains. A train added to the timetable later in the day appears once Kafka brings it.
 

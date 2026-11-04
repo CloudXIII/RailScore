@@ -135,3 +135,37 @@ export function darwinKeepDays(): number {
 export function importSecret(): string | undefined {
   return read("CRON_SECRET");
 }
+
+/**
+ * First day the Darwin import saw from start to end. Earlier stored days are partial: the import
+ * began on the evening of 2026-11-03, so most of that day's runs have no actual times.
+ * `DARWIN_FIRST_DAY` (YYYY-MM-DD) moves it for a database whose import began later.
+ */
+export function darwinFirstDay(): string {
+  const value = read("DARWIN_FIRST_DAY");
+  return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : "2026-11-04";
+}
+
+export type HspConnection = {
+  baseUrl: string;
+  apiKey: string;
+  apiKeyHeader: string;
+};
+
+/**
+ * Historic Service Performance, for the days before Darwin. Undefined when not configured,
+ * and the app then counts Darwin days only. The key goes in the header `HSP_API_KEY_HEADER` names.
+ */
+export function hspConnection(): HspConnection | undefined {
+  const baseUrl = read("HSP_BASE_URL")?.replace(/\/$/, "");
+  const apiKey = read("HSP_API_KEY");
+  const apiKeyHeader = read("HSP_API_KEY_HEADER");
+  return baseUrl && apiKey && apiKeyHeader
+    ? { baseUrl, apiKey, apiKeyHeader }
+    : undefined;
+}
+
+/** HSP calls a day across every visitor. An unset or unusable value stays at 5,000. */
+export function hspDailyCallLimit(): number {
+  return positiveInteger("HSP_DAILY_CALL_LIMIT", 5000);
+}

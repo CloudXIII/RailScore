@@ -1,9 +1,11 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
+import { addCalendarDays } from "@railscore/core";
+import { ArrivalHistory } from "@/features/arrival-history";
+import { BacklogProvider } from "@/features/backlog-context";
 import { ThemeMenu } from "@/features/theme-menu";
 import { DataNotice } from "@/features/data-notice";
 import { pageTitle } from "@/features/page-title";
-import { ReliabilityResultView } from "@/features/reliability-result";
 import { listHref } from "@/features/search-href";
 import { SearchForm } from "@/features/search-form";
 import { ServiceList } from "@/features/service-list";
@@ -15,6 +17,8 @@ import {
 import { usesMockData } from "@/server/env";
 import { errorText } from "@/server/error-text";
 import { findServices } from "@/server/find-services";
+import { backlogTrain } from "@/server/hsp/backlog-query";
+import { serviceKey } from "@/server/services/map";
 import { parseQuery, timeHhmm, type ParsedQuery } from "@/server/query";
 import {
   loadStationDirectory,
@@ -150,6 +154,28 @@ async function TrainPanel({
             runs: found.runs,
           })
         : undefined;
+    // HSP fills the days before Darwin after the page is shown: the listed trains, and the
+    // chosen one first when its history is open.
+    const listed = [...found.services];
+    if (calculation && selected && !listed.includes(selected)) {
+      listed.unshift(selected);
+    }
+    const backlog =
+      found.hsp && !sample && listed.length > 0
+        ? {
+            fromCrs: query.from.crs,
+            toCrs: query.to.crs,
+            days: query.days,
+            periodDays: query.period,
+            trains: listed.map(backlogTrain),
+            ...(calculation && selected
+              ? { runsOf: serviceKey(selected) }
+              : {}),
+          }
+        : undefined;
+    const darwinFrom = found.hsp
+      ? addCalendarDays(found.hsp.to, 1)
+      : found.period.from;
     const trains = (
       <ServiceList
         query={query}
@@ -164,7 +190,7 @@ async function TrainPanel({
     );
 
     return (
-      <>
+      <BacklogProvider request={backlog}>
         {query.calculate && query.serviceKey && !selected ? (
           <p className="warning" role="status">
             That service was not in the historical results for this search.
@@ -179,11 +205,13 @@ async function TrainPanel({
           <TrainDetail
             href={listHref(query)}
             result={
-              <ReliabilityResultView
+              <ArrivalHistory
                 service={selected}
                 fromCrs={query.from.crs}
                 toCrs={query.to.crs}
                 period={found.period}
+                darwinFrom={darwinFrom}
+                darwinRuns={calculation.runs}
                 result={calculation.result}
                 byDay={calculation.byDay}
                 stations={stations}
@@ -196,7 +224,7 @@ async function TrainPanel({
         ) : (
           trains
         )}
-      </>
+      </BacklogProvider>
     );
   } catch (error) {
     console.error("The search failed", errorText(error));

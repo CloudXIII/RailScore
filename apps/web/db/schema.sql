@@ -1,4 +1,4 @@
--- Tables from the HSP version (hsp_runs, hsp_service_lists, hsp_rate_limit, hsp_list_slots,
+-- Tables from the first HSP version (hsp_runs, hsp_service_lists, hsp_rate_limit, hsp_list_slots,
 -- hsp_daily_calls, hsp_calculation_lock) are no longer created or read. A database migrated
 -- before may still hold them; they can be dropped by hand.
 
@@ -57,3 +57,37 @@ create table if not exists darwin_months (
 -- Postgres tries to compress only rows over about 2 KB unless told otherwise. A month row
 -- reaches that after about a week, so the threshold is lowered for rows earlier in the month.
 alter table darwin_months set (toast_tuple_target = 128);
+
+-- HSP (Historic Service Performance) for the days before Darwin's first whole day, 2026-11-04.
+-- Once Darwin covers the whole search period HSP is no longer asked, and these rows age out.
+-- List answers by key: route, day type, quarter-hour and dates. `services` is null while a
+-- search holds the claim to ask HSP for it.
+create table if not exists hsp_metrics (
+  key text primary key,
+  services jsonb,
+  claimed_until timestamptz not null default 'epoch',
+  fetched_at timestamptz
+);
+
+-- Runs from HSP serviceDetails, with calls in the darwin_runs text form (server/darwin/run.ts).
+create table if not exists hsp_backlog_runs (
+  rid text primary key,
+  service_date date not null,
+  toc text not null default '',
+  calls text not null
+);
+
+-- HSP refuses a third list call in flight, so every server shares these two slots.
+create table if not exists hsp_slots (
+  slot smallint primary key,
+  owner text,
+  leased_until timestamptz not null default 'epoch'
+);
+
+insert into hsp_slots (slot) values (1), (2) on conflict (slot) do nothing;
+
+-- HSP calls per London day, added once per search.
+create table if not exists hsp_usage (
+  day date primary key,
+  calls integer not null default 0
+);

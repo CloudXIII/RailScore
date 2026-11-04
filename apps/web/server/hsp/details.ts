@@ -1,0 +1,81 @@
+import type { HistoricalRun } from "@railscore/core";
+import {
+  detailsPayloadFromDarwin,
+  type DarwinRun,
+  type StoredCall,
+} from "../darwin/run";
+import { serviceDateOf, toHistoricalRun } from "../services/map";
+import { HspResponseError } from "./metrics";
+
+/**
+ * A serviceDetails answer in the stored Darwin shape, so it is kept as compact text and read
+ * by the same rules. HSP gives a late or cancellation reason per call but no cancellation
+ * flag; a call with a reason is stored with the `c` flag, which the rules read as a reason.
+ * HSP has no schedule UID, so `uid` is empty.
+ */
+export function runFromDetails(payload: unknown, rid: string): DarwinRun {
+  const details = record(record(payload)?.serviceAttributesDetails);
+  if (!details || !Array.isArray(details.locations)) {
+    throw new HspResponseError(
+      "A historical run was not in the expected shape.",
+    );
+  }
+  const serviceDate = serviceDateOf(payload, rid);
+  if (!serviceDate) {
+    throw new HspResponseError("A historical run had no date.");
+  }
+  const calls = details.locations.flatMap((value): StoredCall[] => {
+    const stop = record(value);
+    const crs = text(stop?.location);
+    if (!stop || !/^[A-Z]{3}$/.test(crs)) {
+      return [];
+    }
+    const pta = clock(stop.gbtt_pta);
+    const ptd = clock(stop.gbtt_ptd);
+    const ata = clock(stop.actual_ta);
+    const atd = clock(stop.actual_td);
+    return [
+      {
+        crs,
+        ...(pta ? { pta } : {}),
+        ...(ptd ? { ptd } : {}),
+        ...(ata ? { ata } : {}),
+        ...(atd ? { atd } : {}),
+        ...(text(stop.late_canc_reason) ? { cancelled: true } : {}),
+      },
+    ];
+  });
+  return {
+    rid,
+    serviceDate,
+    uid: "",
+    toc: text(details.toc_code),
+    calls,
+  };
+}
+
+/**
+ * Classifies a run HSP gave. Unlike a Darwin run, HSP recorded the whole day, so a run with
+ * no actual time anywhere did not run: it is cancelled.
+ */
+export function historicalRunFromHsp(
+  run: DarwinRun,
+  stations: { boardingCrs: string; destinationCrs: string },
+): HistoricalRun {
+  return toHistoricalRun(detailsPayloadFromDarwin(run), stations, run.rid);
+}
+
+function clock(value: unknown): string {
+  const hhmm = text(value);
+  return /^\d{4}$/.test(hhmm) ? hhmm : "";
+}
+
+function record(value: unknown): Record<string, unknown> | undefined {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
+
+function text(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}

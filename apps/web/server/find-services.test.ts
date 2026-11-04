@@ -47,9 +47,15 @@ function run(date: string, id: string, actualArrival?: string): DarwinRun {
   };
 }
 
+const HSP_VARIABLES = ["HSP_BASE_URL", "HSP_API_KEY", "HSP_API_KEY_HEADER"];
+
 describe("findServices", () => {
   beforeEach(() => {
     delete process.env.RAILSCORE_DATA;
+    process.env.DARWIN_FIRST_DAY = "2026-11-02";
+    for (const name of HSP_VARIABLES) {
+      delete process.env[name];
+    }
     vi.mocked(database).mockReset();
     vi.mocked(oldestRunDate).mockReset();
     vi.mocked(runsOfTrains).mockReset();
@@ -74,9 +80,40 @@ describe("findServices", () => {
     expect(found).toEqual({
       services: [],
       retired: [],
-      period: { from: "2026-10-05", to: "2026-11-03" },
+      period: { from: "2026-11-02", to: "2026-11-03" },
       runs: new Map(),
     });
+  });
+
+  it("leaves the days before Darwin to HSP when it is configured", async () => {
+    process.env.HSP_BASE_URL = "https://hsp.test";
+    process.env.HSP_API_KEY = "key";
+    process.env.HSP_API_KEY_HEADER = "x-apikey";
+    vi.mocked(database).mockReturnValue(undefined);
+
+    const found = await findServices(search);
+
+    expect(found.period).toEqual({ from: "2026-10-05", to: "2026-11-03" });
+    expect(found.hsp).toEqual({ from: "2026-10-05", to: "2026-11-01" });
+  });
+
+  it("does not count runs before the first whole Darwin day", async () => {
+    process.env.DARWIN_FIRST_DAY = "2026-11-03";
+    vi.mocked(database).mockReturnValue({} as ReturnType<typeof database>);
+    vi.mocked(oldestRunDate).mockResolvedValue("2026-11-02");
+    vi.mocked(timetableDate).mockResolvedValue("2026-11-04");
+    vi.mocked(runsOnDay).mockResolvedValue([run("2026-11-04", "0000003")]);
+    vi.mocked(runsOfTrains).mockResolvedValue([
+      run("2026-11-03", "0000002", "0840"),
+    ]);
+
+    const found = await findServices(search);
+
+    expect(found.period).toEqual({ from: "2026-11-03", to: "2026-11-03" });
+    expect(vi.mocked(runsOfTrains).mock.calls[0]?.[1]).toMatchObject({
+      fromDate: "2026-11-03",
+    });
+    expect(found.services[0]?.rids).toEqual(["202611030000002"]);
   });
 
   it("lists today's trains with their past runs, from the oldest stored day", async () => {
@@ -115,7 +152,7 @@ describe("findServices", () => {
     const found = await findServices(search);
 
     expect(found.services).toEqual([]);
-    expect(found.period).toEqual({ from: "2026-10-05", to: "2026-11-03" });
+    expect(found.period).toEqual({ from: "2026-11-02", to: "2026-11-03" });
     expect(runsOfTrains).not.toHaveBeenCalled();
   });
 });

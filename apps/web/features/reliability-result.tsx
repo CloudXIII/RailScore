@@ -28,6 +28,8 @@ export function ReliabilityResultView({
   stations,
   days,
   sample = false,
+  progress,
+  pending = false,
 }: {
   service: ScheduledService;
   fromCrs: string;
@@ -38,12 +40,16 @@ export function ReliabilityResultView({
   stations: readonly Station[];
   days: DayFilter;
   sample?: boolean;
+  /** How far HSP's earlier journeys have got, while they load. */
+  progress?: string;
+  /** The figures wait for HSP's earlier journeys: a placeholder stands in for them. */
+  pending?: boolean;
 }) {
   const through = throughServiceLabel(service, fromCrs, toCrs, (crs) =>
     stationName(crs, stations),
   );
   const known = result.withinFiveMinutes.total;
-  const showCalendar = result.calendar.length > 0;
+  const showCalendar = !pending && result.calendar.length > 0;
   const changes = notableChanges(service);
   const notes = scheduleNotes(service);
   const dayNote = serviceDayNote(usualDays(service), days);
@@ -66,8 +72,19 @@ export function ReliabilityResultView({
               </>
             ) : null}
           </p>
-          <Headline result={result} period={period} days={days} />
-          {days === "all" && byDay.length >= 2 ? (
+          {pending ? (
+            <div className="headline">
+              <span className="score-placeholder headline-placeholder" />
+            </div>
+          ) : (
+            <Headline result={result} period={period} days={days} />
+          )}
+          {progress ? (
+            <p className="meta backlog-progress" role="status">
+              {progress}
+            </p>
+          ) : null}
+          {!pending && days === "all" && byDay.length >= 2 ? (
             <DayTypeTable byDay={byDay} />
           ) : null}
           {notes.length > 0 ? (
@@ -77,7 +94,7 @@ export function ReliabilityResultView({
               ))}
             </ul>
           ) : null}
-          {result.excludedCount > 0 ? (
+          {!pending && result.excludedCount > 0 ? (
             <p className="warning">
               {result.excludedCount === 1
                 ? "1 journey has"
@@ -87,13 +104,15 @@ export function ReliabilityResultView({
               every figure.
             </p>
           ) : null}
-          {result.status === "no_history" && result.excludedCount === 0 ? (
+          {!pending &&
+          result.status === "no_history" &&
+          result.excludedCount === 0 ? (
             <p className="warning">
               No past journeys were found for this train in the period.
             </p>
           ) : null}
         </div>
-        {known > 0 ? <Distribution result={result} /> : null}
+        {!pending && known > 0 ? <Distribution result={result} /> : null}
       </section>
       {showCalendar ? (
         <section className="card">
