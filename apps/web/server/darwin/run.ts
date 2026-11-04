@@ -1,3 +1,5 @@
+import type { HistoricalRun } from "@railscore/core";
+import { toHistoricalRun } from "../services/map";
 import type { DarwinCall, DarwinUpdate } from "./push-port";
 import tiplocCrs from "./tiploc-crs.json";
 
@@ -191,4 +193,24 @@ export function detailsPayloadFromDarwin(run: DarwinRun): unknown {
       })),
     },
   };
+}
+
+/**
+ * Classifies a run with the shared run rules. HSP reads a run with no actual time
+ * anywhere as cancelled. Here it only means no movement was seen, as for runs that
+ * ran before the first import, so the outcome is unknown unless Darwin cancelled a call.
+ */
+export function historicalRunFromDarwin(
+  run: DarwinRun,
+  stations: { boardingCrs: string; destinationCrs: string },
+): HistoricalRun {
+  const seen = run.calls.some((call) => call.ata || call.atd || call.cancelled);
+  if (!seen) {
+    return {
+      id: run.rid,
+      serviceDate: run.serviceDate,
+      outcome: "missing_actual",
+    };
+  }
+  return toHistoricalRun(detailsPayloadFromDarwin(run), stations, run.rid);
 }
