@@ -68,11 +68,15 @@ export function serviceDayNote(
 
 /** Journey count, with the day types first when they are narrower than the search. */
 export function formatServiceFacts(
-  runCount: number,
+  /** Undefined while the count is still loading: the days alone are shown. */
+  runCount: number | undefined,
   days: readonly ServiceDay[],
   searched?: ServiceDay | "all",
 ): string {
-  const journeys = `${runCount} ${runCount === 1 ? "journey" : "journeys"}`;
+  const journeys =
+    runCount === undefined
+      ? ""
+      : `${runCount} ${runCount === 1 ? "journey" : "journeys"}`;
   const labels = DAY_ORDER.filter((day) => days.includes(day)).map(
     (day) => DAY_LABELS[day],
   );
@@ -81,8 +85,8 @@ export function formatServiceFacts(
     : labels.length === 0
       ? ""
       : joinLabels(labels);
-  if (!note) {
-    return journeys;
+  if (!note || !journeys) {
+    return note || journeys;
   }
   return `${note} · ${journeys}`;
 }
