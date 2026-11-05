@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { HistoricalRun } from "@railscore/core";
-import type { BacklogTrain } from "@/server/hsp/match";
+import type { BacklogTrain } from "@/shared/contracts";
 import {
   apply,
   finished,

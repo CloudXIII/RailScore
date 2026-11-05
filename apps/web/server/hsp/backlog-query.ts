@@ -1,10 +1,10 @@
-import { isDayPattern } from "../day-type";
+import { isDayPattern } from "@/shared/day-type";
 import { PERIOD_LENGTHS } from "../query";
 import { record } from "../payload";
 import type { ScheduledService } from "../services/fold";
 import { serviceKey } from "../services/fold";
-import type { BacklogQuery } from "./backlog";
-import { quartersOf, type BacklogTrain } from "./match";
+import type { BacklogRequest, BacklogTrain } from "@/shared/contracts";
+import { quartersOf } from "./match";
 
 /** A page lists six trains, a few more when several leave at the same minute. */
 const MAX_TRAINS = 16;
@@ -27,7 +27,7 @@ export function backlogTrain(service: ScheduledService): BacklogTrain {
 }
 
 /** The request body, checked. Undefined when anything is out of shape or too large. */
-export function parseBacklogQuery(value: unknown): BacklogQuery | undefined {
+export function parseBacklogQuery(value: unknown): BacklogRequest | undefined {
   const body = record(value);
   if (!body) {
     return undefined;

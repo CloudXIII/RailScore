@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { DarwinUpdate } from "./push-port";
+import { decodeCalls, encodeCalls } from "../call-text";
 import {
-  decodeCalls,
-  encodeCalls,
   foldRepeatedCalls,
   historicalRunFromDarwin,
   mergeUpdate,

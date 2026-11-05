@@ -1,9 +1,9 @@
 import "server-only";
 import { addCalendarDays, londonIsoDate } from "@railscore/core";
 import { database } from "../db";
-import { dayTypeOf } from "../day-type";
+import { dayTypeOf } from "@/shared/day-type";
 import { darwinFirstDay, hspConnection } from "../env";
-import { laterDate, searchPeriods, type DateSpan } from "../hsp/period";
+import { laterDate, searchPeriods, type DateSpan } from "../periods";
 import {
   servicesFromRuns,
   trainPage,
@@ -13,13 +13,8 @@ import {
   type DarwinServiceList,
 } from "./services";
 import type { DarwinRun } from "./run";
-import {
-  oldestRunDate,
-  openFrom,
-  runsOfTrains,
-  runsOnDay,
-  timetableDate,
-} from "./store";
+import { timetableDate } from "./import-state";
+import { oldestRunDate, openFrom, runsOfTrains, runsOnDay } from "./store";
 
 /** Days of the chosen type tried, newest first, for one with a timetable on this route. */
 const TIMETABLE_DAYS_TRIED = 3;

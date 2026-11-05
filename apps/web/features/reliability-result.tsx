@@ -10,7 +10,7 @@ import {
   serviceDayNote,
   throughServiceLabel,
 } from "@/features/format";
-import type { DayPattern } from "@/server/day-type";
+import type { DayPattern } from "@/shared/day-type";
 import {
   notableChanges,
   scheduleNotes,

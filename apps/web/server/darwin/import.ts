@@ -1,5 +1,4 @@
 import "server-only";
-import { deleteOldBacklog } from "../hsp/store";
 import { Kafka, logLevel, type Consumer } from "kafkajs";
 import { database } from "../db";
 import { darwinKafka, darwinKeepDays } from "../env";
@@ -12,17 +11,15 @@ import {
 } from "./snapshot";
 import {
   acquireImport,
-  applyUpdates,
-  deleteOldRuns,
   importState,
   noteGap,
   noteGapFilled,
   noteProgress,
   noteTimetable,
-  packFinishedDays,
   releaseImport,
   timetableDate,
-} from "./store";
+} from "./import-state";
+import { applyUpdates, deleteOldRuns, packFinishedDays } from "./store";
 
 /** Messages folded into one database write and offset commit. */
 const FLUSH_MESSAGES = 5_000;
@@ -85,11 +82,6 @@ export async function importDarwin(budgetMs: number): Promise<ImportResult> {
       ? await fillGap(deadline)
       : { hours: [], runWrites: 0 };
     const runsDeleted = await deleteOldRuns(sql, darwinKeepDays(), new Date());
-    await deleteOldBacklog(sql, darwinKeepDays(), new Date()).catch(
-      (error: unknown) => {
-        console.error("Old HSP rows could not be deleted", errorText(error));
-      },
-    );
     const daysPacked = await packFinishedDays(sql, new Date(), deadline);
     return {
       status: "done",

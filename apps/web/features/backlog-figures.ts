@@ -5,8 +5,8 @@ import {
   type ReliabilityResult,
 } from "@railscore/core";
 import { formatDate } from "@/features/format";
-import type { HspCounts } from "@/server/hsp/metrics";
-import type { ServiceDay } from "@/server/day-type";
+import type { HspCounts } from "@/shared/contracts";
+import type { ServiceDay } from "@/shared/day-type";
 import type { ListPunctuality } from "@/server/services/fold";
 
 /** What HSP has said so far about one train's days before Darwin. */

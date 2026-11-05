@@ -2,6 +2,7 @@ import { afterResponse } from "@/server/after-response";
 import { importDarwin } from "@/server/darwin/import";
 import { importSecret } from "@/server/env";
 import { errorText } from "@/server/error-text";
+import { deleteOldRows } from "@/server/maintenance";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -40,10 +41,14 @@ export async function GET(request: Request): Promise<Response> {
   });
 }
 
+/** Imports, then, when this call held the import, deletes the HSP rows no search reads. */
 async function runImport() {
   try {
     const result = await importDarwin(IMPORT_BUDGET_MS);
     console.info("[darwin-import]", JSON.stringify(result));
+    if (result.status === "done") {
+      await deleteOldRows();
+    }
     return result;
   } catch (error) {
     console.error("[darwin-import] failed", errorText(error));
