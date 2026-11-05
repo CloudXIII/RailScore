@@ -1,6 +1,6 @@
 import { dateOfRid, journeyMinutes, minutesApart } from "@railscore/core";
 import { DAY_LABELS, formatClock } from "@/features/format";
-import { DAY_TYPES, dayTypeOf, type ServiceDay } from "@/server/day-type";
+import { DAY_TYPES, dayTypeOf, type ServiceDay } from "@/shared/day-type";
 import {
   SAME_TRAIN_MINUTES,
   type ScheduledService,

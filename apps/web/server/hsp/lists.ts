@@ -1,10 +1,6 @@
-import type { ServiceDay } from "../day-type";
-import {
-  quarterOf,
-  quartersOf,
-  type BacklogTrain,
-  type Quarter,
-} from "./match";
+import type { ServiceDay } from "@/shared/day-type";
+import type { BacklogTrain } from "@/shared/contracts";
+import { quarterOf, quartersOf, type Quarter } from "./match";
 import type { DateSpan } from "../periods";
 import { hspStationCode } from "./stations";
 

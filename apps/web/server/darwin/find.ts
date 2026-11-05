@@ -1,7 +1,7 @@
 import "server-only";
 import { addCalendarDays, londonIsoDate } from "@railscore/core";
 import { database } from "../db";
-import { dayTypeOf } from "../day-type";
+import { dayTypeOf } from "@/shared/day-type";
 import { darwinFirstDay, hspConnection } from "../env";
 import { laterDate, searchPeriods, type DateSpan } from "../periods";
 import {

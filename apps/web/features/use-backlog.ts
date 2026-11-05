@@ -3,19 +3,7 @@
 import { useEffect, useState } from "react";
 import type { HistoricalRun } from "@railscore/core";
 import type { TrainBacklog } from "@/features/backlog-figures";
-import type { BacklogEvent } from "@/server/hsp/backlog";
-import type { BacklogTrain } from "@/server/hsp/match";
-import type { DayPattern } from "@/server/day-type";
-
-/** What the page asks HSP about: the listed trains, and the train whose runs it shows. */
-export type BacklogRequest = {
-  readonly fromCrs: string;
-  readonly toCrs: string;
-  readonly days: DayPattern;
-  readonly periodDays: number;
-  readonly trains: readonly BacklogTrain[];
-  readonly runsOf?: string;
-};
+import type { BacklogEvent, BacklogRequest } from "@/shared/contracts";
 
 export type BacklogState = {
   readonly trains: ReadonlyMap<string, TrainBacklog>;
