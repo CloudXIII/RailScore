@@ -3,7 +3,7 @@ import { addCalendarDays, londonIsoDate } from "@railscore/core";
 import { database } from "../db";
 import { dayTypeOf } from "../day-type";
 import { darwinFirstDay, hspConnection } from "../env";
-import { laterDate, searchPeriods, type DateSpan } from "../hsp/period";
+import { laterDate, searchPeriods, type DateSpan } from "../periods";
 import {
   servicesFromRuns,
   trainPage,

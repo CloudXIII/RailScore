@@ -1,6 +1,7 @@
 import { clockMinutes, formatHhmm } from "@railscore/core";
 import { describe, expect, it } from "vitest";
-import type { DarwinRun, StoredCall } from "./run";
+import type { StoredCall } from "../call-text";
+import type { DarwinRun } from "./run";
 import {
   servicesFromRuns,
   trainPage,
@@ -8,7 +9,7 @@ import {
   type DarwinSearch,
 } from "./services";
 import type { ScheduledService } from "../services/fold";
-import { searchPeriods } from "../hsp/period";
+import { searchPeriods } from "../periods";
 
 const search: DarwinSearch = {
   fromCrs: "CLJ",

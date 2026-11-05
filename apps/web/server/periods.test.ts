@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { searchPeriods } from "./period";
+import { searchPeriods } from "./periods";
 
 const at = (iso: string) => new Date(`${iso}T12:00:00Z`);
 

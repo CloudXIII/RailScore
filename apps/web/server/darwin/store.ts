@@ -3,13 +3,8 @@ import type { Sql } from "postgres";
 import { addCalendarDays, londonIsoDate } from "@railscore/core";
 import { decodeMonth, encodeMonthChunk, monthOf } from "./month";
 import type { DarwinUpdate } from "./push-port";
-import {
-  decodeCalls,
-  encodeCalls,
-  foldRepeatedCalls,
-  mergeUpdate,
-  type DarwinRun,
-} from "./run";
+import { decodeCalls, encodeCalls } from "../call-text";
+import { foldRepeatedCalls, mergeUpdate, type DarwinRun } from "./run";
 
 /** Rows per statement. Postgres takes at most 65,535 parameters, seven per row here. */
 const WRITE_ROWS = 2_000;

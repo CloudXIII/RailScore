@@ -19,7 +19,7 @@ import {
   type HspCounts,
   type HspService,
 } from "./metrics";
-import { searchPeriods, type DateSpan } from "./period";
+import { searchPeriods, type DateSpan } from "../periods";
 import {
   addCalls,
   callsToday,
