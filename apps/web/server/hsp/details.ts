@@ -7,6 +7,7 @@ import {
 import { serviceDateOf, toHistoricalRun } from "../services/map";
 import { HspResponseError } from "./metrics";
 import { record, text } from "../payload";
+import { darwinStationCode } from "./stations";
 
 /**
  * A run from HSP: the stored Darwin shape plus HSP's reason code at each call, "" where
@@ -19,6 +20,7 @@ export type HspRun = DarwinRun & { readonly reasons: readonly string[] };
  * by the same rules. HSP gives a late or cancellation reason per call but no cancellation
  * flag; a call with a reason is stored with the `c` flag, which the rules read as a reason,
  * and the code itself is kept in `reasons`. HSP has no schedule UID, so `uid` is empty.
+ * Stations keep Darwin's codes.
  */
 export function runFromDetails(payload: unknown, rid: string): HspRun {
   const details = record(record(payload)?.serviceAttributesDetails);
@@ -34,10 +36,11 @@ export function runFromDetails(payload: unknown, rid: string): HspRun {
   const reasons: string[] = [];
   const calls = details.locations.flatMap((value): StoredCall[] => {
     const stop = record(value);
-    const crs = text(stop?.location);
-    if (!stop || !/^[A-Z]{3}$/.test(crs)) {
+    const code = text(stop?.location);
+    if (!stop || !/^[A-Z]{3}$/.test(code)) {
       return [];
     }
+    const crs = darwinStationCode(code);
     const pta = clock(stop.gbtt_pta);
     const ptd = clock(stop.gbtt_ptd);
     const ata = clock(stop.actual_ta);

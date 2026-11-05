@@ -4,8 +4,11 @@ import {
   historyFigures,
   listPunctuality,
   runsFromCounts,
+  shownPeriod,
   type TrainBacklog,
 } from "./backlog-figures";
+
+const NO_RUNS = { runs: 0, within5: 0, within14: 0, within29: 0, arrived: 0 };
 
 const backlog: TrainBacklog = {
   byDay: {
@@ -103,5 +106,46 @@ describe("historyFigures", () => {
       total: 2,
     });
     expect(figures.result.distribution.thirtyOrMore).toBe(1);
+  });
+});
+
+describe("shownPeriod", () => {
+  const period = { from: "2026-10-06", to: "2026-11-04" };
+  const hsp = { from: "2026-10-06", to: "2026-11-03" };
+  const noRecord: TrainBacklog = { byDay: { weekdays: NO_RUNS }, runCount: 0 };
+
+  it("keeps the whole period when HSP has the train's runs", () => {
+    expect(shownPeriod({ period, hsp, backlog, missing: false })).toEqual({
+      period,
+    });
+  });
+
+  it("starts on Darwin's first day, with a note, when HSP has no record of the train", () => {
+    expect(
+      shownPeriod({ period, hsp, backlog: noRecord, missing: false }),
+    ).toEqual({
+      period: { from: "2026-11-04", to: "2026-11-04" },
+      note: "There is no record of this train before 04/11/2026, so its history starts then.",
+    });
+  });
+
+  it("leaves out the days before Darwin when HSP gave no answer", () => {
+    expect(
+      shownPeriod({ period, hsp, backlog: undefined, missing: true }),
+    ).toEqual({ period: { from: "2026-11-04", to: "2026-11-04" } });
+  });
+
+  it("keeps the period while HSP is still asked, and without HSP", () => {
+    expect(
+      shownPeriod({ period, hsp, backlog: undefined, missing: false }),
+    ).toEqual({ period });
+    expect(
+      shownPeriod({
+        period,
+        hsp: undefined,
+        backlog: noRecord,
+        missing: false,
+      }),
+    ).toEqual({ period });
   });
 });

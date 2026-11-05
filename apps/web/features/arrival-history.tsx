@@ -2,7 +2,7 @@
 
 import type { HistoricalRun } from "@railscore/core";
 import { useBacklogState } from "@/features/backlog-context";
-import { historyFigures } from "@/features/backlog-figures";
+import { historyFigures, shownPeriod } from "@/features/backlog-figures";
 import type { DayPattern } from "@/server/day-type";
 import { ReliabilityResultView } from "@/features/reliability-result";
 import { serviceKey, type ScheduledService } from "@/server/services/map";
@@ -19,6 +19,7 @@ export function ArrivalHistory({
   fromCrs,
   toCrs,
   period,
+  hspDays,
   darwinRuns,
   result,
   stations,
@@ -28,6 +29,8 @@ export function ArrivalHistory({
   fromCrs: string;
   toCrs: string;
   period: { from: string; to: string };
+  /** Days before Darwin that HSP fills, when it is asked. */
+  hspDays?: { from: string; to: string };
   darwinRuns: readonly HistoricalRun[];
   /** Darwin's figures alone, shown when there is no HSP answer. */
   result: ReliabilityResult;
@@ -56,17 +59,24 @@ export function ArrivalHistory({
           ? "Older journeys could not be loaded because the data provider is busy, so they are left out. Reload later to try again."
           : "Older journeys are not in yet because the data provider is busy. Trying again…"
         : undefined;
+  const shown = shownPeriod({
+    period,
+    hsp: hspDays,
+    backlog,
+    missing: state?.missing.has(key) ?? false,
+  });
+  const line = progress ?? shown.note;
   return (
     <ReliabilityResultView
       service={service}
       fromCrs={fromCrs}
       toCrs={toCrs}
-      period={period}
+      period={shown.period}
       result={figures.result}
       stations={stations}
       days={days}
       pending={waiting}
-      {...(progress ? { progress } : {})}
+      {...(line ? { progress: line } : {})}
     />
   );
 }

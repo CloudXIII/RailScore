@@ -11,13 +11,8 @@ import {
 } from "../day-type";
 import { HspCallError, postHsp, takeCallCount } from "./client";
 import { historicalRunFromHsp, runFromDetails, type HspRun } from "./details";
-import {
-  matchBacklog,
-  quarterOf,
-  quartersOf,
-  type BacklogTrain,
-  type Quarter,
-} from "./match";
+import { matchBacklog, type BacklogTrain } from "./match";
+import { listTasks, tasksOf, type ListTask } from "./lists";
 import {
   METRIC_TOLERANCES,
   parseServiceMetrics,
@@ -134,13 +129,7 @@ export async function streamBacklog(
     Boolean(options.signal?.aborted) || Date.now() > options.deadline;
   try {
     const days = dayTypesOf(query.days);
-    const tasks = quartersOf(query.trains).flatMap((quarter) =>
-      days.map((day) => ({
-        quarter,
-        day,
-        key: metricsKey(query, day, quarter, span),
-      })),
-    );
+    const tasks = listTasks(query, query.trains, days, span);
     const answers = await storedMetrics(tasks.map((task) => task.key));
     const sent = new Set<string>();
     const missing = new Set<string>();
@@ -152,7 +141,7 @@ export async function streamBacklog(
         if (sent.has(train.key) || missing.has(train.key)) {
           continue;
         }
-        const own = tasksOf(train, tasks);
+        const own = tasksOf(query, train, tasks);
         if (own.some((task) => failedTasks.has(task.key))) {
           missing.add(train.key);
           emit({ type: "missing", keys: [train.key] });
@@ -178,7 +167,7 @@ export async function streamBacklog(
     emitReady();
 
     // The history train's quarter-hours first, then the rest in clock order.
-    const first = history ? new Set(tasksOf(history, tasks)) : new Set();
+    const first = history ? new Set(tasksOf(query, history, tasks)) : new Set();
     const queue = tasks
       .filter((task) => !answers.has(task.key))
       .sort(
@@ -197,7 +186,7 @@ export async function streamBacklog(
       const services =
         stop() || refusedLists >= REFUSED_LISTS
           ? undefined
-          : await fetchMetrics(query, task, span, options.deadline, stop);
+          : await fetchMetrics(task, span, options.deadline, stop);
       if (services) {
         answers.set(task.key, services);
       } else {
@@ -217,16 +206,6 @@ export async function streamBacklog(
     await addCalls(takeCallCount());
     emit({ type: "end" });
   }
-}
-
-function tasksOf<T extends { quarter: Quarter }>(
-  train: BacklogTrain,
-  tasks: readonly T[],
-): T[] {
-  const quarters = new Set(
-    train.legs.map((leg) => quarterOf(leg.publicDeparture).fromTime),
-  );
-  return tasks.filter((task) => quarters.has(task.quarter.fromTime));
 }
 
 function trainResult(
@@ -251,30 +230,12 @@ function trainResult(
   return { byDay, rids: [...new Set(rids)] };
 }
 
-/** Same route, day type, quarter-hour and dates: the same answer for every search. */
-function metricsKey(
-  query: Pick<BacklogQuery, "fromCrs" | "toCrs">,
-  day: ServiceDay,
-  quarter: Quarter,
-  span: DateSpan,
-): string {
-  return [
-    query.fromCrs,
-    query.toCrs,
-    day,
-    quarter.fromTime,
-    span.from,
-    span.to,
-  ].join("|");
-}
-
 /**
  * One list answer. The search that claims the key asks HSP once a shared slot is free;
  * another search of the same quarter waits for that answer instead of asking again.
  */
 async function fetchMetrics(
-  query: BacklogQuery,
-  task: { key: string; day: ServiceDay; quarter: Quarter },
+  task: ListTask,
   span: DateSpan,
   deadline: number,
   stop: () => boolean,
@@ -298,8 +259,8 @@ async function fetchMetrics(
       const payload = await postHsp(
         "/serviceMetrics",
         {
-          from_loc: query.fromCrs,
-          to_loc: query.toCrs,
+          from_loc: task.stations.fromCrs,
+          to_loc: task.stations.toCrs,
           from_time: task.quarter.fromTime,
           to_time: task.quarter.toTime,
           from_date: span.from,
