@@ -173,6 +173,8 @@ Station names are cached in memory, and in `apps/web/.data/stations.json` when t
 
 A run at the passenger's stations is classified in `apps/web/server/services/map.ts`. Darwin runs are read in the serviceDetails shape that file was first written for (HSP's), with a cancelled call carrying a reason:
 
+The destination is the first call there after boarding, and boarding is the last departure from the boarding station before it. A train round the Kingston loop is read at its arrival back into Waterloo, and a train that passes Clapham Junction twice is boarded the second time. When Darwin repeated the destination call at the end of a run after a schedule change, the repeat with the same public arrival and an actual time is used.
+
 - **Arrived**, if the destination has an actual arrival. If the boarding stop has no actual time and a `late_canc_reason`, the outcome is **did not call**.
 - **Cancelled**, if the destination has no actual arrival, it has a reason code, and no calling point has an actual time.
 - **Did not call**, if the destination has no actual arrival, it has a reason code, and some calling point has an actual time.
