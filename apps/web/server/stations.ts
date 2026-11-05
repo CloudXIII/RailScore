@@ -1,3 +1,5 @@
+import { record, text } from "./payload";
+
 export type Station = {
   readonly crs: string;
   readonly name: string;
@@ -25,17 +27,6 @@ export function parseStationFeed(payload: unknown): Station[] {
       left.crs.localeCompare(right.crs),
   );
   return stations;
-}
-
-function record(value: unknown): Record<string, unknown> | undefined {
-  if (typeof value === "object" && value !== null && !Array.isArray(value)) {
-    return value as Record<string, unknown>;
-  }
-  return undefined;
-}
-
-function text(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 export function stationName(crs: string, stations: readonly Station[]): string {

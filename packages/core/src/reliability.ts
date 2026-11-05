@@ -1,5 +1,4 @@
 const WITHIN_MINUTES = 5;
-const LOW_SAMPLE_BELOW = 20;
 
 /** One historical run at the passenger's destination. `serviceDate` is `YYYY-MM-DD` when known. */
 export type HistoricalRun =
@@ -63,18 +62,10 @@ export type ReliabilityResult = {
   readonly status: ReliabilityStatus;
   /** Arrivals at most 5 minutes late, of every run with a known outcome, cancellations included. */
   readonly withinFiveMinutes: CountedPercentage;
-  /** Cancelled or did not call, of the same runs. */
-  readonly cancellationRate: CountedPercentage;
   readonly distribution: LatenessDistribution;
   readonly calendar: readonly CalendarMark[];
-  readonly longestDelay: {
-    readonly minutes: number;
-    readonly serviceDate?: string;
-  } | null;
   /** Runs with no arrival and no sign of cancellation. Left out of every figure. */
   readonly excludedCount: number;
-  /** True when some runs have a known outcome and there are fewer than 20. */
-  readonly lowSample: boolean;
 };
 
 export function calculateReliability(
@@ -88,7 +79,6 @@ export function calculateReliability(
     cancelled: 0,
   };
   let excluded = 0;
-  let longestDelay: ReliabilityResult["longestDelay"] = null;
   const calendar = new Map<string, CalendarMark>();
 
   for (const run of runs) {
@@ -110,12 +100,6 @@ export function calculateReliability(
       } else {
         distribution.thirtyOrMore += 1;
       }
-      if (
-        lateness > WITHIN_MINUTES &&
-        (longestDelay === null || lateness > longestDelay.minutes)
-      ) {
-        longestDelay = { minutes: lateness, serviceDate: run.serviceDate };
-      }
       continue;
     }
     if (run.outcome === "cancelled" || run.outcome === "did_not_call") {
@@ -129,14 +113,11 @@ export function calculateReliability(
   return {
     status: statusFor(runs.length, excluded),
     withinFiveMinutes: counted(distribution.withinFive, known),
-    cancellationRate: counted(distribution.cancelled, known),
     distribution,
     calendar: [...calendar.values()].sort((left, right) =>
       left.serviceDate.localeCompare(right.serviceDate),
     ),
-    longestDelay,
     excludedCount: excluded,
-    lowSample: known > 0 && known < LOW_SAMPLE_BELOW,
   };
 }
 

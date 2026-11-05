@@ -6,6 +6,7 @@ import {
 } from "../darwin/run";
 import { serviceDateOf, toHistoricalRun } from "../services/map";
 import { HspResponseError } from "./metrics";
+import { record, text } from "../payload";
 
 /**
  * A run from HSP: the stored Darwin shape plus HSP's reason code at each call, "" where
@@ -89,14 +90,4 @@ export function decodeReasons(text: string, callCount: number): string[] {
 function clock(value: unknown): string {
   const hhmm = text(value);
   return /^\d{4}$/.test(hhmm) ? hhmm : "";
-}
-
-function record(value: unknown): Record<string, unknown> | undefined {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : undefined;
-}
-
-function text(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
 }

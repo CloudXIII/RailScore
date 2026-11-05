@@ -1,10 +1,9 @@
+import { isDayPattern, type DayPattern } from "./day-type";
 import { resolveStation, type Station } from "./stations";
-
-export type DayPattern = "weekdays" | "saturday" | "sunday" | "all";
 
 /** Days of history. Finished days are packed into month rows, so 90 fit in Neon Free (0.5 GB). */
 export const PERIOD_LENGTHS = [30, 60, 90] as const;
-export type PeriodLength = (typeof PERIOD_LENGTHS)[number];
+type PeriodLength = (typeof PERIOD_LENGTHS)[number];
 
 export type ParsedQuery = {
   fromText: string;
@@ -19,8 +18,6 @@ export type ParsedQuery = {
   errors: string[];
 };
 
-const DAYS: readonly DayPattern[] = ["weekdays", "saturday", "sunday", "all"];
-
 export function parseQuery(
   params: Record<string, string | string[] | undefined>,
   stations: readonly Station[],
@@ -29,9 +26,7 @@ export function parseQuery(
   const toText = single(params.to);
   const time = single(params.time) || "06:30";
   const daysValue = single(params.days);
-  const days: DayPattern = DAYS.includes(daysValue as DayPattern)
-    ? (daysValue as DayPattern)
-    : "weekdays";
+  const days: DayPattern = isDayPattern(daysValue) ? daysValue : "weekdays";
   const period = parsePeriod(single(params.period));
   const serviceKey = single(params.service);
   const calculate = single(params.calculate) === "1";

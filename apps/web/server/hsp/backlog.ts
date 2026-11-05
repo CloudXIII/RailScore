@@ -1,10 +1,14 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
-import type { HistoricalRun } from "@railscore/core";
+import { dateOfRid, type HistoricalRun } from "@railscore/core";
 import { darwinFirstDay, hspConnection, hspDailyCallLimit } from "../env";
 import { errorText } from "../error-text";
-import type { DayPattern } from "../query";
-import { serviceDateOf, type ServiceDay } from "../services/map";
+import {
+  DAY_TYPES,
+  dayTypesOf,
+  type DayPattern,
+  type ServiceDay,
+} from "../day-type";
 import { HspCallError, postHsp, takeCallCount } from "./client";
 import { historicalRunFromHsp, runFromDetails, type HspRun } from "./details";
 import {
@@ -65,8 +69,6 @@ const HSP_DAYS: Record<ServiceDay, "WEEKDAY" | "SATURDAY" | "SUNDAY"> = {
   saturday: "SATURDAY",
   sunday: "SUNDAY",
 };
-
-const ALL_DAYS: readonly ServiceDay[] = ["weekdays", "saturday", "sunday"];
 
 /** HSP's gateway gives up at about 55 s. Successes still arrive at 53 s. */
 const LIST_CALL_TIMEOUT_MS = 54_000;
@@ -131,7 +133,7 @@ export async function streamBacklog(
   const stop = () =>
     Boolean(options.signal?.aborted) || Date.now() > options.deadline;
   try {
-    const days = query.days === "all" ? ALL_DAYS : [query.days];
+    const days = dayTypesOf(query.days);
     const tasks = quartersOf(query.trains).flatMap((quarter) =>
       days.map((day) => ({
         quarter,
@@ -234,7 +236,7 @@ function trainResult(
 ): { byDay: Partial<Record<ServiceDay, HspCounts>>; rids: string[] } {
   const byDay: Partial<Record<ServiceDay, HspCounts>> = {};
   const rids: string[] = [];
-  for (const day of ALL_DAYS) {
+  for (const day of DAY_TYPES) {
     const services = own
       .filter((task) => task.day === day)
       .flatMap((task) => answers.get(task.key) ?? []);
@@ -356,9 +358,7 @@ async function streamRuns(
 ): Promise<void> {
   const stations = { boardingCrs: query.fromCrs, destinationCrs: query.toCrs };
   const newestFirst = [...rids].sort((left, right) =>
-    (serviceDateOf({}, right) ?? "").localeCompare(
-      serviceDateOf({}, left) ?? "",
-    ),
+    (dateOfRid(right) ?? "").localeCompare(dateOfRid(left) ?? ""),
   );
   const stored = await storedRuns(newestFirst);
   if (stored.size > 0) {

@@ -3,6 +3,8 @@
  * each with its run identifiers and how many runs arrived within each asked tolerance.
  */
 
+import { record, text } from "../payload";
+
 /** Tolerances asked for, in minutes late at the destination. A high one counts every arrival. */
 export const METRIC_TOLERANCES = ["5", "14", "29", "999"] as const;
 
@@ -52,10 +54,10 @@ export function parseServiceMetrics(payload: unknown): HspService[] {
   return root.Services.flatMap((value): HspService[] => {
     const service = record(value);
     const attributes = record(service?.serviceAttributesMetrics);
-    const departure = text(attributes?.gbtt_ptd);
-    const operator = text(attributes?.toc_code);
-    const origin = text(attributes?.origin_location);
-    const destination = text(attributes?.destination_location);
+    const departure = field(attributes?.gbtt_ptd);
+    const operator = field(attributes?.toc_code);
+    const origin = field(attributes?.origin_location);
+    const destination = field(attributes?.destination_location);
     if (!attributes || !departure || !operator || !origin || !destination) {
       return [];
     }
@@ -68,7 +70,7 @@ export function parseServiceMetrics(payload: unknown): HspService[] {
         originCrs: origin,
         destinationCrs: destination,
         publicDeparture: departure,
-        publicArrival: text(attributes.gbtt_pta),
+        publicArrival: field(attributes.gbtt_pta),
         operatorCode: operator,
         rids,
         ...(counts ? { counts } : {}),
@@ -84,9 +86,9 @@ function parseCounts(value: unknown): HspCounts | undefined {
   const at = (tolerance: string) => {
     const metric = value
       .map(record)
-      .find((entry) => text(entry?.tolerance_value) === tolerance);
-    const within = Number(text(metric?.num_tolerance) || Number.NaN);
-    const outside = Number(text(metric?.num_not_tolerance) || Number.NaN);
+      .find((entry) => field(entry?.tolerance_value) === tolerance);
+    const within = Number(field(metric?.num_tolerance) || Number.NaN);
+    const outside = Number(field(metric?.num_not_tolerance) || Number.NaN);
     return Number.isInteger(within) && Number.isInteger(outside)
       ? { within, runs: within + outside }
       : undefined;
@@ -123,16 +125,7 @@ export function addCounts(
   };
 }
 
-function record(value: unknown): Record<string, unknown> | undefined {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : undefined;
-}
-
-function text(value: unknown): string {
-  return typeof value === "string"
-    ? value.trim()
-    : typeof value === "number"
-      ? String(value)
-      : "";
+/** Text or a number as text: HSP sends counts and codes either way. */
+function field(value: unknown): string {
+  return typeof value === "number" ? String(value) : text(value);
 }

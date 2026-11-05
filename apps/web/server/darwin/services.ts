@@ -1,13 +1,10 @@
-import { clockMinutes, journeyMinutes } from "@railscore/core";
-import { dayTypeOf } from "../day-type";
+import { clockMinutes, dateOfRid, journeyMinutes } from "@railscore/core";
+import { dayTypeOf, dayTypesOf, type DayPattern } from "../day-type";
 import {
   listServices,
-  serviceDateOf,
   type ListPunctuality,
   type ScheduledService,
-  type ServiceDay,
 } from "../services/map";
-import type { DayPattern } from "../query";
 import { historicalRunFromDarwin, type DarwinRun } from "./run";
 
 export type DarwinSearch = {
@@ -27,15 +24,13 @@ export type DarwinServiceList = {
   timetableDate: string;
 };
 
-const DAY_TYPES: readonly ServiceDay[] = ["weekdays", "saturday", "sunday"];
-
 /** Departure times a list covers, HHMM, both inclusive. */
 export type ClockWindow = { from: string; to: string };
 
 export const WHOLE_DAY: ClockWindow = { from: "0000", to: "2359" };
 
 /** Trains a list shows from the searched time. */
-export const LIST_SIZE = 6;
+const LIST_SIZE = 6;
 
 export type TrainPage = {
   services: ScheduledService[];
@@ -112,7 +107,7 @@ export function servicesFromRuns(
   },
   window: ClockWindow,
 ): DarwinServiceList | undefined {
-  const dayTypes = search.days === "all" ? DAY_TYPES : [search.days];
+  const dayTypes = dayTypesOf(search.days);
   const period = input.period;
   const counted = (date: string) =>
     date >= input.countedFrom && date < input.today;
@@ -171,7 +166,7 @@ export function servicesFromRuns(
   );
   const listed = listServices(groups, period.to);
   const runsOn = (service: ScheduledService) =>
-    service.rids.some((rid) => serviceDateOf({}, rid) === timetableDate);
+    service.rids.some((rid) => dateOfRid(rid) === timetableDate);
   return {
     services: listed.services.filter(runsOn).map(countedOnly(counted)),
     retired: [
@@ -264,7 +259,7 @@ function punctualityOf(run: DarwinRun, search: DarwinSearch): ListPunctuality {
  */
 function countedOnly(counted: (date: string) => boolean) {
   const earlier = (rids: readonly string[]) =>
-    rids.filter((rid) => counted(serviceDateOf({}, rid) ?? ""));
+    rids.filter((rid) => counted(dateOfRid(rid) ?? ""));
   return (service: ScheduledService): ScheduledService => ({
     ...service,
     rids: earlier(service.rids),

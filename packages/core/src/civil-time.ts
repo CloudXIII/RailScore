@@ -20,15 +20,19 @@ export function signedLatenessMinutes(
 
 /** Whole minutes from midnight. Rejects anything that is not a valid HHMM. */
 export function clockMinutes(hhmm: string): number {
-  if (!/^\d{4}$/.test(hhmm)) {
-    throw new Error(`Expected an HHMM clock time, received "${hhmm}".`);
+  const minutes = parseClock(hhmm);
+  if (minutes === undefined) {
+    throw new Error(`Expected a valid HHMM clock time, received "${hhmm}".`);
   }
-  const hours = Number(hhmm.slice(0, 2));
-  const minutes = Number(hhmm.slice(2, 4));
-  if (hours > 23 || minutes > 59) {
-    throw new Error(`Expected a valid clock time, received "${hhmm}".`);
-  }
-  return hours * 60 + minutes;
+  return minutes;
+}
+
+/** Minutes from midnight as HHMM, wrapped into the day: 1450 is "0010", -10 is "2350". */
+export function formatHhmm(minutes: number): string {
+  const wrapped =
+    ((minutes % MINUTES_IN_DAY) + MINUTES_IN_DAY) % MINUTES_IN_DAY;
+  const hours = Math.floor(wrapped / 60);
+  return `${String(hours).padStart(2, "0")}${String(wrapped % 60).padStart(2, "0")}`;
 }
 
 /** Shorter gap between two clock times, so 23:59 and 00:01 are 2 minutes apart. */
@@ -53,13 +57,17 @@ export function journeyMinutes(departure: string, arrival: string): number {
 }
 
 function clockMinutesOrNaN(hhmm: string): number {
+  return parseClock(hhmm) ?? Number.NaN;
+}
+
+function parseClock(hhmm: string): number | undefined {
   if (!/^\d{4}$/.test(hhmm)) {
-    return Number.NaN;
+    return undefined;
   }
   const hours = Number(hhmm.slice(0, 2));
   const minutes = Number(hhmm.slice(2, 4));
   if (hours > 23 || minutes > 59) {
-    return Number.NaN;
+    return undefined;
   }
   return hours * 60 + minutes;
 }

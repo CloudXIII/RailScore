@@ -5,10 +5,10 @@ import {
   timetableChangeLabel,
   timetableMarks,
   type DayCell,
-  type DayFilter,
 } from "@/features/day-grid";
 import { formatClock } from "@/features/format";
 import type { TimetableChange } from "@/features/timetable-changes";
+import type { DayPattern } from "@/server/day-type";
 
 export function DayCalendar({
   period,
@@ -18,7 +18,7 @@ export function DayCalendar({
 }: {
   period: { from: string; to: string };
   marks: readonly CalendarMark[];
-  days: DayFilter;
+  days: DayPattern;
   changes?: readonly TimetableChange[];
 }) {
   const months = calendarMonths(period, marks, days);
@@ -123,7 +123,7 @@ function LegendItem({
   );
 }
 
-function calendarCaption(days: DayFilter): string {
+function calendarCaption(days: DayPattern): string {
   if (days === "weekdays") {
     return "How each weekday went";
   }

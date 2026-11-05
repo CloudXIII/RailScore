@@ -30,7 +30,7 @@ export type DarwinRun = {
 
 const CRS_BY_TIPLOC: Readonly<Record<string, string>> = tiplocCrs;
 
-export function crsOf(tpl: string): string | undefined {
+function crsOf(tpl: string): string | undefined {
   return CRS_BY_TIPLOC[tpl];
 }
 
