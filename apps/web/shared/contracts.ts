@@ -1,4 +1,4 @@
-import type { HistoricalRun } from "@railscore/core";
+import type { HistoricalRun, PunctualityTally } from "@railscore/core";
 import type { DayPattern, ServiceDay } from "./day-type";
 
 /**
@@ -35,25 +35,15 @@ export type BacklogRequest = {
   readonly runsOf?: string;
 };
 
-/**
- * Runs of one HSP train in the period by arrival. `runs` includes cancellations and runs that
- * did not call at the boarding station, which HSP counts outside every tolerance.
- * `arrived` is every run within the high tolerance: it reached the destination.
- */
-export type HspCounts = {
-  readonly runs: number;
-  readonly within5: number;
-  readonly within14: number;
-  readonly within29: number;
-  readonly arrived: number;
-};
-
 export type BacklogEvent =
-  /** HSP's counts for one listed train, by day type, before Darwin's first day. */
+  /**
+   * HSP's counts for one listed train, by day type, before Darwin's first day. HSP counts a
+   * run within its high tolerance as arrived.
+   */
   | {
       readonly type: "train";
       readonly key: string;
-      readonly byDay: Partial<Record<ServiceDay, HspCounts>>;
+      readonly byDay: Partial<Record<ServiceDay, PunctualityTally>>;
       /** Runs HSP listed for the train, each one fetched for the arrival history. */
       readonly runCount: number;
     }

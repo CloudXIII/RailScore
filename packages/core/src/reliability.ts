@@ -1,3 +1,5 @@
+import type { PunctualityTally } from "./tally";
+
 const WITHIN_MINUTES = 5;
 
 /** One historical run at the passenger's destination. `serviceDate` is `YYYY-MM-DD` when known. */
@@ -68,8 +70,13 @@ export type ReliabilityResult = {
   readonly excludedCount: number;
 };
 
+/**
+ * The figures for `runs`, plus runs known only by count in `tallies`, such as HSP's for runs
+ * not fetched yet. Counted runs go into the totals and the bands, never on the calendar.
+ */
 export function calculateReliability(
   runs: readonly HistoricalRun[],
+  tallies: readonly PunctualityTally[] = [],
 ): ReliabilityResult {
   const distribution = {
     withinFive: 0,
@@ -78,6 +85,16 @@ export function calculateReliability(
     thirtyOrMore: 0,
     cancelled: 0,
   };
+  let tallied = 0;
+  for (const tally of tallies) {
+    const bands = tallyBands(tally);
+    distribution.withinFive += bands.withinFive;
+    distribution.sixToFourteen += bands.sixToFourteen;
+    distribution.fifteenToTwentyNine += bands.fifteenToTwentyNine;
+    distribution.thirtyOrMore += bands.thirtyOrMore;
+    distribution.cancelled += bands.cancelled;
+    tallied += Object.values(bands).reduce((sum, count) => sum + count, 0);
+  }
   let excluded = 0;
   const calendar = new Map<string, CalendarMark>();
 
@@ -109,15 +126,30 @@ export function calculateReliability(
     excluded += 1;
   }
 
-  const known = runs.length - excluded;
+  const known = runs.length + tallied - excluded;
   return {
-    status: statusFor(runs.length, excluded),
+    status: statusFor(runs.length + tallied, excluded),
     withinFiveMinutes: counted(distribution.withinFive, known),
     distribution,
     calendar: [...calendar.values()].sort((left, right) =>
       left.serviceDate.localeCompare(right.serviceDate),
     ),
     excludedCount: excluded,
+  };
+}
+
+/**
+ * A tally's runs by band. A band is never below zero, should a source send counts that do not
+ * nest.
+ */
+function tallyBands(tally: PunctualityTally): LatenessDistribution {
+  const band = (count: number) => Math.max(0, count);
+  return {
+    withinFive: band(tally.within5),
+    sixToFourteen: band(tally.within14 - tally.within5),
+    fifteenToTwentyNine: band(tally.within29 - tally.within14),
+    thirtyOrMore: band(tally.arrived - tally.within29),
+    cancelled: band(tally.runs - tally.arrived),
   };
 }
 

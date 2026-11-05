@@ -1,6 +1,6 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
-import { dateOfRid } from "@railscore/core";
+import { dateOfRid, type PunctualityTally } from "@railscore/core";
 import { darwinFirstDay, hspConnection, hspDailyCallLimit } from "../env";
 import { errorText } from "../error-text";
 import { DAY_TYPES, dayTypesOf, type ServiceDay } from "@/shared/day-type";
@@ -8,7 +8,6 @@ import type {
   BacklogEvent,
   BacklogRequest,
   BacklogTrain,
-  HspCounts,
 } from "@/shared/contracts";
 import { HspCallError, postHsp, takeCallCount } from "./client";
 import { historicalRunFromHsp, runFromDetails, type HspRun } from "./details";
@@ -189,8 +188,8 @@ function trainResult(
   train: BacklogTrain,
   own: readonly { key: string; day: ServiceDay }[],
   answers: ReadonlyMap<string, HspService[]>,
-): { byDay: Partial<Record<ServiceDay, HspCounts>>; rids: string[] } {
-  const byDay: Partial<Record<ServiceDay, HspCounts>> = {};
+): { byDay: Partial<Record<ServiceDay, PunctualityTally>>; rids: string[] } {
+  const byDay: Partial<Record<ServiceDay, PunctualityTally>> = {};
   const rids: string[] = [];
   for (const day of DAY_TYPES) {
     const services = own

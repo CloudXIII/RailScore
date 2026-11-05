@@ -119,7 +119,13 @@ describe("darwinSource.findServices", () => {
     expect(found.services[0]).toMatchObject({
       publicDeparture: "0812",
       rids: ["202611020000001", "202611030000002"],
-      punctuality: { runs: 2, within5: 1, within14: 1, within29: 2 },
+      punctuality: {
+        runs: 2,
+        within5: 1,
+        within14: 1,
+        within29: 2,
+        arrived: 2,
+      },
     });
     // The search's runs serve the calculation: no second read.
     expect(
