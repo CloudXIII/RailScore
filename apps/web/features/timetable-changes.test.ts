@@ -4,7 +4,7 @@ import {
   timetableChanges,
   usualDays,
 } from "./timetable-changes";
-import type { ScheduledService } from "@/server/services/map";
+import type { ScheduledService } from "@/server/services/fold";
 
 const usual: ScheduledService = {
   originCrs: "EDB",

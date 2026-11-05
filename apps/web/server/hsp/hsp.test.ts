@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { historicalRunFromDarwin } from "../darwin/run";
 import {
-  decodeReasons,
-  encodeReasons,
+  decodeHspCalls,
+  encodeHspCalls,
   historicalRunFromHsp,
   runFromDetails,
 } from "./details";
@@ -281,9 +280,14 @@ describe("matchBacklog", () => {
 });
 
 describe("reason codes", () => {
-  it("stores nothing for a run without codes and reads it back as empty", () => {
-    expect(encodeReasons(["", ""])).toBe("");
-    expect(decodeReasons("", 3)).toEqual(["", "", ""]);
+  it("stores nothing for a run without codes and reads it back without any", () => {
+    const calls = [
+      { crs: "LIV", ptd: "1015" },
+      { crs: "MAN", pta: "1100" },
+    ];
+    const stored = encodeHspCalls(calls);
+    expect(stored.reasons).toBe("");
+    expect(decodeHspCalls(stored)).toEqual(calls);
   });
 });
 
@@ -310,7 +314,7 @@ describe("HSP runs", () => {
     late_canc_reason: reason,
   });
 
-  it("stores the calls in the Darwin shape and measures lateness", () => {
+  it("reads each call with its reason code and measures lateness", () => {
     const run = runFromDetails(
       details([
         stop("LIV", { ptd: "1015", atd: "1016" }),
@@ -321,16 +325,12 @@ describe("HSP runs", () => {
     expect(run).toEqual({
       rid: "202610200000001",
       serviceDate: "2026-10-20",
-      uid: "",
       toc: "NT",
       calls: [
         { crs: "LIV", ptd: "1015", atd: "1016" },
-        { crs: "MAN", pta: "1100", ata: "1108", cancelled: true },
+        { crs: "MAN", pta: "1100", ata: "1108", reason: "IB" },
       ],
-      reasons: ["", "IB"],
     });
-    expect(encodeReasons(run.reasons)).toBe(";IB");
-    expect(decodeReasons(";IB", 2)).toEqual(["", "IB"]);
     expect(historicalRunFromHsp(run, stations)).toMatchObject({
       outcome: "arrived",
       latenessMinutes: 8,
@@ -343,9 +343,39 @@ describe("HSP runs", () => {
       "202610200000001",
     );
     expect(historicalRunFromHsp(run, stations).outcome).toBe("cancelled");
-    expect(historicalRunFromDarwin(run, stations).outcome).toBe(
-      "missing_actual",
+  });
+
+  it("takes the date from the RID when HSP gives none", () => {
+    const run = runFromDetails(
+      { serviceAttributesDetails: { locations: [] } },
+      "202607174100001",
     );
+    expect(run.serviceDate).toBe("2026-07-17");
+  });
+
+  it("rejects an answer that is not in the serviceDetails shape", () => {
+    expect(() => runFromDetails({ Services: [] }, "202608289999999")).toThrow(
+      /expected shape/,
+    );
+  });
+
+  it("stores the reason codes beside the calls and reads them back", () => {
+    const calls = [
+      { crs: "LIV", ptd: "1015", atd: "1016" },
+      { crs: "MAN", pta: "1100", ata: "1108", reason: "IB" },
+    ];
+    const stored = encodeHspCalls(calls);
+    expect(stored).toEqual({
+      calls: "LIV,,1015,,1016,,;MAN,1100,,1108,,c,",
+      reasons: ";IB",
+    });
+    expect(decodeHspCalls(stored)).toEqual(calls);
+  });
+
+  it("keeps a flagged call stored without its code as flagged", () => {
+    expect(decodeHspCalls({ calls: "MAN,1100,,,,c,", reasons: "" })).toEqual([
+      { crs: "MAN", pta: "1100", reason: "" },
+    ]);
   });
 
   it("reads an Elizabeth line run at Paddington under Darwin's code", () => {

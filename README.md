@@ -156,13 +156,13 @@ If HSP is down or refuses after its retries, the trains keep Darwin's figures an
 ## Layout
 
 ```text
-packages/core/src/          punctuality rules and London dates, no Next.js or database
+packages/core/src/          run classification, punctuality rules and London dates, no Next.js or database
 apps/web/app/               home page, /api/import/darwin and /api/backlog
 apps/web/features/          search, list, result, day grid
 apps/web/server/            search, calculation, station list
 apps/web/server/darwin/     Push Port parsing, run merge, store, import, lists from runs
 apps/web/server/hsp/        HSP for the days before Darwin: periods, list counts, matching, runs, store
-apps/web/server/services/   train folding and run classification shared by lists and calculations
+apps/web/server/services/   train folding for the lists
 apps/web/db/schema.sql      tables for Darwin runs, the import state and HSP's answers
 apps/web/scripts/           database migrate, TIPLOC to CRS map
 ```
@@ -171,14 +171,14 @@ Station names are cached in memory, and in `apps/web/.data/stations.json` when t
 
 ## Rules in the code
 
-A run at the passenger's stations is classified in `apps/web/server/services/map.ts`. Darwin runs are read in the serviceDetails shape that file was first written for (HSP's), with a cancelled call carrying a reason:
+A run at the passenger's stations is classified in `packages/core/src/run-outcome.ts`, from its calls in one typed shape (`Call`). Darwin's runs and HSP's answers are each translated into it first. A call is flagged when Darwin cancelled it or HSP gave a reason code for it; HSP does not say whether a code is a late or a cancellation reason.
 
-The destination is the first call there after boarding, and boarding is the last departure from the boarding station before it. A train round the Kingston loop is read at its arrival back into Waterloo, and a train that passes Clapham Junction twice is boarded the second time. When Darwin repeated the destination call at the end of a run after a schedule change, the repeat with the same public arrival and an actual time is used.
+The destination is the first call there after boarding, preferring one with a public arrival, and boarding is the last departure from the boarding station before it. A train round the Kingston loop is read at its arrival back into Waterloo, and a train that passes Clapham Junction twice is boarded the second time. When Darwin repeated the destination call at the end of a run after a schedule change, the repeat with the same public arrival and an actual time is used.
 
-- **Arrived**, if the destination has an actual arrival. If the boarding stop has no actual time and a `late_canc_reason`, the outcome is **did not call**.
-- **Cancelled**, if the destination has no actual arrival, it has a reason code, and no calling point has an actual time.
-- **Did not call**, if the destination has no actual arrival, it has a reason code, and some calling point has an actual time.
-- **No data** otherwise. Those runs are left out of the percentages.
+- **Arrived**, if the destination has an actual arrival. If the boarding stop has a public departure and no actual departure (or, without a public departure, no actual time and a flag), the outcome is **did not call**.
+- **Cancelled**, if the destination has no actual arrival and no call has an actual time.
+- **Did not call**, if the destination has no actual arrival, it is flagged, and some call has an actual time.
+- **No data** otherwise. Those runs are left out of the percentages. A Darwin run with no movement seen at all is no data too, since the import may not have seen it.
 
 `packages/core` then counts, with no I/O:
 
