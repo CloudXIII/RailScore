@@ -44,14 +44,19 @@ export function ArrivalHistory({
   const figures = backlog
     ? historyFigures({ darwinRuns, backlog, hspRuns: state?.runs ?? [] })
     : { result, complete: true };
+  const busy = state?.busy
+    ? " The data provider is busy, so this may take a few minutes."
+    : "";
   const progress = waiting
     ? "Loading earlier journeys…"
     : backlog && !figures.complete
       ? state?.done
-        ? `${state.runs.length} of ${backlog.runCount} earlier days are on the calendar. The figures count them all. The rest could not be loaded just now because the data provider is busy. Reload in a few minutes to add them.`
-        : `Loading earlier journeys: ${state?.runs.length ?? 0} of ${backlog.runCount} days…`
+        ? `${state.runs.length} of ${backlog.runCount} earlier days are on the calendar. The figures count them all. The rest could not be loaded because the data provider is busy. Reload later to add them.`
+        : `Loading earlier journeys: ${state?.runs.length ?? 0} of ${backlog.runCount} days…${busy}`
       : state?.missing.has(key)
-        ? "Earlier journeys could not be loaded just now because the data provider is busy, so they are left out. Reload in a few minutes to try again."
+        ? state.done
+          ? "Earlier journeys could not be loaded because the data provider is busy, so they are left out. Reload later to try again."
+          : "Earlier journeys are not in yet because the data provider is busy. Trying again…"
         : undefined;
   return (
     <ReliabilityResultView
