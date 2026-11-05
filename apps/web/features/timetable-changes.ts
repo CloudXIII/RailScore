@@ -1,12 +1,9 @@
-import { journeyMinutes, minutesApart } from "@railscore/core";
+import { dateOfRid, journeyMinutes, minutesApart } from "@railscore/core";
 import { DAY_LABELS, formatClock } from "@/features/format";
-import { dayTypeOf } from "@/server/day-type";
+import { DAY_TYPES, dayTypeOf, type ServiceDay } from "@/server/day-type";
 import {
-  DAY_ORDER,
   SAME_TRAIN_MINUTES,
-  serviceDateOf,
   type ScheduledService,
-  type ServiceDay,
   type ServiceVariant,
 } from "@/server/services/map";
 
@@ -34,7 +31,7 @@ export function timetableChanges(service: ScheduledService): TimetableChange[] {
     const extraMinutes =
       journeyMinutes(variant.publicDeparture, variant.publicArrival) - usual;
     return variant.rids.flatMap((rid) => {
-      const serviceDate = serviceDateOf({}, rid);
+      const serviceDate = dateOfRid(rid);
       return serviceDate
         ? [
             {
@@ -171,13 +168,13 @@ function mergeSameTimes(variants: readonly ServiceVariant[]): ServiceVariant[] {
 export function usualDays(service: ScheduledService): ServiceDay[] {
   const counts = new Map<ServiceDay, number>();
   for (const rid of service.rids) {
-    const date = serviceDateOf({}, rid);
+    const date = dateOfRid(rid);
     const day = date ? dayTypeOf(date) : undefined;
     if (day) {
       counts.set(day, (counts.get(day) ?? 0) + 1);
     }
   }
-  const usual = DAY_ORDER.filter((day) => (counts.get(day) ?? 0) >= 2);
+  const usual = DAY_TYPES.filter((day) => (counts.get(day) ?? 0) >= 2);
   return usual.length > 0 ? usual : [...service.days];
 }
 
@@ -256,13 +253,13 @@ function bookedArrivalNote(variant: ServiceVariant): string {
 function dayLabelFor(variant: ServiceVariant): string {
   const present = new Set<ServiceDay>();
   for (const rid of variant.rids) {
-    const date = serviceDateOf({}, rid);
+    const date = dateOfRid(rid);
     const day = date ? dayTypeOf(date) : undefined;
     if (day) {
       present.add(day);
     }
   }
-  const labels = DAY_ORDER.filter((day) => present.has(day)).map(
+  const labels = DAY_TYPES.filter((day) => present.has(day)).map(
     (day) => DAY_LABELS[day],
   );
   if (labels.length === 0) {

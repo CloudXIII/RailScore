@@ -5,6 +5,7 @@ import {
   decodeCalls,
   encodeCalls,
   detailsPayloadFromDarwin,
+  foldRepeatedCalls,
   historicalRunFromDarwin,
   mergeUpdate,
   type DarwinRun,
@@ -278,5 +279,74 @@ describe("the passenger's leg on loops and repeated calls", () => {
         destinationCrs: "RDG",
       }),
     ).toMatchObject({ outcome: "arrived", latenessMinutes: 2 });
+  });
+});
+
+/** 4 November 2026, Paddington 07:38 to Didcot Parkway, cut short at Reading. */
+describe("a train cut short", () => {
+  const cutShort = "202611046748197";
+  const scheduled: DarwinUpdate = {
+    kind: "schedule",
+    rid: cutShort,
+    serviceDate: "2026-11-04",
+    uid: "C48197",
+    toc: "GW",
+    calls: [
+      { tpl: "PADTON", ptd: "0738" },
+      { tpl: "RDNGSTN", pta: "0816", ptd: "0824" },
+      { tpl: "TILHRST", pta: "0828", ptd: "0828", cancelled: true },
+      { tpl: "DIDCOTP", pta: "0850", cancelled: true },
+    ],
+  };
+  const arrivedReading: DarwinUpdate = {
+    kind: "status",
+    rid: cutShort,
+    serviceDate: "2026-11-04",
+    calls: [{ tpl: "RDNGSTN", pta: "0816", ata: "0821", platform: "12" }],
+  };
+
+  it("keeps the arrival at its new last stop on that stop, not as an extra call", () => {
+    const run = mergeUpdate(mergeUpdate(undefined, scheduled), arrivedReading);
+    expect(run?.calls.map((call) => call.crs)).toEqual([
+      "PAD",
+      "RDG",
+      "TLH",
+      "DID",
+    ]);
+    expect(run?.calls[1]).toEqual({
+      crs: "RDG",
+      pta: "0816",
+      ptd: "0824",
+      ata: "0821",
+      platform: "12",
+    });
+  });
+
+  it("keeps the arrival when the schedule comes after the status", () => {
+    const run = mergeUpdate(mergeUpdate(undefined, arrivedReading), scheduled);
+    expect(run?.calls.map((call) => call.crs)).toEqual([
+      "PAD",
+      "RDG",
+      "TLH",
+      "DID",
+    ]);
+    expect(run?.calls[1]?.ata).toBe("0821");
+  });
+
+  it("folds a repeat stored at the end back into its call", () => {
+    const calls = foldRepeatedCalls(
+      decodeCalls(
+        "PAD,,0738,,0737,,10;SLO,0753,0753,0756,0758,,2;RDG,0816,0824,,,,;TLH,0828,0828,,,c,3;DID,0850,,,,c,4;RDG,0816,,0821,,,12",
+      ),
+    );
+    expect(encodeCalls(calls)).toBe(
+      "PAD,,0738,,0737,,10;SLO,0753,0753,0756,0758,,2;RDG,0816,0824,0821,,,12;TLH,0828,0828,,,c,3;DID,0850,,,,c,4",
+    );
+  });
+
+  it("leaves the two calls of a loop at one station apart", () => {
+    const loop =
+      "WAT,,0530,,0529,,8;CLJ,0540,0540,0540,0541,,5;KNG,0616,0618,0615,0617,,3;CLJ,0639,0640,0637,0639,,10;WAT,0649,,0648,,,5";
+    expect(encodeCalls(foldRepeatedCalls(decodeCalls(loop)))).toBe(loop);
   });
 });

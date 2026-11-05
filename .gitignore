@@ -23,3 +23,6 @@ skills-lock.json
 # Local HSP benchmark and its results. Not part of the app.
 benchmark/
 apps/web/scripts/hsp-bench.mjs
+
+# Claude Code worktrees: copies of the repository.
+.claude/worktrees/

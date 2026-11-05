@@ -13,11 +13,17 @@
     "start": "npm run start -w @railscore/web",
     "db:migrate": "npm run db:migrate -w @railscore/web",
     "test": "npm test --workspaces --if-present",
+    "lint": "eslint .",
+    "knip": "knip",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "npm run typecheck --workspaces --if-present"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.7",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^15.5.29",
+    "knip": "^6.44.1",
     "prettier": "^3.9.10"
   },
   "overrides": {

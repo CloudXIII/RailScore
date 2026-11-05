@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
+import Link from "next/link";
 import { ArrivalHistory } from "@/features/arrival-history";
 import { BacklogProvider } from "@/features/backlog-context";
 import { ThemeMenu } from "@/features/theme-menu";
@@ -181,7 +182,6 @@ async function TrainPanel({
         earlier={found.earlier}
         later={found.later}
         stations={stations}
-        sample={sample}
       />
     );
 
@@ -211,7 +211,6 @@ async function TrainPanel({
                 result={calculation.result}
                 stations={stations}
                 days={query.days}
-                sample={sample}
               />
             }
             trains={trains}
@@ -235,9 +234,9 @@ function SiteHeader() {
   return (
     <header className="site-header">
       <div className="header-bar">
-        <a href="/" className="brand">
+        <Link href="/" className="brand">
           RailScore
-        </a>
+        </Link>
         <ThemeMenu />
       </div>
     </header>
@@ -249,7 +248,7 @@ function Intro() {
     <header className="intro">
       <h1>How reliable is your train?</h1>
       <p className="lede">
-        See how often a direct train has arrived on time on its recent journeys.
+        See how often a train has arrived on time on its recent journeys.
       </p>
     </header>
   );

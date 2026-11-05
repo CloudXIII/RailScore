@@ -3,14 +3,17 @@ import {
   lastRunDate,
   listServices,
   matchesServiceKey,
-  mergeServices,
   serviceDateOf,
   serviceKey,
   toHistoricalRun,
-  historicalRunFromDetails,
   type ScheduledService,
-  type ServiceDay,
 } from "./map";
+import type { ServiceDay } from "../day-type";
+
+/** The list's folding alone: a period end so early that no train is set apart as retired. */
+function mergeServices(groups: ScheduledService[][]): ScheduledService[] {
+  return listServices(groups, "2000-01-01").services;
+}
 
 describe("toHistoricalRun", () => {
   const leedsToManchester = { boardingCrs: "LDS", destinationCrs: "MAN" };
@@ -295,9 +298,7 @@ describe("toHistoricalRun", () => {
       },
     };
 
-    expect(
-      historicalRunFromDetails(payload, stations, "202608280000001"),
-    ).toEqual({
+    expect(toHistoricalRun(payload, stations, "202608280000001")).toEqual({
       id: "202608280000001",
       serviceDate: "2026-08-28",
       outcome: "missing_actual",
@@ -320,17 +321,10 @@ describe("toHistoricalRun", () => {
     ).toBe("missing_actual");
   });
 
-  it("treats an unreadable payload as a run with no data", () => {
-    const run = historicalRunFromDetails(
-      { Services: [] },
-      leedsToManchester,
-      "202608289999999",
-    );
-    expect(run).toEqual({
-      id: "202608289999999",
-      serviceDate: "2026-08-28",
-      outcome: "missing_actual",
-    });
+  it("rejects a payload that is not in the serviceDetails shape", () => {
+    expect(() =>
+      toHistoricalRun({ Services: [] }, leedsToManchester, "202608289999999"),
+    ).toThrow(/expected shape/);
   });
 });
 

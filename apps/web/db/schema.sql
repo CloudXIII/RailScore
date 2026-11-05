@@ -77,14 +77,15 @@ create table if not exists hsp_backlog_runs (
   calls text not null
 );
 
--- HSP refuses a third list call in flight, so every server shares these two slots.
+-- At busy times HSP refuses a second call beside a list call, so every server shares one slot:
+-- one HSP call at a time. A database migrated before may hold a second row; it is never used.
 create table if not exists hsp_slots (
   slot smallint primary key,
   owner text,
   leased_until timestamptz not null default 'epoch'
 );
 
-insert into hsp_slots (slot) values (1), (2) on conflict (slot) do nothing;
+insert into hsp_slots (slot) values (1) on conflict (slot) do nothing;
 
 -- HSP calls per London day, added once per search.
 create table if not exists hsp_usage (

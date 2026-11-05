@@ -3,7 +3,7 @@
 import type { HistoricalRun } from "@railscore/core";
 import { useBacklogState } from "@/features/backlog-context";
 import { historyFigures, shownPeriod } from "@/features/backlog-figures";
-import type { DayFilter } from "@/features/day-grid";
+import type { DayPattern } from "@/server/day-type";
 import { ReliabilityResultView } from "@/features/reliability-result";
 import { serviceKey, type ScheduledService } from "@/server/services/map";
 import type { Station } from "@/server/stations";
@@ -24,7 +24,6 @@ export function ArrivalHistory({
   result,
   stations,
   days,
-  sample,
 }: {
   service: ScheduledService;
   fromCrs: string;
@@ -36,8 +35,7 @@ export function ArrivalHistory({
   /** Darwin's figures alone, shown when there is no HSP answer. */
   result: ReliabilityResult;
   stations: readonly Station[];
-  days: DayFilter;
-  sample: boolean;
+  days: DayPattern;
 }) {
   const state = useBacklogState();
   const key = serviceKey(service);
@@ -51,15 +49,15 @@ export function ArrivalHistory({
     ? " The data provider is busy, so this may take a few minutes."
     : "";
   const progress = waiting
-    ? "Loading earlier journeys…"
+    ? "Loading older journeys…"
     : backlog && !figures.complete
       ? state?.done
-        ? `${state.runs.length} of ${backlog.runCount} earlier days are on the calendar. The figures count them all. The rest could not be loaded because the data provider is busy. Reload later to add them.`
-        : `Loading earlier journeys: ${state?.runs.length ?? 0} of ${backlog.runCount} days…${busy}`
+        ? `${state.runs.length} of ${backlog.runCount} older days are on the calendar. The figures count them all. The rest could not be loaded because the data provider is busy. Reload later to add them.`
+        : `Loading older journeys: ${state?.runs.length ?? 0} of ${backlog.runCount} days…${busy}`
       : state?.missing.has(key)
         ? state.done
-          ? "Earlier journeys could not be loaded because the data provider is busy, so they are left out. Reload later to try again."
-          : "Earlier journeys are not in yet because the data provider is busy. Trying again…"
+          ? "Older journeys could not be loaded because the data provider is busy, so they are left out. Reload later to try again."
+          : "Older journeys are not in yet because the data provider is busy. Trying again…"
         : undefined;
   const shown = shownPeriod({
     period,
@@ -77,7 +75,6 @@ export function ArrivalHistory({
       result={figures.result}
       stations={stations}
       days={days}
-      sample={sample}
       pending={waiting}
       {...(line ? { progress: line } : {})}
     />

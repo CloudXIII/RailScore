@@ -1,4 +1,4 @@
-import { calculateReliability, departureWindows } from "@railscore/core";
+import { calculateReliability, clockMinutes } from "@railscore/core";
 import { describe, expect, it } from "vitest";
 import { usesMockData } from "@/server/env";
 import { mockRuns, mockServices } from "@/server/mock/catalogue";
@@ -72,15 +72,12 @@ describe("mockRuns", () => {
       "ok",
       "partial",
     ]);
-    expect(results.map((result) => result.lowSample)).toEqual([
-      false,
-      false,
-      true,
-      false,
-    ]);
+    expect(
+      results.map((result) => result.withinFiveMinutes.total < 20),
+    ).toEqual([false, false, true, false]);
     expect(results[0]?.withinFiveMinutes.percentage).toBeGreaterThan(80);
     expect(results[1]?.withinFiveMinutes.percentage).toBeLessThan(50);
-    expect(results[1]?.cancellationRate.count).toBeGreaterThan(0);
+    expect(results[1]?.distribution.cancelled).toBeGreaterThan(0);
     expect(results[3]?.excludedCount).toBeGreaterThan(0);
   });
 });
@@ -106,7 +103,7 @@ describe("usesMockData", () => {
 });
 
 function insideWindow(hhmm: string, timeHhmm: string): boolean {
-  return departureWindows(timeHhmm).some(
-    (window) => hhmm >= window.fromTime && hhmm <= window.toTime,
-  );
+  const minutesAfter =
+    (clockMinutes(hhmm) - clockMinutes(timeHhmm) + 24 * 60) % (24 * 60);
+  return minutesAfter < 60;
 }

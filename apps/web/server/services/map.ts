@@ -1,14 +1,13 @@
 import {
   addCalendarDays,
+  dateOfRid,
   journeyMinutes,
   minutesApart,
   signedLatenessMinutes,
   type HistoricalRun,
 } from "@railscore/core";
-
-export const DAY_ORDER = ["weekdays", "saturday", "sunday"] as const;
-
-export type ServiceDay = (typeof DAY_ORDER)[number];
+import { orderedDays, type ServiceDay } from "../day-type";
+import { record, text } from "../payload";
 
 export type ScheduledService = {
   readonly originCrs: string;
@@ -57,9 +56,6 @@ const OTHER_DAYS_TRAIN_MINUTES = 10;
 /** A train with no run in this many days before the period ends no longer runs. Two weeks, as recent days can lag. */
 const RETIRED_AFTER_DAYS = 14;
 
-/** A run payload not in the serviceDetails shape. */
-export class UnreadableRunError extends Error {}
-
 export function serviceKey(service: {
   publicDeparture: string;
   publicArrival: string;
@@ -92,20 +88,13 @@ export function matchesServiceKey(
 
 /**
  * Pools identical schedules across day types, then folds near-identical ones into the
- * most-run schedule. Same operator, departure within two minutes, journey length within
+ * most-run schedule: same operator, departure within two minutes, journey length within
  * fifteen minutes, and no shared run date. Then folds a train that runs on other day
  * types only into the one train it replaces, when the journey is about the same length.
- */
-export function mergeServices(
-  groups: readonly ScheduledService[][],
-): ScheduledService[] {
-  return foldAcrossDays(assembleServices(groups));
-}
-
-/**
- * Like `mergeServices`, but trains whose last run is long before `periodEnd` are set apart,
- * as after a timetable change. They are set apart before the day-type fold, so a train
- * that no longer runs cannot absorb one that still does.
+ *
+ * Trains whose last run is long before `periodEnd` are set apart, as after a timetable
+ * change. They are set apart before the day-type fold, so a train that no longer runs
+ * cannot absorb one that still does.
  */
 export function listServices(
   groups: readonly ScheduledService[][],
@@ -472,35 +461,13 @@ function withPunctuality(
 function runDates(rids: readonly string[]): Set<string> | undefined {
   const dates = new Set<string>();
   for (const rid of rids) {
-    const date = serviceDateOf({}, rid);
+    const date = dateOfRid(rid);
     if (!date) {
       return undefined;
     }
     dates.add(date);
   }
   return dates;
-}
-
-/**
- * Classifies one details payload. An unreadable payload is a run with no data,
- * so one bad response does not fail the whole service.
- */
-export function historicalRunFromDetails(
-  payload: unknown,
-  stations: { boardingCrs: string; destinationCrs: string },
-  rid: string,
-): HistoricalRun {
-  try {
-    return toHistoricalRun(payload, stations, rid);
-  } catch (error) {
-    if (!(error instanceof UnreadableRunError)) {
-      throw error;
-    }
-    const serviceDate = serviceDateOf(payload, rid);
-    return serviceDate
-      ? { id: rid, serviceDate, outcome: "missing_actual" }
-      : { id: rid, outcome: "missing_actual" };
-  }
 }
 
 /**
@@ -517,9 +484,7 @@ export function toHistoricalRun(
   const root = record(payload);
   const details = root ? record(root.serviceAttributesDetails) : undefined;
   if (!details || !Array.isArray(details.locations)) {
-    throw new UnreadableRunError(
-      "A historical run was not in the expected shape.",
-    );
+    throw new Error("A historical run was not in the expected shape.");
   }
   const stops = details.locations
     .map(record)
@@ -650,22 +615,5 @@ export function serviceDateOf(
   if (/^\d{4}-\d{2}-\d{2}$/.test(stated)) {
     return stated;
   }
-  const fromRid = /^(\d{4})(\d{2})(\d{2})/.exec(rid);
-  return fromRid ? `${fromRid[1]}-${fromRid[2]}-${fromRid[3]}` : undefined;
-}
-
-function orderedDays(days: readonly ServiceDay[]): ServiceDay[] {
-  const present = new Set(days);
-  return DAY_ORDER.filter((day) => present.has(day));
-}
-
-function record(value: unknown): Record<string, unknown> | undefined {
-  if (typeof value === "object" && value !== null && !Array.isArray(value)) {
-    return value as Record<string, unknown>;
-  }
-  return undefined;
-}
-
-function text(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
+  return dateOfRid(rid);
 }

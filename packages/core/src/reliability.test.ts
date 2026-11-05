@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  formatHhmm,
   journeyMinutes,
   minutesApart,
   signedLatenessMinutes,
@@ -25,12 +26,7 @@ describe("calculateReliability", () => {
       total: 4,
       percentage: 75,
     });
-    expect(result.cancellationRate).toEqual({
-      count: 0,
-      total: 4,
-      percentage: 0,
-    });
-    expect(result.lowSample).toBe(true);
+    expect(result.distribution.cancelled).toBe(0);
   });
 
   it("rounds the percentage to a whole number and keeps the counts", () => {
@@ -63,11 +59,7 @@ describe("calculateReliability", () => {
       total: 3,
       percentage: 33,
     });
-    expect(result.cancellationRate).toEqual({
-      count: 2,
-      total: 3,
-      percentage: 67,
-    });
+    expect(result.distribution.cancelled).toBe(2);
     expect(result.excludedCount).toBe(0);
     expect(result.status).toBe("ok");
   });
@@ -84,11 +76,7 @@ describe("calculateReliability", () => {
       total: 1,
       percentage: 100,
     });
-    expect(result.cancellationRate).toEqual({
-      count: 0,
-      total: 1,
-      percentage: 0,
-    });
+    expect(result.distribution.cancelled).toBe(0);
     expect(result.excludedCount).toBe(1);
   });
 
@@ -113,31 +101,6 @@ describe("calculateReliability", () => {
     expect(result.withinFiveMinutes.total).toBe(7);
   });
 
-  it("reports the longest delay with its date, and none when every arrival was on time", () => {
-    const late = calculateReliability([
-      {
-        id: "a",
-        serviceDate: "2026-08-13",
-        outcome: "arrived",
-        latenessMinutes: 28,
-      },
-      {
-        id: "b",
-        serviceDate: "2026-08-28",
-        outcome: "arrived",
-        latenessMinutes: 72,
-      },
-      { id: "c", outcome: "cancelled" },
-    ]);
-    const punctual = calculateReliability([arrived("a", 3), arrived("b", -1)]);
-
-    expect(late.longestDelay).toEqual({
-      minutes: 72,
-      serviceDate: "2026-08-28",
-    });
-    expect(punctual.longestDelay).toBeNull();
-  });
-
   it("returns no history when every run has no usable outcome", () => {
     const result = calculateReliability([
       { id: "gap-1", outcome: "missing_actual" },
@@ -146,9 +109,7 @@ describe("calculateReliability", () => {
 
     expect(result.status).toBe("no_history");
     expect(result.withinFiveMinutes.percentage).toBeNull();
-    expect(result.cancellationRate.percentage).toBeNull();
     expect(result.excludedCount).toBe(2);
-    expect(result.lowSample).toBe(false);
   });
 
   it("does not round a punctuality figure up to 100 when a run was late", () => {
@@ -194,18 +155,6 @@ describe("calculateReliability", () => {
 
     expect(result.status).toBe("no_history");
     expect(result.withinFiveMinutes.percentage).toBeNull();
-    expect(result.cancellationRate.percentage).toBeNull();
-    expect(result.lowSample).toBe(false);
-  });
-
-  it("warns below 20 included runs and not at 20", () => {
-    const nineteen = Array.from({ length: 19 }, (_, index) =>
-      arrived(String(index), 0),
-    );
-    const twenty = [...nineteen, arrived("20", 0)];
-
-    expect(calculateReliability(nineteen).lowSample).toBe(true);
-    expect(calculateReliability(twenty).lowSample).toBe(false);
   });
 
   it("places dated runs on the calendar and keeps the worse run when a date repeats", () => {
@@ -252,12 +201,7 @@ describe("calculateReliability", () => {
       total: 2,
       percentage: 0,
     });
-    expect(result.cancellationRate).toEqual({
-      count: 2,
-      total: 2,
-      percentage: 100,
-    });
-    expect(result.lowSample).toBe(true);
+    expect(result.distribution.cancelled).toBe(2);
   });
 });
 
@@ -293,5 +237,13 @@ describe("signedLatenessMinutes", () => {
 
   it("rejects a clock time that is not HHMM", () => {
     expect(() => signedLatenessMinutes("630", "0632")).toThrow(/HHMM/);
+  });
+});
+
+describe("formatHhmm", () => {
+  it("writes minutes from midnight as HHMM, wrapped into the day", () => {
+    expect(formatHhmm(7 * 60 + 5)).toBe("0705");
+    expect(formatHhmm(24 * 60 + 10)).toBe("0010");
+    expect(formatHhmm(-10)).toBe("2350");
   });
 });
