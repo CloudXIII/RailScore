@@ -1,8 +1,8 @@
 import "server-only";
 import type { HistoricalRun, ReliabilityResult } from "@railscore/core";
-import type { BacklogRequest } from "@/shared/contracts";
+import type { EarlierDaysRequest } from "@/shared/contracts";
 import type { DayPattern } from "@/shared/day-type";
-import { backlogTrain } from "../hsp/backlog-query";
+import { earlierDaysTrain } from "../hsp/earlier-days-query";
 import type { DateSpan } from "../periods";
 import {
   matchesServiceKey,
@@ -43,7 +43,7 @@ export type TrainSearchView = {
     readonly hspDays?: DateSpan;
   };
   /** What the page asks HSP about once it is shown. Absent once Darwin covers the period. */
-  readonly backlog?: BacklogRequest;
+  readonly earlierDays?: EarlierDaysRequest;
 };
 
 /**
@@ -84,14 +84,14 @@ export async function searchTrains(
   if (history && !listed.includes(history.service)) {
     listed.unshift(history.service);
   }
-  const backlog: BacklogRequest | undefined =
+  const earlierDays: EarlierDaysRequest | undefined =
     found.hsp && listed.length > 0
       ? {
           fromCrs: search.fromCrs,
           toCrs: search.toCrs,
           days: search.days,
           periodDays: search.periodDays,
-          trains: listed.map(backlogTrain),
+          trains: listed.map(earlierDaysTrain),
           ...(history ? { runsOf: serviceKey(history.service) } : {}),
         }
       : undefined;
@@ -110,6 +110,6 @@ export async function searchTrains(
     ...(found.later ? { later: found.later } : {}),
     ...(notice ? { notice } : {}),
     ...(history ? { history } : {}),
-    ...(backlog ? { backlog } : {}),
+    ...(earlierDays ? { earlierDays } : {}),
   };
 }

@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrivalHistory } from "@/features/arrival-history";
-import { BacklogProvider } from "@/features/backlog-context";
+import { EarlierDaysProvider } from "@/features/earlier-days-context";
 import { ThemeMenu } from "@/features/theme-menu";
 import { DataNotice } from "@/features/data-notice";
 import { pageTitle } from "@/features/page-title";
@@ -20,6 +20,7 @@ import {
 import type { Station } from "@/shared/stations";
 import { trainSource } from "@/server/train-source";
 import { searchTrains } from "@/server/use-cases/search-trains";
+import styles from "./page.module.css";
 
 export const dynamic = "force-dynamic";
 /** Next to Neon (eu-west-2). A US region adds an ocean to every database round trip. */
@@ -148,7 +149,7 @@ async function TrainPanel({
     const history = view.history;
 
     return (
-      <BacklogProvider request={view.backlog}>
+      <EarlierDaysProvider request={view.earlierDays}>
         {view.notice === "train-not-found" ? (
           <p className="warning" role="status">
             That service was not in the historical results for this search.
@@ -180,7 +181,7 @@ async function TrainPanel({
         ) : (
           trains
         )}
-      </BacklogProvider>
+      </EarlierDaysProvider>
     );
   } catch (error) {
     console.error("The search failed", errorText(error));
@@ -194,9 +195,9 @@ async function TrainPanel({
 
 function SiteHeader() {
   return (
-    <header className="site-header">
-      <div className="header-bar">
-        <Link href="/" className="brand">
+    <header className={styles.siteHeader}>
+      <div className={styles.headerBar}>
+        <Link href="/" className={styles.brand}>
           RailScore
         </Link>
         <ThemeMenu />
@@ -207,9 +208,9 @@ function SiteHeader() {
 
 function Intro() {
   return (
-    <header className="intro">
+    <header className={styles.intro}>
       <h1>How reliable is your train?</h1>
-      <p className="lede">
+      <p className={styles.lede}>
         See how often a train has arrived on time on its recent journeys.
       </p>
     </header>

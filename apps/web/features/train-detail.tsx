@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type MouseEvent, type ReactNode } from "react";
+import styles from "./train-detail.module.css";
 
 /**
  * One chosen train, with the list already loaded for this search.
@@ -21,20 +22,23 @@ export function TrainDetail({
     if (!showTrains) {
       return;
     }
-    const chosen = document.querySelector<HTMLElement>(
-      ".service:has(input:checked)",
-    );
+    const chosen = document
+      .querySelector<HTMLInputElement>('input[name="service"]:checked')
+      ?.closest<HTMLElement>("label");
     const heading = document.getElementById("trains-heading");
     (chosen ?? heading)?.scrollIntoView({ block: chosen ? "center" : "start" });
     heading?.focus({ preventScroll: true });
   }, [showTrains]);
 
   return (
-    <div className="detail-screen" data-view={showTrains ? "trains" : "result"}>
-      <div className="detail-trains">{trains}</div>
-      <div className="detail-result">
+    <div
+      className={styles.detailScreen}
+      data-view={showTrains ? "trains" : "result"}
+    >
+      <div className={styles.detailTrains}>{trains}</div>
+      <div className={styles.detailResult}>
         <a
-          className="back-trains"
+          className={styles.backTrains}
           href={href}
           aria-label="Back to trains"
           onClick={(event: MouseEvent<HTMLAnchorElement>) => {
@@ -44,7 +48,11 @@ export function TrainDetail({
             window.history.replaceState(null, "", href);
           }}
         >
-          <svg className="back-chevron" viewBox="0 0 12 24" aria-hidden="true">
+          <svg
+            className={styles.backChevron}
+            viewBox="0 0 12 24"
+            aria-hidden="true"
+          >
             <path
               d="M9.5 2.5 2.5 12l7 9.5"
               fill="none"

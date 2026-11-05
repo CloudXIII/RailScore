@@ -22,12 +22,13 @@ import {
   type ScheduledService,
 } from "@/shared/scheduled-service";
 import type { ParsedQuery } from "@/shared/search-query";
-import { useBacklogState } from "@/features/backlog-context";
+import { useEarlierDaysState } from "@/features/earlier-days-context";
 import {
-  backlogTotal,
+  earlierDaysTotal,
   listPunctuality,
-  type TrainBacklog,
-} from "@/features/backlog-figures";
+  type TrainEarlierDays,
+} from "@/features/earlier-days-figures";
+import styles from "./service-list.module.css";
 
 export function ServiceList({
   query,
@@ -63,17 +64,17 @@ export function ServiceList({
     const only = services.length === 1 ? services[0] : undefined;
     return only ? serviceKey(only) : undefined;
   });
-  const backlog = useBacklogState();
+  const earlierDays = useEarlierDaysState();
   if (!query.from || !query.to) {
     return null;
   }
   const from = query.from;
   const to = query.to;
   const waiting = (service: ScheduledService) =>
-    backlog !== undefined &&
-    !backlog.done &&
+    earlierDays !== undefined &&
+    !earlierDays.done &&
     services.includes(service) &&
-    !backlog.trains.has(serviceKey(service));
+    !earlierDays.trains.has(serviceKey(service));
   const loading = services.some(waiting);
   const row = (service: ScheduledService) => (
     <ServiceRow
@@ -83,7 +84,7 @@ export function ServiceList({
         stationName(crs, stations),
       )}
       searched={query.days}
-      backlog={backlog?.trains.get(serviceKey(service))}
+      earlierDays={earlierDays?.trains.get(serviceKey(service))}
       waiting={waiting(service)}
       chosen={chosen === serviceKey(service)}
       onChoose={() => setChosen(serviceKey(service))}
@@ -92,7 +93,7 @@ export function ServiceList({
 
   return (
     <form
-      className="services"
+      className={styles.services}
       method="get"
       action="/"
       onSubmit={() => setPending(true)}
@@ -121,7 +122,7 @@ export function ServiceList({
       {loading ? (
         <p className="meta" role="status">
           Loading older journeys…
-          {backlog?.busy
+          {earlierDays?.busy
             ? " The data provider is busy, so this may take a few minutes."
             : ""}
         </p>
@@ -145,7 +146,7 @@ export function ServiceList({
           {services.map(row)}
           {retired.length > 0 ? (
             <details
-              className="service-group retired-services"
+              className={`${styles.serviceGroup} ${styles.retiredServices}`}
               open={retired.some((service) => chosen === serviceKey(service))}
             >
               <summary className="meta">
@@ -165,7 +166,7 @@ export function ServiceList({
         </TimeShift>
       ) : null}
       {services.length > 0 || retired.length > 0 ? (
-        <div className="calculate-bar">
+        <div className={styles.calculateBar}>
           <button
             type="submit"
             className="primary"
@@ -183,7 +184,7 @@ function ServiceRow({
   service,
   through,
   searched,
-  backlog,
+  earlierDays,
   waiting,
   chosen,
   onChoose,
@@ -192,7 +193,7 @@ function ServiceRow({
   through: string;
   searched: ParsedQuery["days"];
   /** HSP's counts for the days before Darwin, once they arrive. */
-  backlog: TrainBacklog | undefined;
+  earlierDays: TrainEarlierDays | undefined;
   /** HSP has not answered for this train yet. */
   waiting: boolean;
   chosen: boolean;
@@ -200,12 +201,13 @@ function ServiceRow({
 }) {
   const score = waiting
     ? undefined
-    : listScore(listPunctuality(service.punctuality, backlog));
+    : listScore(listPunctuality(service.punctuality, earlierDays));
   const journeys =
-    service.rids.length + (backlog ? backlogTotal(backlog).runs : 0);
+    service.rids.length +
+    (earlierDays ? earlierDaysTotal(earlierDays).runs : 0);
   const severe = score ? formatSevereJourneys(score.severe, score.runs) : "";
   return (
-    <label className="card service">
+    <label className={`card ${styles.service}`}>
       <input
         type="radio"
         name="service"
@@ -214,31 +216,33 @@ function ServiceRow({
         onChange={onChoose}
         required
       />
-      <span className="service-times">
+      <span className={styles.serviceTimes}>
         <strong>{formatClock(service.publicDeparture)}</strong>
-        <span className="service-line" aria-hidden="true" />
+        <span className={styles.serviceLine} aria-hidden="true" />
         <strong>{formatClock(service.publicArrival)}</strong>
       </span>
-      <span className="service-duration">
+      <span className={styles.serviceDuration}>
         {formatDuration(service.publicDeparture, service.publicArrival)}
       </span>
       {score ? (
-        <span className="service-score">
+        <span className={styles.serviceScore}>
           <span
-            className={`on-time-value tier-${scoreTier(score.onTimePercent, score.runs)}`}
+            className={`${styles.onTimeValue} tier-${scoreTier(score.onTimePercent, score.runs)}`}
           >
             {score.onTimePercent}%
           </span>
-          <span className="on-time-label">on time</span>
+          <span className={styles.onTimeLabel}>on time</span>
         </span>
       ) : waiting ? (
-        <span className="service-score service-score-waiting">
+        <span
+          className={`${styles.serviceScore} ${styles.serviceScoreWaiting}`}
+        >
           <span className="score-placeholder" aria-hidden="true" />
           <span className="visually-hidden">On-time share loading</span>
         </span>
       ) : null}
-      {severe ? <span className="service-severe">{severe}</span> : null}
-      <span className="meta service-detail">
+      {severe ? <span className={styles.serviceSevere}>{severe}</span> : null}
+      <span className={`meta ${styles.serviceDetail}`}>
         {[
           operatorName(service.operatorCode),
           formatServiceFacts(
@@ -250,11 +254,13 @@ function ServiceRow({
           .filter(Boolean)
           .join(" · ")}
       </span>
-      {through ? <span className="meta service-detail">{through}</span> : null}
+      {through ? (
+        <span className={`meta ${styles.serviceDetail}`}>{through}</span>
+      ) : null}
       {scheduleNotes(service).map((note, index) => (
         <span
           key={`${index}:${note}`}
-          className="meta service-detail included-time"
+          className={`meta ${styles.serviceDetail} ${styles.includedTime}`}
         >
           {note}
         </span>
@@ -273,9 +279,12 @@ function TimeShift({
   children: string;
 }) {
   return (
-    <a className={`time-shift ${direction}`} href={href}>
+    <a
+      className={`${styles.timeShift}${direction === "later" ? ` ${styles.later}` : ""}`}
+      href={href}
+    >
       <svg
-        className="time-shift-chevron"
+        className={styles.timeShiftChevron}
         viewBox="0 0 24 12"
         aria-hidden="true"
       >
