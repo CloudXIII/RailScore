@@ -20,9 +20,10 @@ const CLAIM_MS = 70_000;
  * HSP calls in flight across every server. At busy times HSP refuses a second call beside a
  * list call, list or detail alike (measured 5 November 2026: a second list always refused,
  * detail calls beside a list mostly refused). A list call holds the slot for its call; a
- * history holds it for its whole run of detail calls. The table may hold more rows than this.
+ * history holds it for its whole run of detail calls. A database migrated before may hold more
+ * rows than this; only the first `CALL_SLOTS` are used.
  */
-export const CALL_SLOTS = 1;
+const CALL_SLOTS = 1;
 
 const memoryMetrics = new Map<string, HspService[]>();
 const memoryClaims = new Map<string, number>();

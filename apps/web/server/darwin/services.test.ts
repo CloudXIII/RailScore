@@ -1,4 +1,4 @@
-import { searchClockRange } from "@railscore/core";
+import { clockMinutes, formatHhmm } from "@railscore/core";
 import { describe, expect, it } from "vitest";
 import type { DarwinRun, StoredCall } from "./run";
 import {
@@ -81,8 +81,13 @@ function listOf(
         false,
       ).period,
     },
-    searchClockRange(search.timeHhmm),
+    hourFrom(search.timeHhmm),
   );
+}
+
+/** The searched minute and the 59 that follow, as one clock window. */
+function hourFrom(timeHhmm: string) {
+  return { from: timeHhmm, to: formatHhmm(clockMinutes(timeHhmm) + 59) };
 }
 
 describe("servicesFromRuns", () => {

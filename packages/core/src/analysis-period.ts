@@ -1,5 +1,3 @@
-import { clockMinutes } from "./civil-time";
-
 const LONDON = "Europe/London";
 
 /** Trailing London calendar dates, ending on the last complete day. `length` includes that day. */
@@ -11,87 +9,6 @@ export function trailingDays(
   const to = addCalendarDays(today, -1);
   const from = addCalendarDays(to, -(length - 1));
   return { from, to };
-}
-
-/**
- * Departing after 07:00 is 07:00–07:59: the chosen minute and the 59 that follow.
- * HSP takes about as long per clock minute whatever the period, so the hour is what a search costs.
- */
-export const DEPARTURE_WINDOW_MINUTES = 60;
-
-/**
- * Inclusive clock span a departing-after search covers.
- * 07:00 is 07:00–07:59. A window that crosses midnight stays one span, 23:30–00:29.
- */
-export function searchClockRange(timeHhmm: string): {
-  from: string;
-  to: string;
-} {
-  const minute = clockMinutes(timeHhmm);
-  const to = (minute + DEPARTURE_WINDOW_MINUTES - 1) % (24 * 60);
-  return { from: formatClock(minute), to: formatClock(to) };
-}
-
-/**
- * HSP day windows for a departing-after search. Both ends are inclusive.
- * 07:00 is 0700–0759. A window that crosses midnight is two same-day ranges,
- * and 23:00 stays 2300–2359: 00:00 belongs to the next search.
- */
-export function departureWindows(
-  timeHhmm: string,
-): Array<{ fromTime: string; toTime: string }> {
-  const start = clockMinutes(timeHhmm);
-  return inclusiveClockWindows(start, start + DEPARTURE_WINDOW_MINUTES);
-}
-
-/**
- * Five-minute blocks HSP is asked for. On a busy route a quarter-hour can take
- * longer than the gateway allows, so a shorter block stays under that cutoff
- * and several blocks run at once.
- */
-const SLICE_MINUTES = 5;
-
-/**
- * `departureWindows` cut every five minutes, so searches that start at
- * different minutes share the same slices. 07:10 is 0710–0714, 0715–0719, …, 0805–0809.
- */
-export function departureSlices(
-  timeHhmm: string,
-): Array<{ fromTime: string; toTime: string }> {
-  const start = clockMinutes(timeHhmm);
-  const end = start + DEPARTURE_WINDOW_MINUTES;
-  const day = 24 * 60;
-  const slices: Array<{ fromTime: string; toTime: string }> = [];
-  for (let from = start; from < end;) {
-    const boundary = (Math.floor(from / SLICE_MINUTES) + 1) * SLICE_MINUTES;
-    const to = Math.min(boundary, end);
-    slices.push({
-      fromTime: formatClock(from % day),
-      toTime: formatClock((to - 1) % day),
-    });
-    from = to;
-  }
-  return slices;
-}
-
-/** `endExclusive` is the first minute that is outside the window. */
-function inclusiveClockWindows(
-  startInclusive: number,
-  endExclusive: number,
-): Array<{ fromTime: string; toTime: string }> {
-  const day = 24 * 60;
-  if (endExclusive <= day) {
-    return [
-      {
-        fromTime: formatClock(startInclusive),
-        toTime: formatClock(endExclusive - 1),
-      },
-    ];
-  }
-  return [
-    { fromTime: formatClock(startInclusive), toTime: "2359" },
-    { fromTime: "0000", toTime: formatClock(endExclusive - day - 1) },
-  ];
 }
 
 export function londonIsoDate(now: Date): string {
@@ -122,8 +39,11 @@ export function addCalendarDays(isoDate: string, days: number): string {
   return utc.toISOString().slice(0, 10);
 }
 
-function formatClock(minutes: number): string {
-  const hours = Math.floor(minutes / 60);
-  const mins = minutes % 60;
-  return `${String(hours).padStart(2, "0")}${String(mins).padStart(2, "0")}`;
+/**
+ * The service date a Darwin RID starts with (`YYYYMMDD…`), as `YYYY-MM-DD`.
+ * Undefined when the RID does not start with eight digits.
+ */
+export function dateOfRid(rid: string): string | undefined {
+  const match = /^(\d{4})(\d{2})(\d{2})/.exec(rid);
+  return match ? `${match[1]}-${match[2]}-${match[3]}` : undefined;
 }

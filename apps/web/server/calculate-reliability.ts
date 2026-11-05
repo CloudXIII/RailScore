@@ -1,23 +1,18 @@
 import "server-only";
 import {
   calculateReliability,
+  dateOfRid,
+  londonIsoDate,
   type HistoricalRun,
   type ReliabilityResult,
 } from "@railscore/core";
-import { londonIsoDate } from "@railscore/core";
 import { historicalRunFromDarwin, type DarwinRun } from "./darwin/run";
-import { reliabilityByDayType, type DayTypeResult } from "./day-split";
 import { usesMockData } from "./env";
 import { mockRuns } from "./mock/catalogue";
-import {
-  matchesServiceKey,
-  serviceDateOf,
-  type ScheduledService,
-} from "./services/map";
+import { matchesServiceKey, type ScheduledService } from "./services/map";
 
 type ServiceCalculation = {
   readonly result: ReliabilityResult;
-  readonly byDay: readonly DayTypeResult[];
   /** The classified runs, so the page can add HSP's days before Darwin to them. */
   readonly runs: readonly HistoricalRun[];
 };
@@ -59,7 +54,7 @@ export function findSelectedService(
 }
 
 function missingRun(rid: string): HistoricalRun {
-  const serviceDate = serviceDateOf({}, rid);
+  const serviceDate = dateOfRid(rid);
   return serviceDate
     ? { id: rid, serviceDate, outcome: "missing_actual" }
     : { id: rid, outcome: "missing_actual" };
@@ -68,7 +63,6 @@ function missingRun(rid: string): HistoricalRun {
 function summarise(runs: readonly HistoricalRun[]): ServiceCalculation {
   return {
     result: calculateReliability(runs),
-    byDay: reliabilityByDayType(runs),
     runs,
   };
 }

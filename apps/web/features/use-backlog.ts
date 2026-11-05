@@ -5,7 +5,7 @@ import type { HistoricalRun } from "@railscore/core";
 import type { TrainBacklog } from "@/features/backlog-figures";
 import type { BacklogEvent } from "@/server/hsp/backlog";
 import type { BacklogTrain } from "@/server/hsp/match";
-import type { DayPattern } from "@/server/query";
+import type { DayPattern } from "@/server/day-type";
 
 /** What the page asks HSP about: the listed trains, and the train whose runs it shows. */
 export type BacklogRequest = {
@@ -43,7 +43,7 @@ const DONE: BacklogState = { ...EMPTY, done: true };
  * spells of up to half a minute at busy times. A new attempt is cheap: the server sends
  * what it stored at once and asks HSP only for the rest.
  */
-export const RETRY_DELAYS_MS = [15_000, 30_000, 60_000] as const;
+const RETRY_DELAYS_MS = [15_000, 30_000, 60_000] as const;
 
 /**
  * Streams HSP's figures for the days before Darwin, one event per line, into state as they

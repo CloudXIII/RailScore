@@ -63,12 +63,12 @@ export function ServiceList({
     const only = services.length === 1 ? services[0] : undefined;
     return only ? serviceKey(only) : undefined;
   });
+  const backlog = useBacklogState();
   if (!query.from || !query.to) {
     return null;
   }
   const from = query.from;
   const to = query.to;
-  const backlog = useBacklogState();
   const waiting = (service: ScheduledService) =>
     backlog !== undefined &&
     !backlog.done &&

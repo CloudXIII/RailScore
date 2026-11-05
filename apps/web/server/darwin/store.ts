@@ -21,7 +21,7 @@ const MONTH_ROWS = 500;
  * Days kept as one row per run: today and the 7 before it, so the latest day of every day type
  * is there for a search to start from. Older days are packed into `darwin_months`.
  */
-export const OPEN_DAYS = 8;
+const OPEN_DAYS = 8;
 
 /** First day still kept as one row per run. Earlier days are packed and no longer change. */
 export function openFrom(now: Date): string {

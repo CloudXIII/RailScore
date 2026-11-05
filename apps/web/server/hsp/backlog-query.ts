@@ -1,4 +1,6 @@
-import { PERIOD_LENGTHS, type DayPattern } from "../query";
+import { isDayPattern } from "../day-type";
+import { PERIOD_LENGTHS } from "../query";
+import { record } from "../payload";
 import type { ScheduledService } from "../services/map";
 import { serviceKey } from "../services/map";
 import type { BacklogQuery } from "./backlog";
@@ -9,8 +11,6 @@ const MAX_TRAINS = 16;
 const MAX_LEGS = 8;
 /** Quarter-hours one request may ask HSP about. Eight trains every half hour need eight. */
 const MAX_QUARTERS = 16;
-
-const DAYS: readonly DayPattern[] = ["weekdays", "saturday", "sunday", "all"];
 
 /** What the page sends for its trains: each train with the schedules folded into it. */
 export function backlogTrain(service: ScheduledService): BacklogTrain {
@@ -36,7 +36,7 @@ export function parseBacklogQuery(value: unknown): BacklogQuery | undefined {
   if (
     !isCrs(fromCrs) ||
     !isCrs(toCrs) ||
-    !DAYS.includes(days as DayPattern) ||
+    !isDayPattern(days) ||
     !PERIOD_LENGTHS.includes(periodDays as (typeof PERIOD_LENGTHS)[number]) ||
     !Array.isArray(body.trains) ||
     body.trains.length === 0 ||
@@ -56,7 +56,7 @@ export function parseBacklogQuery(value: unknown): BacklogQuery | undefined {
   return {
     fromCrs,
     toCrs,
-    days: days as DayPattern,
+    days,
     periodDays: periodDays as number,
     trains: checked,
     ...(typeof runsOf === "string" ? { runsOf } : {}),
@@ -110,10 +110,4 @@ function isCrs(value: unknown): value is string {
 
 function isClock(value: unknown): value is string {
   return typeof value === "string" && /^([01]\d|2[0-3])[0-5]\d$/.test(value);
-}
-
-function record(value: unknown): Record<string, unknown> | undefined {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : undefined;
 }

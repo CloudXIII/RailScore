@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
+import Link from "next/link";
 import { ArrivalHistory } from "@/features/arrival-history";
 import { BacklogProvider } from "@/features/backlog-context";
 import { ThemeMenu } from "@/features/theme-menu";
@@ -232,9 +233,9 @@ function SiteHeader() {
   return (
     <header className="site-header">
       <div className="header-bar">
-        <a href="/" className="brand">
+        <Link href="/" className="brand">
           RailScore
-        </a>
+        </Link>
         <ThemeMenu />
       </div>
     </header>

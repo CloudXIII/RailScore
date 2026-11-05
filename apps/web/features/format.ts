@@ -1,17 +1,17 @@
 import { addCalendarDays, counted, journeyMinutes } from "@railscore/core";
-import type {
-  ListPunctuality,
-  ScheduledService,
-  ServiceDay,
-} from "@/server/services/map";
+import {
+  DAY_TYPES,
+  dayTypesOf,
+  type DayPattern,
+  type ServiceDay,
+} from "@/server/day-type";
+import type { ListPunctuality, ScheduledService } from "@/server/services/map";
 
 export const DAY_LABELS: Record<ServiceDay, string> = {
   weekdays: "Weekdays",
   saturday: "Saturdays",
   sunday: "Sundays",
 };
-
-const DAY_ORDER: readonly ServiceDay[] = ["weekdays", "saturday", "sunday"];
 
 const OPERATORS: Record<string, string> = {
   AW: "Transport for Wales",
@@ -53,10 +53,10 @@ export function operatorName(code: string): string {
  */
 export function serviceDayNote(
   days: readonly ServiceDay[],
-  searched: ServiceDay | "all",
+  searched: DayPattern,
 ): string {
-  const present = DAY_ORDER.filter((day) => days.includes(day));
-  const searchedDays = searched === "all" ? DAY_ORDER : [searched];
+  const present = DAY_TYPES.filter((day) => days.includes(day));
+  const searchedDays = dayTypesOf(searched);
   const repeatsSearch =
     present.length === searchedDays.length &&
     present.every((day) => searchedDays.includes(day));
@@ -71,13 +71,13 @@ export function formatServiceFacts(
   /** Undefined while the count is still loading: the days alone are shown. */
   runCount: number | undefined,
   days: readonly ServiceDay[],
-  searched?: ServiceDay | "all",
+  searched?: DayPattern,
 ): string {
   const journeys =
     runCount === undefined
       ? ""
       : `${runCount} ${runCount === 1 ? "journey" : "journeys"}`;
-  const labels = DAY_ORDER.filter((day) => days.includes(day)).map(
+  const labels = DAY_TYPES.filter((day) => days.includes(day)).map(
     (day) => DAY_LABELS[day],
   );
   const note = searched
@@ -244,20 +244,6 @@ export function listIntro(input: {
 
 export function formatClock(hhmm: string): string {
   return `${hhmm.slice(0, 2)}:${hhmm.slice(2, 4)}`;
-}
-
-/** Moves an `HH:MM` time by whole minutes, wrapping at midnight. */
-export function shiftTime(time: string, deltaMinutes: number): string {
-  const match = /^(\d{2}):(\d{2})$/.exec(time);
-  if (!match) {
-    return time;
-  }
-  const minutes = Number(match[1]) * 60 + Number(match[2]);
-  const wrapped =
-    (((minutes + deltaMinutes) % (24 * 60)) + 24 * 60) % (24 * 60);
-  const hours = Math.floor(wrapped / 60);
-  const mins = wrapped % 60;
-  return `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}`;
 }
 
 /** Journey length between two public HHMM times; an arrival before departure crosses midnight. */

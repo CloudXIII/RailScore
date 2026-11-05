@@ -1,11 +1,10 @@
-import { clockMinutes, type HistoricalRun } from "@railscore/core";
+import { clockMinutes, formatHhmm, type HistoricalRun } from "@railscore/core";
+import type { DayPattern, ServiceDay } from "@/server/day-type";
 import {
   serviceKey,
   type ListPunctuality,
   type ScheduledService,
-  type ServiceDay,
 } from "@/server/services/map";
-import type { DayPattern } from "@/server/query";
 import type { Station } from "@/server/stations";
 
 type MockProfile = "reliable" | "poor" | "sparse" | "partial" | "empty";
@@ -180,11 +179,7 @@ function otherStation(primary: string, alsoAvoid: string): string {
 }
 
 export function shiftClock(hhmm: string, deltaMinutes: number): string {
-  const wrapped = (clockMinutes(hhmm) + deltaMinutes) % (24 * 60);
-  const minutes = wrapped < 0 ? wrapped + 24 * 60 : wrapped;
-  const hours = Math.floor(minutes / 60);
-  const mins = minutes % 60;
-  return `${String(hours).padStart(2, "0")}${String(mins).padStart(2, "0")}`;
+  return formatHhmm(clockMinutes(hhmm) + deltaMinutes);
 }
 
 function hash(value: string): number {

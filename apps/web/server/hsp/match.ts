@@ -1,4 +1,4 @@
-import { clockMinutes } from "@railscore/core";
+import { clockMinutes, dateOfRid, formatHhmm } from "@railscore/core";
 import {
   addCounts,
   NO_COUNTS,
@@ -7,7 +7,7 @@ import {
 } from "./metrics";
 
 /** One public schedule of a listed train: the train itself or a schedule folded into it. */
-export type BacklogLeg = {
+type BacklogLeg = {
   readonly originCrs: string;
   readonly destinationCrs: string;
   /** Departure from the boarding station, HHMM. */
@@ -30,7 +30,7 @@ export type Quarter = { readonly fromTime: string; readonly toTime: string };
 /** The quarter-hour a departure falls in: 07:07 is 0700–0714. */
 export function quarterOf(hhmm: string): Quarter {
   const start = Math.floor(clockMinutes(hhmm) / 15) * 15;
-  return { fromTime: clock(start), toTime: clock(start + 14) };
+  return { fromTime: formatHhmm(start), toTime: formatHhmm(start + 14) };
 }
 
 /** Quarter-hours the trains leave in, earliest first, each once. */
@@ -119,9 +119,9 @@ function samePassengerTrain(
   return candidates.length === 1 ? candidates[0] : undefined;
 }
 
-/** A RID starts with its service date, YYYYMMDD. */
+/** The service date a RID starts with. A RID without one stands for its own day. */
 function dayOfRid(rid: string): string {
-  return rid.slice(0, 8);
+  return dateOfRid(rid) ?? rid;
 }
 
 function matchingTrain(
@@ -141,9 +141,4 @@ function matchingTrain(
     ),
   );
   return exact ?? (candidates.length === 1 ? candidates[0] : undefined);
-}
-
-function clock(minutes: number): string {
-  const hours = Math.floor(minutes / 60);
-  return `${String(hours).padStart(2, "0")}${String(minutes % 60).padStart(2, "0")}`;
 }

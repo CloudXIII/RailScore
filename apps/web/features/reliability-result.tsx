@@ -10,7 +10,7 @@ import {
   serviceDayNote,
   throughServiceLabel,
 } from "@/features/format";
-import type { DayFilter } from "@/features/day-grid";
+import type { DayPattern } from "@/server/day-type";
 import {
   notableChanges,
   scheduleNotes,
@@ -36,7 +36,7 @@ export function ReliabilityResultView({
   period: { from: string; to: string };
   result: ReliabilityResult;
   stations: readonly Station[];
-  days: DayFilter;
+  days: DayPattern;
   /** How far HSP's older journeys have got, while they load. */
   progress?: string;
   /** The figures wait for HSP's older journeys: a placeholder stands in for them. */
@@ -188,7 +188,7 @@ function Headline({
 }: {
   result: ReliabilityResult;
   period: { from: string; to: string };
-  days: DayFilter;
+  days: DayPattern;
 }) {
   const within = result.withinFiveMinutes;
   return (
@@ -217,7 +217,7 @@ function punctualitySentence(result: ReliabilityResult): string {
 function sampleLine(
   result: ReliabilityResult,
   period: { from: string; to: string },
-  days: DayFilter,
+  days: DayPattern,
 ): string {
   const known = result.withinFiveMinutes.total;
   const excluded =
@@ -229,7 +229,7 @@ function sampleLine(
     : line;
 }
 
-function journeyNoun(count: number, days: DayFilter): string {
+function journeyNoun(count: number, days: DayPattern): string {
   const journeys = count === 1 ? "journey" : "journeys";
   if (days === "weekdays") {
     return `weekday ${journeys}`;

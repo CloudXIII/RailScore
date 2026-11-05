@@ -3,7 +3,7 @@
 import type { HistoricalRun } from "@railscore/core";
 import { useBacklogState } from "@/features/backlog-context";
 import { historyFigures } from "@/features/backlog-figures";
-import type { DayFilter } from "@/features/day-grid";
+import type { DayPattern } from "@/server/day-type";
 import { ReliabilityResultView } from "@/features/reliability-result";
 import { serviceKey, type ScheduledService } from "@/server/services/map";
 import type { Station } from "@/server/stations";
@@ -32,7 +32,7 @@ export function ArrivalHistory({
   /** Darwin's figures alone, shown when there is no HSP answer. */
   result: ReliabilityResult;
   stations: readonly Station[];
-  days: DayFilter;
+  days: DayPattern;
 }) {
   const state = useBacklogState();
   const key = serviceKey(service);
