@@ -18,7 +18,7 @@ import { usesMockData } from "@/server/env";
 import { errorText } from "@/server/error-text";
 import { findServices } from "@/server/find-services";
 import { backlogTrain } from "@/server/hsp/backlog-query";
-import { serviceKey } from "@/server/services/map";
+import { serviceKey } from "@/server/services/fold";
 import { parseQuery, timeHhmm, type ParsedQuery } from "@/server/query";
 import {
   loadStationDirectory,

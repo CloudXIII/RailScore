@@ -1,16 +1,9 @@
-import type { HistoricalRun } from "@railscore/core";
-import { toHistoricalRun } from "../services/map";
+import { classifyRun, type Call, type HistoricalRun } from "@railscore/core";
 import type { DarwinCall, DarwinUpdate } from "./push-port";
 import tiplocCrs from "./tiploc-crs.json";
 
-/** A public call at a station, as stored. Times are HHMM. */
-export type StoredCall = {
-  readonly crs: string;
-  readonly pta?: string;
-  readonly ptd?: string;
-  readonly ata?: string;
-  readonly atd?: string;
-  readonly cancelled?: boolean;
+/** A public call as a Darwin run keeps it: the shared call, with the last public platform. */
+export type StoredCall = Omit<Call, "reason"> & {
   /** Last public platform Darwin gave. */
   readonly platform?: string;
 };
@@ -209,31 +202,6 @@ export function decodeCalls(text: string): StoredCall[] {
   });
 }
 
-/** Reason text a cancelled call carries, so the run rules read it as one. */
-const CANCELLED_REASON = "DARWIN_CANCELLED";
-
-/**
- * The run in the serviceDetails shape `toHistoricalRun` reads (first defined by HSP).
- * A cancelled call reads as a call with a late or cancel reason.
- */
-export function detailsPayloadFromDarwin(run: DarwinRun): unknown {
-  return {
-    serviceAttributesDetails: {
-      date_of_service: run.serviceDate,
-      toc_code: run.toc,
-      rid: run.rid,
-      locations: run.calls.map((call) => ({
-        location: call.crs,
-        gbtt_ptd: call.ptd ?? "",
-        gbtt_pta: call.pta ?? "",
-        actual_td: call.atd ?? "",
-        actual_ta: call.ata ?? "",
-        late_canc_reason: call.cancelled ? CANCELLED_REASON : "",
-      })),
-    },
-  };
-}
-
 /**
  * Classifies a run with the shared run rules. HSP reads a run with no actual time
  * anywhere as cancelled. Here it only means no movement was seen, as for runs that
@@ -251,5 +219,8 @@ export function historicalRunFromDarwin(
       outcome: "missing_actual",
     };
   }
-  return toHistoricalRun(detailsPayloadFromDarwin(run), stations, run.rid);
+  return classifyRun(
+    { id: run.rid, serviceDate: run.serviceDate, calls: run.calls },
+    stations,
+  );
 }

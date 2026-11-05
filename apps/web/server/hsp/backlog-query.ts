@@ -1,8 +1,8 @@
 import { isDayPattern } from "../day-type";
 import { PERIOD_LENGTHS } from "../query";
 import { record } from "../payload";
-import type { ScheduledService } from "../services/map";
-import { serviceKey } from "../services/map";
+import type { ScheduledService } from "../services/fold";
+import { serviceKey } from "../services/fold";
 import type { BacklogQuery } from "./backlog";
 import { quartersOf, type BacklogTrain } from "./match";
 

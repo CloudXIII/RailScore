@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { calculateService } from "./calculate-reliability";
 import type { DarwinRun } from "./darwin/run";
-import type { ScheduledService } from "./services/map";
+import type { ScheduledService } from "./services/fold";
 
 const NOW = new Date("2026-11-04T12:00:00Z");
 
