@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { database } from "../db";
-import type { ScheduledService } from "../services/fold";
+import type { ScheduledService } from "@/shared/scheduled-service";
 import type { DarwinRun } from "./run";
 import { calculateFromDarwin, darwinSource } from "./source";
 import { timetableDate } from "./import-state";

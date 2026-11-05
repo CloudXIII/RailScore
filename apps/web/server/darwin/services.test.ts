@@ -8,7 +8,7 @@ import {
   uidsLeaving,
   type DarwinSearch,
 } from "./services";
-import type { ScheduledService } from "../services/fold";
+import type { ScheduledService } from "@/shared/scheduled-service";
 import { searchPeriods } from "../periods";
 
 const search: DarwinSearch = {

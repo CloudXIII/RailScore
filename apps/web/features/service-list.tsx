@@ -13,15 +13,15 @@ import {
   throughServiceLabel,
   trainListHeading,
 } from "@/features/format";
-import { stationName, type Station } from "@/server/stations";
+import { stationName, type Station } from "@/shared/stations";
 import { scheduleNotes, usualDays } from "@/features/timetable-changes";
 import { listHref } from "@/features/search-href";
 import {
   matchesServiceKey,
   serviceKey,
   type ScheduledService,
-} from "@/server/services/fold";
-import type { ParsedQuery } from "@/server/query";
+} from "@/shared/scheduled-service";
+import type { ParsedQuery } from "@/shared/search-query";
 import { useBacklogState } from "@/features/backlog-context";
 import {
   backlogTotal,

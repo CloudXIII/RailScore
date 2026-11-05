@@ -2,7 +2,7 @@
 
 import { useId, useState, type KeyboardEvent } from "react";
 import { keepFieldInView } from "@/features/keep-field-in-view";
-import { searchStations, stationLabel, type Station } from "@/server/stations";
+import { searchStations, stationLabel, type Station } from "@/shared/stations";
 
 export function StationField({
   name,

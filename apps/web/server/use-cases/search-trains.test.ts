@@ -1,6 +1,6 @@
 import { calculateReliability, type HistoricalRun } from "@railscore/core";
 import { describe, expect, it, vi } from "vitest";
-import { serviceKey, type ScheduledService } from "../services/fold";
+import { serviceKey, type ScheduledService } from "@/shared/scheduled-service";
 import type { ServiceSearch, TrainSource } from "../train-source";
 import { searchTrains, type TrainSearch } from "./search-trains";
 

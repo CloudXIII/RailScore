@@ -5,8 +5,8 @@ import {
   type PunctualityTally,
 } from "@railscore/core";
 import type { DayPattern, ServiceDay } from "@/shared/day-type";
-import { serviceKey, type ScheduledService } from "@/server/services/fold";
-import type { Station } from "@/server/stations";
+import { serviceKey, type ScheduledService } from "@/shared/scheduled-service";
+import type { Station } from "@/shared/stations";
 
 type MockProfile = "reliable" | "poor" | "sparse" | "partial" | "empty";
 

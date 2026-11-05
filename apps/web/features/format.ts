@@ -10,7 +10,7 @@ import {
   type DayPattern,
   type ServiceDay,
 } from "@/shared/day-type";
-import type { ScheduledService } from "@/server/services/fold";
+import type { ScheduledService } from "@/shared/scheduled-service";
 
 export const DAY_LABELS: Record<ServiceDay, string> = {
   weekdays: "Weekdays",
