@@ -28,6 +28,7 @@ import {
   listPunctuality,
   type TrainEarlierDays,
 } from "@/features/earlier-days-figures";
+import styles from "./service-list.module.css";
 
 export function ServiceList({
   query,
@@ -92,7 +93,7 @@ export function ServiceList({
 
   return (
     <form
-      className="services"
+      className={styles.services}
       method="get"
       action="/"
       onSubmit={() => setPending(true)}
@@ -145,7 +146,7 @@ export function ServiceList({
           {services.map(row)}
           {retired.length > 0 ? (
             <details
-              className="service-group retired-services"
+              className={`${styles.serviceGroup} ${styles.retiredServices}`}
               open={retired.some((service) => chosen === serviceKey(service))}
             >
               <summary className="meta">
@@ -165,7 +166,7 @@ export function ServiceList({
         </TimeShift>
       ) : null}
       {services.length > 0 || retired.length > 0 ? (
-        <div className="calculate-bar">
+        <div className={styles.calculateBar}>
           <button
             type="submit"
             className="primary"
@@ -206,7 +207,7 @@ function ServiceRow({
     (earlierDays ? earlierDaysTotal(earlierDays).runs : 0);
   const severe = score ? formatSevereJourneys(score.severe, score.runs) : "";
   return (
-    <label className="card service">
+    <label className={`card ${styles.service}`}>
       <input
         type="radio"
         name="service"
@@ -215,31 +216,33 @@ function ServiceRow({
         onChange={onChoose}
         required
       />
-      <span className="service-times">
+      <span className={styles.serviceTimes}>
         <strong>{formatClock(service.publicDeparture)}</strong>
-        <span className="service-line" aria-hidden="true" />
+        <span className={styles.serviceLine} aria-hidden="true" />
         <strong>{formatClock(service.publicArrival)}</strong>
       </span>
-      <span className="service-duration">
+      <span className={styles.serviceDuration}>
         {formatDuration(service.publicDeparture, service.publicArrival)}
       </span>
       {score ? (
-        <span className="service-score">
+        <span className={styles.serviceScore}>
           <span
-            className={`on-time-value tier-${scoreTier(score.onTimePercent, score.runs)}`}
+            className={`${styles.onTimeValue} tier-${scoreTier(score.onTimePercent, score.runs)}`}
           >
             {score.onTimePercent}%
           </span>
-          <span className="on-time-label">on time</span>
+          <span className={styles.onTimeLabel}>on time</span>
         </span>
       ) : waiting ? (
-        <span className="service-score service-score-waiting">
+        <span
+          className={`${styles.serviceScore} ${styles.serviceScoreWaiting}`}
+        >
           <span className="score-placeholder" aria-hidden="true" />
           <span className="visually-hidden">On-time share loading</span>
         </span>
       ) : null}
-      {severe ? <span className="service-severe">{severe}</span> : null}
-      <span className="meta service-detail">
+      {severe ? <span className={styles.serviceSevere}>{severe}</span> : null}
+      <span className={`meta ${styles.serviceDetail}`}>
         {[
           operatorName(service.operatorCode),
           formatServiceFacts(
@@ -251,11 +254,13 @@ function ServiceRow({
           .filter(Boolean)
           .join(" · ")}
       </span>
-      {through ? <span className="meta service-detail">{through}</span> : null}
+      {through ? (
+        <span className={`meta ${styles.serviceDetail}`}>{through}</span>
+      ) : null}
       {scheduleNotes(service).map((note, index) => (
         <span
           key={`${index}:${note}`}
-          className="meta service-detail included-time"
+          className={`meta ${styles.serviceDetail} ${styles.includedTime}`}
         >
           {note}
         </span>
@@ -274,9 +279,12 @@ function TimeShift({
   children: string;
 }) {
   return (
-    <a className={`time-shift ${direction}`} href={href}>
+    <a
+      className={`${styles.timeShift}${direction === "later" ? ` ${styles.later}` : ""}`}
+      href={href}
+    >
       <svg
-        className="time-shift-chevron"
+        className={styles.timeShiftChevron}
         viewBox="0 0 24 12"
         aria-hidden="true"
       >

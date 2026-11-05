@@ -1,0 +1,68 @@
+/*
+ * The lateness bands' colours, shared by the day calendar's cells and key and the
+ * distribution's swatches and bars, so a band looks the same everywhere.
+ */
+
+.swatch {
+  width: 0.9rem;
+  height: 0.9rem;
+  border-radius: 3px;
+  flex: none;
+}
+
+.onTime {
+  background: var(--on-time-bg);
+  color: var(--on-time-ink);
+}
+
+.late {
+  background: var(--late-bg);
+  color: var(--late-ink);
+}
+
+.later {
+  background: var(--later-bg);
+  color: var(--later-ink);
+}
+
+.severe {
+  background: var(--severe-bg);
+  color: var(--severe-ink);
+}
+
+.cancelled {
+  background: var(--cancelled-bg);
+  color: var(--cancelled-ink);
+}
+
+/* The distribution's bars: the band's colour only. */
+.onTimeBar {
+  background: var(--on-time-bg);
+}
+
+.lateBar {
+  background: var(--late-bg);
+}
+
+.laterBar {
+  background: var(--later-bg);
+}
+
+.severeBar {
+  background: var(--severe-bg);
+}
+
+.cancelledBar {
+  background: var(--cancelled-bg);
+}
+
+.missing {
+  background: var(--page);
+  color: var(--muted);
+  border: 1px dashed var(--line);
+}
+
+.empty {
+  background: var(--hover);
+  border: 1px solid var(--line);
+}
