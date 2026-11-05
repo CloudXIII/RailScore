@@ -35,7 +35,7 @@ export type ClockWindow = { from: string; to: string };
 export const WHOLE_DAY: ClockWindow = { from: "0000", to: "2359" };
 
 /** Trains a list shows from the searched time. */
-export const LIST_SIZE = 8;
+export const LIST_SIZE = 6;
 
 export type TrainPage = {
   services: ScheduledService[];
