@@ -2,8 +2,8 @@ import "server-only";
 import { hspConnection } from "../env";
 
 /**
- * HSP refused or failed the call. `busy` is a 503 or 429: HSP takes about two list calls
- * and five detail calls a second, and refuses the rest at once.
+ * HSP refused or failed the call. `busy` is a 503 or 429, sent at once. At busy times HSP
+ * refuses a second call in flight, and even a lone call in spells of up to half a minute.
  */
 export class HspCallError extends Error {
   constructor(

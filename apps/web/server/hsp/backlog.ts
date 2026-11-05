@@ -73,24 +73,30 @@ const LIST_CALL_TIMEOUT_MS = 54_000;
 
 const DETAIL_CALL_TIMEOUT_MS = 10_000;
 
-/** A 503 on a detail call clears after about 300 ms; an immediate retry fails. */
+/**
+ * Pauses after a refused detail call: 300 ms, then longer, up to 2 s. A lone 503 clears after
+ * about 300 ms, but at busy times HSP refuses every call for up to half a minute, so a
+ * refused run is asked again at this pace until the search's deadline.
+ */
 const DETAIL_RETRY_MS = 300;
 
-const DETAIL_ATTEMPTS = 6;
+const DETAIL_RETRY_MAX_MS = 2_000;
 
-/** Pause after a refused list call before asking again. */
-const LIST_RETRY_MS = 1_000;
-
-const LIST_ATTEMPTS = 4;
+/**
+ * Pause after a refused list call before asking again. HSP can refuse every list call, even
+ * a lone one, for 10 to 20 seconds at a time, then answer one. A list call is retried at this
+ * pace until the search's deadline, so a cold search waits the busy spell out.
+ */
+const LIST_RETRY_MS = 2_500;
 
 /** How often a search checks for a free slot, or for another search's answer. */
 const POLL_MS = 400;
 
-/** Quarter-hours refused after their retries that end a search's lists. */
+/** Quarter-hours left unanswered that end a search's lists. */
 const REFUSED_LISTS = 2;
 
-/** Runs refused in a row after their retries that end a history's detail calls. */
-const REFUSED_RUNS = 3;
+/** Runs failed in a row, other than by a busy refusal, that end a history's detail calls. */
+const FAILED_RUNS = 3;
 
 /** A history renews its slot this often while its detail calls run. */
 const SLOT_RENEW_MS = 20_000;
@@ -162,7 +168,7 @@ export async function streamBacklog(
           runCount: result.rids.length,
         });
         if (train === history && result.rids.length > 0) {
-          // The history train's runs start now, beside the other trains' lists.
+          // The history train's runs start now; the other trains' lists wait for them.
           runs = streamRuns(query, result.rids, emit, stop);
         }
       }
@@ -176,27 +182,28 @@ export async function streamBacklog(
       .sort(
         (left, right) => Number(first.has(right)) - Number(first.has(left)),
       );
-    // A quarter-hour that HSP would not answer after its retries leaves its trains on
-    // Darwin's figures. A second one ends the lists: HSP is down or overloaded, and waiting
-    // would only hold the page. One alone must not cost the other trains their history.
+    // A quarter-hour HSP did not answer by the deadline, or failed outright, leaves its
+    // trains on Darwin's figures. A second one ends the lists: HSP is down or overloaded,
+    // and waiting would only hold the page. One alone must not cost the other trains.
     let refusedLists = 0;
-    const worker = async () => {
-      for (let task = queue.shift(); task; task = queue.shift()) {
-        const services =
-          stop() || refusedLists >= REFUSED_LISTS
-            ? undefined
-            : await fetchMetrics(query, task, span, options.deadline, stop);
-        if (services) {
-          answers.set(task.key, services);
-        } else {
-          refusedLists += 1;
-          failedTasks.add(task.key);
-        }
-        emitReady();
+    // One HSP call at a time: the history train's lists, then its runs, then the other
+    // trains' lists. A list beside the runs would only get both refused.
+    for (const task of queue) {
+      if (!first.has(task)) {
+        await runs;
       }
-    };
-    // A history leaves one slot free for its detail calls.
-    await Promise.all(history ? [worker()] : [worker(), worker()]);
+      const services =
+        stop() || refusedLists >= REFUSED_LISTS
+          ? undefined
+          : await fetchMetrics(query, task, span, options.deadline, stop);
+      if (services) {
+        answers.set(task.key, services);
+      } else {
+        refusedLists += 1;
+        failedTasks.add(task.key);
+      }
+      emitReady();
+    }
     const leftover = keys.filter((key) => !sent.has(key) && !missing.has(key));
     if (leftover.length > 0) {
       emit({ type: "missing", keys: leftover });
@@ -271,7 +278,7 @@ async function fetchMetrics(
   stop: () => boolean,
 ): Promise<HspService[] | undefined> {
   const owner = randomUUID();
-  for (let attempts = 0; !stop();) {
+  while (!stop()) {
     const stored = (await storedMetrics([task.key])).get(task.key);
     if (stored) {
       return stored;
@@ -286,7 +293,6 @@ async function fetchMetrics(
       return undefined;
     }
     try {
-      attempts += 1;
       const payload = await postHsp(
         "/serviceMetrics",
         {
@@ -309,19 +315,16 @@ async function fetchMetrics(
       return services;
     } catch (error) {
       await releaseMetrics(task.key);
-      if (
-        !(error instanceof HspCallError) ||
-        error.kind !== "busy" ||
-        attempts >= LIST_ATTEMPTS
-      ) {
+      if (!(error instanceof HspCallError) || error.kind !== "busy") {
         console.info("[hsp] list gave up", task.key, errorText(error));
         return undefined;
       }
     } finally {
       await releaseCallSlot(slot, owner);
     }
-    await pause(LIST_RETRY_MS * attempts);
+    await pause(LIST_RETRY_MS);
   }
+  console.info("[hsp] list gave up at the deadline", task.key);
   return undefined;
 }
 
@@ -341,9 +344,9 @@ async function waitForSlot(
 
 /**
  * The history train's runs before Darwin, newest first: stored ones at once, then the rest
- * from HSP one at a time. A run HSP would not give is skipped: the figures then stay on
- * HSP's counts, and the next visit asks for it again. After a few refused in a row HSP is
- * taken to be overloaded, and the rest wait for the next visit.
+ * from HSP one at a time. A refused run is asked again until the deadline. A run that fails
+ * otherwise is skipped: the figures then stay on HSP's counts, and the next visit asks for it
+ * again. After a few such failures in a row the rest wait for the next visit.
  */
 async function streamRuns(
   query: BacklogQuery,
@@ -381,18 +384,18 @@ async function streamRuns(
     void renewCallSlot(slot, owner);
   }, SLOT_RENEW_MS);
   const pending: HspRun[] = [];
-  let refusedInARow = 0;
+  let failedInARow = 0;
   try {
     for (const rid of missing) {
-      if (stop() || refusedInARow >= REFUSED_RUNS) {
+      if (stop() || failedInARow >= FAILED_RUNS) {
         break;
       }
       const run = await fetchRun(rid, stop);
       if (!run) {
-        refusedInARow += 1;
+        failedInARow += 1;
         continue;
       }
-      refusedInARow = 0;
+      failedInARow = 0;
       pending.push(run);
       if (pending.length >= SAVE_EVERY) {
         await saveRuns(pending.splice(0));
@@ -420,11 +423,11 @@ async function fetchRun(
       return runFromDetails(payload, rid);
     } catch (error) {
       const busy = error instanceof HspCallError && error.kind === "busy";
-      if (!busy || attempt >= DETAIL_ATTEMPTS || stop()) {
-        console.info("[hsp] run gave up", rid, errorText(error));
+      if (!busy || stop()) {
+        console.info("[hsp] run gave up", rid, attempt, errorText(error));
         return undefined;
       }
-      await pause(DETAIL_RETRY_MS * attempt);
+      await pause(Math.min(DETAIL_RETRY_MS * attempt, DETAIL_RETRY_MAX_MS));
     }
   }
 }
