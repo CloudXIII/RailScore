@@ -526,10 +526,7 @@ export function toHistoricalRun(
     .filter((stop) => stop !== undefined);
   const serviceDate = serviceDateOf(payload, rid);
   const base = serviceDate ? { id: rid, serviceDate } : { id: rid };
-  const boarding = stops.find((stop) => stop.location === stations.boardingCrs);
-  const destination = stops.find(
-    (stop) => stop.location === stations.destinationCrs,
-  );
+  const { boarding, destination } = passengerLeg(stops, stations);
   if (!destination) {
     return { ...base, outcome: "missing_actual" };
   }
@@ -556,6 +553,64 @@ export function toHistoricalRun(
     }
   }
   return { ...base, outcome: notArrived(stops, destination) };
+}
+
+/**
+ * The calls a passenger boards and leaves at. The destination is the first call there after
+ * boarding, so a train that starts and ends at the same station, such as Waterloo round the
+ * Kingston loop, is read at its arrival and not at its departure. Boarding is the last
+ * departure from the boarding station before that, the leg the list shows for a train that
+ * passes the station twice. Darwin can repeat a call at the end of a run when its schedule
+ * changes; when the destination has no actual arrival, a later call there with the same public
+ * arrival that has one is taken instead. Without a boarding call the first destination call
+ * counts, as before.
+ */
+function passengerLeg(
+  stops: readonly Record<string, unknown>[],
+  stations: { boardingCrs: string; destinationCrs: string },
+): {
+  boarding: Record<string, unknown> | undefined;
+  destination: Record<string, unknown> | undefined;
+} {
+  const isBoarding = (stop: Record<string, unknown>) =>
+    stop.location === stations.boardingCrs;
+  const isDestination = (stop: Record<string, unknown>) =>
+    stop.location === stations.destinationCrs;
+  const departing = stops.findIndex(
+    (stop) => isBoarding(stop) && text(stop.gbtt_ptd),
+  );
+  const firstBoarding =
+    departing === -1 ? stops.findIndex(isBoarding) : departing;
+  const destinationIndex = stops.findIndex(
+    (stop, index) => index > firstBoarding && isDestination(stop),
+  );
+  if (destinationIndex === -1) {
+    return {
+      boarding: firstBoarding === -1 ? undefined : stops[firstBoarding],
+      destination: undefined,
+    };
+  }
+  let boardingIndex = firstBoarding;
+  for (let index = firstBoarding + 1; index < destinationIndex; index += 1) {
+    if (isBoarding(stops[index]!) && text(stops[index]!.gbtt_ptd)) {
+      boardingIndex = index;
+    }
+  }
+  const first = stops[destinationIndex]!;
+  const repeated = text(first.actual_ta)
+    ? undefined
+    : stops
+        .slice(destinationIndex + 1)
+        .find(
+          (stop) =>
+            isDestination(stop) &&
+            text(stop.gbtt_pta) === text(first.gbtt_pta) &&
+            text(stop.actual_ta),
+        );
+  return {
+    boarding: boardingIndex === -1 ? undefined : stops[boardingIndex],
+    destination: repeated ?? first,
+  };
 }
 
 /** Outcome of a run with no actual arrival at the destination. */

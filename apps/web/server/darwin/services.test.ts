@@ -250,6 +250,38 @@ describe("servicesFromRuns", () => {
     });
   });
 
+  it("lists a train that passes the boarding station twice at its later call", () => {
+    // SW 202611047683639 of 4 November 2026: Waterloo round the Kingston loop and back.
+    const kingston: DarwinRun = {
+      rid: "202611030000007",
+      serviceDate: "2026-11-03",
+      uid: "W77777",
+      toc: "SW",
+      calls: [
+        { crs: "WAT", ptd: "0730" },
+        { crs: "CLJ", pta: "0740", ptd: "0740", atd: "0741" },
+        { crs: "KNG", pta: "0816", ptd: "0818" },
+        { crs: "CLJ", pta: "0839", ptd: "0840", atd: "0839" },
+        { crs: "WAT", pta: "0849", ata: "0848" },
+      ],
+    };
+    const list = listOf(
+      [kingston, run("2026-11-03", "0000001", { actualArrival: "0823" })],
+      search,
+      { today, todayTimetable: false, oldest: "2026-11-01" },
+    );
+    expect(
+      list?.services.map((service) => [
+        service.publicDeparture,
+        service.publicArrival,
+        service.punctuality,
+      ]),
+    ).toEqual([
+      ["0812", "0823", { runs: 1, within5: 1, within14: 1, within29: 1 }],
+      ["0840", "0849", { runs: 1, within5: 1, within14: 1, within29: 1 }],
+    ]);
+  });
+
   it("returns nothing when no stored run fits the search", () => {
     expect(
       listOf([], search, {

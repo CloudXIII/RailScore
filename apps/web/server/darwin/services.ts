@@ -198,10 +198,12 @@ const NO_RUNS: ListPunctuality = {
 
 /**
  * The leg from boarding to destination: a public departure, then a later public arrival.
- * A train that called at the destination before boarding is on a loop. That is the only way
- * on a circular line such as the Wirral line through Liverpool Central, but the long way
- * round on a loop such as Waterloo to Waterloo via Hounslow, so the caller compares its
- * length with the other trains.
+ * A train that passes the boarding station twice before the destination, such as Clapham
+ * Junction going out and coming back round the Kingston loop into Waterloo, is boarded at
+ * the later call: the short way, and the leg HSP lists. A train that called at the
+ * destination before boarding is on a loop. That is the only way on a circular line such as
+ * the Wirral line through Liverpool Central, but the long way round on a loop such as
+ * Waterloo to Waterloo via Hounslow, so the caller compares its length with the other trains.
  */
 function legOf(
   run: DarwinRun,
@@ -210,17 +212,23 @@ function legOf(
 ):
   | { departure: string; arrival: string; passedDestination: boolean }
   | undefined {
-  const boarding = run.calls.findIndex(
-    (call) => call.crs === fromCrs && call.ptd,
-  );
-  if (boarding === -1) {
+  const first = run.calls.findIndex((call) => call.crs === fromCrs && call.ptd);
+  if (first === -1) {
     return undefined;
   }
-  const destination = run.calls
-    .slice(boarding + 1)
-    .find((call) => call.crs === toCrs && call.pta);
-  if (!destination) {
+  const destinationIndex = run.calls.findIndex(
+    (call, index) => index > first && call.crs === toCrs && call.pta,
+  );
+  if (destinationIndex === -1) {
     return undefined;
+  }
+  const destination = run.calls[destinationIndex]!;
+  let boarding = first;
+  for (let index = first + 1; index < destinationIndex; index += 1) {
+    const call = run.calls[index]!;
+    if (call.crs === fromCrs && call.ptd) {
+      boarding = index;
+    }
   }
   return {
     departure: run.calls[boarding]!.ptd!,
