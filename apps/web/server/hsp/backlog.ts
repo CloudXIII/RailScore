@@ -86,6 +86,9 @@ const LIST_ATTEMPTS = 4;
 /** How often a search checks for a free slot, or for another search's answer. */
 const POLL_MS = 400;
 
+/** Quarter-hours refused after their retries that end a search's lists. */
+const REFUSED_LISTS = 2;
+
 /** Runs refused in a row after their retries that end a history's detail calls. */
 const REFUSED_RUNS = 3;
 
@@ -173,19 +176,20 @@ export async function streamBacklog(
       .sort(
         (left, right) => Number(first.has(right)) - Number(first.has(left)),
       );
-    // One quarter-hour that HSP would not answer after its retries ends the lists: HSP is
-    // down or overloaded, and the trains keep Darwin's figures rather than wait.
-    let refused = false;
+    // A quarter-hour that HSP would not answer after its retries leaves its trains on
+    // Darwin's figures. A second one ends the lists: HSP is down or overloaded, and waiting
+    // would only hold the page. One alone must not cost the other trains their history.
+    let refusedLists = 0;
     const worker = async () => {
       for (let task = queue.shift(); task; task = queue.shift()) {
         const services =
-          stop() || refused
+          stop() || refusedLists >= REFUSED_LISTS
             ? undefined
             : await fetchMetrics(query, task, span, options.deadline, stop);
         if (services) {
           answers.set(task.key, services);
         } else {
-          refused = true;
+          refusedLists += 1;
           failedTasks.add(task.key);
         }
         emitReady();
