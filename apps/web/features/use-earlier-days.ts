@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from "react";
 import type { HistoricalRun } from "@railscore/core";
-import type { TrainBacklog } from "@/features/backlog-figures";
-import type { BacklogEvent, BacklogRequest } from "@/shared/contracts";
+import type { TrainEarlierDays } from "@/features/earlier-days-figures";
+import type { EarlierDaysEvent, EarlierDaysRequest } from "@/shared/contracts";
 
-export type BacklogState = {
-  readonly trains: ReadonlyMap<string, TrainBacklog>;
+export type EarlierDaysState = {
+  readonly trains: ReadonlyMap<string, TrainEarlierDays>;
   /** Trains HSP gave nothing for so far. Their figures are Darwin's until it does. */
   readonly missing: ReadonlySet<string>;
   readonly runs: readonly HistoricalRun[];
@@ -16,7 +16,7 @@ export type BacklogState = {
   readonly busy: boolean;
 };
 
-const EMPTY: BacklogState = {
+const EMPTY: EarlierDaysState = {
   trains: new Map(),
   missing: new Set(),
   runs: [],
@@ -24,7 +24,7 @@ const EMPTY: BacklogState = {
   busy: false,
 };
 
-const DONE: BacklogState = { ...EMPTY, done: true };
+const DONE: EarlierDaysState = { ...EMPTY, done: true };
 
 /**
  * Waits before asking again for what an attempt left missing. HSP refuses every call in
@@ -38,9 +38,11 @@ const RETRY_DELAYS_MS = [15_000, 30_000, 60_000] as const;
  * arrive. No request (HSP not needed) is done at once. When an answer ends with trains or
  * runs missing, as when HSP is busy, it is asked again a few times, keeping what came.
  */
-export function useBacklog(request: BacklogRequest | undefined): BacklogState {
+export function useEarlierDays(
+  request: EarlierDaysRequest | undefined,
+): EarlierDaysState {
   const body = request ? JSON.stringify(request) : "";
-  const [state, setState] = useState<BacklogState>(body ? EMPTY : DONE);
+  const [state, setState] = useState<EarlierDaysState>(body ? EMPTY : DONE);
 
   useEffect(() => {
     if (!body) {
@@ -48,7 +50,7 @@ export function useBacklog(request: BacklogRequest | undefined): BacklogState {
       return;
     }
     const controller = new AbortController();
-    void followBacklog(body, controller.signal, setState);
+    void followEarlierDays(body, controller.signal, setState);
     return () => controller.abort();
   }, [body]);
 
@@ -56,18 +58,18 @@ export function useBacklog(request: BacklogRequest | undefined): BacklogState {
 }
 
 /**
- * Asks for the backlog of `body`, a BacklogRequest as JSON, and again after each delay while
+ * Asks for the earlier days of `body`, an EarlierDaysRequest as JSON, and again after each delay while
  * something is missing. Every new state goes to `onState`. Nothing more once `signal` aborts.
  */
-export async function followBacklog(
+export async function followEarlierDays(
   body: string,
   signal: AbortSignal,
-  onState: (state: BacklogState) => void,
+  onState: (state: EarlierDaysState) => void,
   delays: readonly number[] = RETRY_DELAYS_MS,
 ): Promise<void> {
-  const asked = JSON.parse(body) as BacklogRequest;
+  const asked = JSON.parse(body) as EarlierDaysRequest;
   let current = EMPTY;
-  const publish = (next: BacklogState) => {
+  const publish = (next: EarlierDaysState) => {
     current = next;
     onState(next);
   };
@@ -91,8 +93,8 @@ export async function followBacklog(
 
 /** Every train answered, and every run of the history train fetched. */
 export function isComplete(
-  state: BacklogState,
-  request: Pick<BacklogRequest, "trains" | "runsOf">,
+  state: EarlierDaysState,
+  request: Pick<EarlierDaysRequest, "trains" | "runsOf">,
 ): boolean {
   if (!request.trains.every((train) => state.trains.has(train.key))) {
     return false;
@@ -103,9 +105,9 @@ export function isComplete(
 
 /** The last state: a train still unanswered, even after a failed request, is missing. */
 export function finished(
-  state: BacklogState,
-  request: Pick<BacklogRequest, "trains">,
-): BacklogState {
+  state: EarlierDaysState,
+  request: Pick<EarlierDaysRequest, "trains">,
+): EarlierDaysState {
   const unanswered = request.trains
     .map((train) => train.key)
     .filter((key) => !state.trains.has(key));
@@ -134,10 +136,10 @@ function wait(ms: number, signal: AbortSignal): Promise<boolean> {
 async function read(
   body: string,
   signal: AbortSignal,
-  onEvent: (event: BacklogEvent) => void,
+  onEvent: (event: EarlierDaysEvent) => void,
 ): Promise<void> {
   try {
-    const response = await fetch("/api/backlog", {
+    const response = await fetch("/api/earlier-days", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body,
@@ -160,7 +162,7 @@ async function read(
       buffered = lines.pop() ?? "";
       for (const line of lines) {
         if (line.trim()) {
-          onEvent(JSON.parse(line) as BacklogEvent);
+          onEvent(JSON.parse(line) as EarlierDaysEvent);
         }
       }
     }
@@ -173,7 +175,10 @@ async function read(
  * Adds one event to the state. A later attempt sends again what the server stored, so a
  * train answered is no longer missing and a run already held is not added twice.
  */
-export function apply(state: BacklogState, event: BacklogEvent): BacklogState {
+export function apply(
+  state: EarlierDaysState,
+  event: EarlierDaysEvent,
+): EarlierDaysState {
   switch (event.type) {
     case "train": {
       const trains = new Map(state.trains);

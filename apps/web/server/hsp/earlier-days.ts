@@ -5,13 +5,13 @@ import { darwinFirstDay, hspConnection, hspDailyCallLimit } from "../env";
 import { errorText } from "../error-text";
 import { DAY_TYPES, dayTypesOf, type ServiceDay } from "@/shared/day-type";
 import type {
-  BacklogEvent,
-  BacklogRequest,
-  BacklogTrain,
+  EarlierDaysEvent,
+  EarlierDaysRequest,
+  EarlierDaysTrain,
 } from "@/shared/contracts";
 import { HspCallError, postHsp, takeCallCount } from "./client";
 import { historicalRunFromHsp, runFromDetails, type HspRun } from "./details";
-import { matchBacklog } from "./match";
+import { matchEarlierDays } from "./match";
 import { listTasks, tasksOf, type ListTask } from "./lists";
 import {
   METRIC_TOLERANCES,
@@ -81,9 +81,9 @@ const SAVE_EVERY = 10;
  * history train, its runs. Answers already stored are sent first. No new HSP call starts
  * after `deadline`, nor once `signal` aborts; a call in flight still finishes and is stored.
  */
-export async function streamBacklog(
-  query: BacklogRequest,
-  emit: (event: BacklogEvent) => void,
+export async function streamEarlierDays(
+  query: EarlierDaysRequest,
+  emit: (event: EarlierDaysEvent) => void,
   options: { signal?: AbortSignal; deadline: number; now?: Date },
 ): Promise<void> {
   const now = options.now ?? new Date();
@@ -175,7 +175,7 @@ export async function streamBacklog(
     }
     await runs;
   } catch (error) {
-    console.error("HSP backlog failed", errorText(error));
+    console.error("HSP earlier days failed", errorText(error));
   } finally {
     await addCalls(takeCallCount()).catch((error: unknown) => {
       console.error("[hsp] the call count was not saved", errorText(error));
@@ -185,7 +185,7 @@ export async function streamBacklog(
 }
 
 function trainResult(
-  train: BacklogTrain,
+  train: EarlierDaysTrain,
   own: readonly { key: string; day: ServiceDay }[],
   answers: ReadonlyMap<string, HspService[]>,
 ): { byDay: Partial<Record<ServiceDay, PunctualityTally>>; rids: string[] } {
@@ -196,7 +196,7 @@ function trainResult(
       .filter((task) => task.day === day)
       .flatMap((task) => answers.get(task.key) ?? []);
     const joined = own.some((task) => task.day === day)
-      ? matchBacklog([train], services).get(train.key)
+      ? matchEarlierDays([train], services).get(train.key)
       : undefined;
     if (joined) {
       byDay[day] = joined.counts;
@@ -288,9 +288,9 @@ async function waitForSlot(
  * again. After a few such failures in a row the rest wait for the next visit.
  */
 async function streamRuns(
-  query: BacklogRequest,
+  query: EarlierDaysRequest,
   rids: readonly string[],
-  emit: (event: BacklogEvent) => void,
+  emit: (event: EarlierDaysEvent) => void,
   stop: () => boolean,
 ): Promise<void> {
   const stations = { boardingCrs: query.fromCrs, destinationCrs: query.toCrs };
