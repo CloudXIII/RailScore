@@ -84,8 +84,7 @@ export function ServiceList({
         backlog !== undefined &&
         !backlog.done &&
         services.includes(service) &&
-        !backlog.trains.has(serviceKey(service)) &&
-        !backlog.missing.has(serviceKey(service))
+        !backlog.trains.has(serviceKey(service))
       }
       chosen={chosen === serviceKey(service)}
       onChoose={() => setChosen(serviceKey(service))}

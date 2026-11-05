@@ -17,11 +17,12 @@ import type { HspService } from "./metrics";
 const CLAIM_MS = 70_000;
 
 /**
- * HSP calls in flight across every server. HSP refuses a third, list or detail alike:
- * a detail call made beside two list calls gets a 503. A list call holds a slot for its
- * call; a history holds one for its whole run of detail calls.
+ * HSP calls in flight across every server. At busy times HSP refuses a second call beside a
+ * list call, list or detail alike (measured 5 November 2026: a second list always refused,
+ * detail calls beside a list mostly refused). A list call holds the slot for its call; a
+ * history holds it for its whole run of detail calls. The table may hold more rows than this.
  */
-export const CALL_SLOTS = 2;
+export const CALL_SLOTS = 1;
 
 const memoryMetrics = new Map<string, HspService[]>();
 const memoryClaims = new Map<string, number>();
@@ -139,14 +140,15 @@ export async function releaseMetrics(key: string): Promise<void> {
   );
 }
 
-/** Takes one of the shared call slots for about a minute. Undefined while both are in use. */
+/** Takes a shared call slot for about a minute. Undefined while every slot is in use. */
 export async function takeCallSlot(owner: string): Promise<number | undefined> {
   const taken = await withDatabase(async (sql) => {
     const [row] = await sql<{ slot: number }[]>`
       update hsp_slots
       set owner = ${owner}, leased_until = now() + ${CLAIM_MS} * interval '1 millisecond'
       where slot = (
-        select slot from hsp_slots where leased_until < now()
+        select slot from hsp_slots
+        where leased_until < now() and slot <= ${CALL_SLOTS}
         order by slot limit 1 for update skip locked
       )
       returning slot
