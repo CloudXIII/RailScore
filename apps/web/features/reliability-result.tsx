@@ -18,6 +18,8 @@ import {
 } from "@/features/timetable-changes";
 import { stationName, type Station } from "@/shared/stations";
 import type { ScheduledService } from "@/shared/scheduled-service";
+import bands from "./bands.module.css";
+import styles from "./reliability-result.module.css";
 
 export function ReliabilityResultView({
   service,
@@ -51,10 +53,13 @@ export function ReliabilityResultView({
   const notes = scheduleNotes(service);
   const dayNote = serviceDayNote(usualDays(service), days);
   return (
-    <div className="result-stack" aria-live="polite">
-      <section className="card result" aria-labelledby="result-title">
-        <div className="result-summary">
-          <h2 id="result-title" className="result-times">
+    <div className={styles.resultStack} aria-live="polite">
+      <section
+        className={`card ${styles.result}`}
+        aria-labelledby="result-title"
+      >
+        <div className={styles.resultSummary}>
+          <h2 id="result-title" className={styles.resultTimes}>
             {formatClock(service.publicDeparture)}–
             {formatClock(service.publicArrival)}
           </h2>
@@ -70,8 +75,10 @@ export function ReliabilityResultView({
             ) : null}
           </p>
           {pending ? (
-            <div className="headline">
-              <span className="score-placeholder headline-placeholder" />
+            <div className={styles.headline}>
+              <span
+                className={`score-placeholder ${styles.headlinePlaceholder}`}
+              />
             </div>
           ) : (
             <Headline result={result} period={period} days={days} />
@@ -82,7 +89,7 @@ export function ReliabilityResultView({
             </p>
           ) : null}
           {notes.length > 0 ? (
-            <ul className="included-times">
+            <ul className={styles.includedTimes}>
               {notes.map((note) => (
                 <li key={note}>{note}</li>
               ))}
@@ -128,52 +135,60 @@ function Distribution({ result }: { result: ReliabilityResult }) {
     {
       label: "Early or within 5 minutes",
       count: distribution.withinFive,
-      band: "on-time",
+      band: bands.onTime,
+      bar: bands.onTimeBar,
     },
     {
       label: "6 to 14 minutes late",
       count: distribution.sixToFourteen,
-      band: "late",
+      band: bands.late,
+      bar: bands.lateBar,
     },
     {
       label: "15 to 29 minutes late",
       count: distribution.fifteenToTwentyNine,
-      band: "later",
+      band: bands.later,
+      bar: bands.laterBar,
     },
     {
       label: "30 minutes or more late",
       count: distribution.thirtyOrMore,
-      band: "severe",
+      band: bands.severe,
+      bar: bands.severeBar,
     },
     {
       label: "Cancelled or did not reach your destination",
       count: distribution.cancelled,
-      band: "cancelled",
+      band: bands.cancelled,
+      bar: bands.cancelledBar,
     },
   ];
   const max = Math.max(...rows.map((row) => row.count));
   return (
-    <table className="distribution">
+    <table className={styles.distribution}>
       <caption>How each journey went</caption>
       <tbody>
         {rows.map((row) => (
           <tr key={row.label}>
             <th scope="row">
-              {/* The swatch doubles as the calendar's key: its cells use the same colours. */}
-              <span className="distribution-label">
-                <span className={`swatch day-${row.band}`} aria-hidden="true" />
+              {/* The swatch doubles as the calendar's key: its cells use the same colours (bands.module.css). */}
+              <span className={styles.distributionLabel}>
+                <span
+                  className={`${bands.swatch} ${row.band}`}
+                  aria-hidden="true"
+                />
                 {row.label}
               </span>
-              <span className="distribution-track" aria-hidden="true">
+              <span className={styles.distributionTrack} aria-hidden="true">
                 <span
-                  className={`distribution-bar band-${row.band}`}
+                  className={`${styles.distributionBar} ${row.bar}`}
                   style={{
                     width: max === 0 ? "0%" : `${(row.count / max) * 100}%`,
                   }}
                 />
               </span>
             </th>
-            <td className="distribution-count">{row.count}</td>
+            <td className={styles.distributionCount}>{row.count}</td>
           </tr>
         ))}
       </tbody>
@@ -192,15 +207,15 @@ function Headline({
 }) {
   const within = result.withinFiveMinutes;
   return (
-    <div className="headline">
+    <div className={styles.headline}>
       {within.percentage !== null ? (
         <p
-          className={`headline-value tier-${scoreTier(within.percentage, within.total)}`}
+          className={`${styles.headlineValue} tier-${scoreTier(within.percentage, within.total)}`}
         >
           {within.percentage}%
         </p>
       ) : null}
-      <p className="verdict">{punctualitySentence(result)}</p>
+      <p className={styles.verdict}>{punctualitySentence(result)}</p>
       <p className="meta">{sampleLine(result, period, days)}</p>
     </div>
   );

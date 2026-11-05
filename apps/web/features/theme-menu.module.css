@@ -1,0 +1,89 @@
+.themeMenu {
+  position: relative;
+}
+
+.themeButton {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  min-height: 2.25rem;
+  padding: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: white;
+}
+
+.themeButton:hover,
+.themeButton[aria-expanded="true"] {
+  background: rgb(255 255 255 / 0.14);
+}
+
+.themeButton:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.themeButton svg {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+/* Icon follows html[data-theme-preference] from the head script — no React flash. */
+.themeIcons {
+  display: grid;
+  place-items: center;
+}
+
+.themeIcons .themeIcon {
+  grid-area: 1 / 1;
+  display: none;
+}
+
+:root:not([data-theme-preference]) .themeIconSystem,
+:root[data-theme-preference="system"] .themeIconSystem,
+:root[data-theme-preference="light"] .themeIconLight,
+:root[data-theme-preference="dark"] .themeIconDark {
+  display: block;
+}
+
+.themeList {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  right: 0;
+  z-index: 20;
+  min-width: 9.5rem;
+  margin: 0;
+  padding: 0.3rem;
+  list-style: none;
+  background: var(--card);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
+}
+
+.themeOption {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  width: 100%;
+  min-height: 2.25rem;
+  padding: 0.35rem 0.55rem;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font-weight: 600;
+  text-align: left;
+}
+
+.themeOption:hover,
+.themeOption:focus-visible {
+  background: var(--hover);
+  outline: none;
+}
+
+.themeCheck {
+  width: 1rem;
+  text-align: center;
+}

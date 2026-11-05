@@ -1,0 +1,73 @@
+.stationField {
+  position: relative;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.stationField:focus-within {
+  z-index: 2;
+}
+
+.stationField label {
+  font-weight: 700;
+}
+
+.stationField input {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border: 2px solid var(--ink);
+  border-radius: 4px;
+  background: var(--field);
+  color: inherit;
+  scroll-margin-top: 4rem;
+  scroll-margin-bottom: 6rem;
+}
+
+.stationList {
+  position: absolute;
+  z-index: 3;
+  left: 0;
+  right: 0;
+  top: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  background: var(--card);
+  border: 2px solid var(--ink);
+  border-top: 0;
+  border-radius: 0 0 4px 4px;
+  box-shadow: 0 8px 20px rgba(11, 12, 12, 0.18);
+  max-height: min(20rem, 45dvh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.stationOption,
+.stationEmpty {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 48px;
+  padding: 0.5rem 0.75rem;
+  border-top: 1px solid var(--page);
+}
+
+.stationOption {
+  cursor: pointer;
+}
+
+.stationOption[aria-selected="true"] {
+  background: var(--selected);
+}
+
+.stationCode {
+  color: var(--muted);
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.stationEmpty {
+  color: var(--muted);
+}

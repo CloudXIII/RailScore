@@ -9,6 +9,8 @@ import {
 import { formatClock } from "@/features/format";
 import type { TimetableChange } from "@/features/timetable-changes";
 import type { DayPattern } from "@/shared/day-type";
+import bands from "./bands.module.css";
+import styles from "./day-calendar.module.css";
 
 export function DayCalendar({
   period,
@@ -40,11 +42,11 @@ export function DayCalendar({
   );
   const showEmpty = cells.some((cell) => cell.kind === "empty");
   return (
-    <figure className="day-calendar">
+    <figure className={styles.dayCalendar}>
       <figcaption>{calendarCaption(days)}</figcaption>
-      <div className="day-months">
+      <div className={styles.dayMonths}>
         {months.map((month) => (
-          <table key={month.id} className="day-month">
+          <table key={month.id} className={styles.dayMonth}>
             <caption>{month.label}</caption>
             <thead>
               <tr>
@@ -80,12 +82,12 @@ export function DayCalendar({
       {/* The colours of the outcomes are keyed by the distribution above the calendar.
           Only what it does not show is listed here. */}
       {showMissing || showEmpty || footnotes.marks.length > 0 ? (
-        <ul className="day-legend">
+        <ul className={styles.dayLegend}>
           {showMissing ? (
-            <LegendItem swatch="day-missing" label="No data" />
+            <LegendItem swatch={bands.missing} label="No data" />
           ) : null}
           {showEmpty ? (
-            <LegendItem swatch="day-empty" label="No train" />
+            <LegendItem swatch={bands.empty} label="No train" />
           ) : null}
           {footnotes.marks.map((mark) => (
             <LegendItem
@@ -112,11 +114,11 @@ function LegendItem({
   return (
     <li aria-label={note ? `Timetable ${note.slice(1)}, ${label}` : undefined}>
       {note ? (
-        <span className="day-footnote" aria-hidden="true">
+        <span className={styles.dayFootnote} aria-hidden="true">
           {note}
         </span>
       ) : (
-        <span className={`swatch ${swatch}`} aria-hidden="true" />
+        <span className={`${bands.swatch} ${swatch}`} aria-hidden="true" />
       )}
       {label}
     </li>
@@ -145,20 +147,20 @@ function dayCell(
     return null;
   }
   const dateNumber = Number(cell.date.slice(8, 10));
-  const changed = footnote ? " day-changed" : "";
+  const changed = footnote ? ` ${styles.dayChanged}` : "";
   const changeLabel = change ? timetableChangeLabel(change) : "";
   const mark = footnote ? (
-    <span className="day-footnote" aria-hidden="true">
+    <span className={styles.dayFootnote} aria-hidden="true">
       *{footnote}
     </span>
   ) : null;
   if (cell.kind === "empty") {
     return (
       <span
-        className={`day day-empty${changed}`}
+        className={`${styles.day} ${bands.empty}${changed}`}
         aria-label={`${dayLabel(cell.date)}, no train recorded${changeLabel}`}
       >
-        <span className="day-date">{dateNumber}</span>
+        <span className={styles.dayDate}>{dateNumber}</span>
         {mark}
       </span>
     );
@@ -166,11 +168,11 @@ function dayCell(
   const described = describe(cell.mark);
   return (
     <span
-      className={`day ${bandClass(cell.mark)}${changed}`}
+      className={`${styles.day} ${bandClass(cell.mark)}${changed}`}
       aria-label={`${dayLabel(cell.date)}, ${described.label}${changeLabel}`}
     >
-      <span className="day-date">{dateNumber}</span>
-      <span className="day-value">{described.text}</span>
+      <span className={styles.dayDate}>{dateNumber}</span>
+      <span className={styles.dayValue}>{described.text}</span>
       {mark}
     </span>
   );
@@ -205,19 +207,19 @@ function describe(mark: CalendarMark): { text: string; label: string } {
 
 function bandClass(mark: CalendarMark): string {
   if (mark.kind === "on_time") {
-    return "day-on-time";
+    return bands.onTime;
   }
   if (mark.kind === "cancelled") {
-    return "day-cancelled";
+    return bands.cancelled;
   }
   if (mark.kind === "no_data") {
-    return "day-missing";
+    return bands.missing;
   }
   if (mark.latenessMinutes < 15) {
-    return "day-late";
+    return bands.late;
   }
   if (mark.latenessMinutes < 30) {
-    return "day-later";
+    return bands.later;
   }
-  return "day-severe";
+  return bands.severe;
 }

@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { THEME_PREFERENCE_KEY } from "@/features/theme-bootstrap";
+import styles from "./theme-menu.module.css";
 
 type Preference = "light" | "dark" | "system";
 
@@ -84,40 +85,40 @@ export function ThemeMenu() {
   }
 
   return (
-    <div className="theme-menu" ref={rootRef}>
+    <div className={styles.themeMenu} ref={rootRef}>
       <button
         type="button"
-        className="theme-button"
+        className={styles.themeButton}
         aria-label="Colour scheme"
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={menuId}
         onClick={() => setOpen((value) => !value)}
       >
-        <span className="theme-icons" aria-hidden="true">
-          <span className="theme-icon theme-icon-light">
+        <span className={styles.themeIcons} aria-hidden="true">
+          <span className={`${styles.themeIcon} ${styles.themeIconLight}`}>
             <LightIcon />
           </span>
-          <span className="theme-icon theme-icon-dark">
+          <span className={`${styles.themeIcon} ${styles.themeIconDark}`}>
             <DarkIcon />
           </span>
-          <span className="theme-icon theme-icon-system">
+          <span className={`${styles.themeIcon} ${styles.themeIconSystem}`}>
             <SystemIcon />
           </span>
         </span>
       </button>
       {open ? (
-        <ul id={menuId} className="theme-list" role="menu">
+        <ul id={menuId} className={styles.themeList} role="menu">
           {OPTIONS.map((option) => (
             <li key={option.value} role="none">
               <button
                 type="button"
                 role="menuitemradio"
                 aria-checked={preference === option.value}
-                className="theme-option"
+                className={styles.themeOption}
                 onClick={() => choose(option.value)}
               >
-                <span className="theme-check" aria-hidden="true">
+                <span className={styles.themeCheck} aria-hidden="true">
                   {preference === option.value ? "✓" : ""}
                 </span>
                 {option.label}
