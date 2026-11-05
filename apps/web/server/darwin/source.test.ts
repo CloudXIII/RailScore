@@ -1,17 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { DarwinRun } from "./darwin/run";
-import {
-  oldestRunDate,
-  runsOfTrains,
-  runsOnDay,
-  timetableDate,
-} from "./darwin/store";
-import { database } from "./db";
-import { findServices } from "./find-services";
+import { database } from "../db";
+import type { ScheduledService } from "../services/fold";
+import type { DarwinRun } from "./run";
+import { calculateFromDarwin, darwinSource } from "./source";
+import { oldestRunDate, runsOfTrains, runsOnDay, timetableDate } from "./store";
 
-vi.mock("./db", () => ({ database: vi.fn() }));
-vi.mock("./darwin/store", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("./darwin/store")>()),
+vi.mock("../db", () => ({ database: vi.fn() }));
+vi.mock("./store", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./store")>()),
   oldestRunDate: vi.fn(),
   runsOfTrains: vi.fn(),
   runsOnDay: vi.fn(),
@@ -49,9 +45,8 @@ function run(date: string, id: string, actualArrival?: string): DarwinRun {
 
 const HSP_VARIABLES = ["HSP_BASE_URL", "HSP_API_KEY", "HSP_API_KEY_HEADER"];
 
-describe("findServices", () => {
+describe("darwinSource.findServices", () => {
   beforeEach(() => {
-    delete process.env.RAILSCORE_DATA;
     process.env.DARWIN_FIRST_DAY = "2026-11-02";
     for (const name of HSP_VARIABLES) {
       delete process.env[name];
@@ -63,26 +58,15 @@ describe("findServices", () => {
     vi.mocked(timetableDate).mockReset();
   });
 
-  it("lists sample trains in mock mode without the database", async () => {
-    process.env.RAILSCORE_DATA = "mock";
-
-    const found = await findServices(search);
-
-    expect(found.services.length).toBeGreaterThan(0);
-    expect(database).not.toHaveBeenCalled();
-  });
-
   it("lists nothing without a database", async () => {
     vi.mocked(database).mockReturnValue(undefined);
 
-    const found = await findServices(search);
+    const found = await darwinSource.findServices(search);
 
-    expect(found).toEqual({
-      services: [],
-      retired: [],
-      period: { from: "2026-11-02", to: "2026-11-03" },
-      runs: new Map(),
-    });
+    expect(found.services).toEqual([]);
+    expect(found.retired).toEqual([]);
+    expect(found.period).toEqual({ from: "2026-11-02", to: "2026-11-03" });
+    expect(found.hsp).toBeUndefined();
   });
 
   it("leaves the days before Darwin to HSP when it is configured", async () => {
@@ -91,7 +75,7 @@ describe("findServices", () => {
     process.env.HSP_API_KEY_HEADER = "x-apikey";
     vi.mocked(database).mockReturnValue(undefined);
 
-    const found = await findServices(search);
+    const found = await darwinSource.findServices(search);
 
     expect(found.period).toEqual({ from: "2026-10-05", to: "2026-11-03" });
     expect(found.hsp).toEqual({ from: "2026-10-05", to: "2026-11-01" });
@@ -107,7 +91,7 @@ describe("findServices", () => {
       run("2026-11-03", "0000002", "0840"),
     ]);
 
-    const found = await findServices(search);
+    const found = await darwinSource.findServices(search);
 
     expect(found.period).toEqual({ from: "2026-11-03", to: "2026-11-03" });
     expect(vi.mocked(runsOfTrains).mock.calls[0]?.[1]).toMatchObject({
@@ -127,7 +111,7 @@ describe("findServices", () => {
       run("2026-11-04", "0000003"),
     ]);
 
-    const found = await findServices(search);
+    const found = await darwinSource.findServices(search);
 
     expect(found.period).toEqual({ from: "2026-11-02", to: "2026-11-03" });
     expect(found.services).toHaveLength(1);
@@ -136,11 +120,10 @@ describe("findServices", () => {
       rids: ["202611020000001", "202611030000002"],
       punctuality: { runs: 2, within5: 1, within14: 1, within29: 2 },
     });
-    expect([...found.runs.keys()].sort()).toEqual([
-      "202611020000001",
-      "202611030000002",
-      "202611040000003",
-    ]);
+    // The search's runs serve the calculation: no second read.
+    expect(
+      found.calculate(found.services[0]!).runs.map((run) => run.outcome),
+    ).toEqual(["arrived", "arrived"]);
   });
 
   it("lists nothing when no timetable day has a train on the route", async () => {
@@ -149,10 +132,70 @@ describe("findServices", () => {
     vi.mocked(timetableDate).mockResolvedValue("2026-11-04");
     vi.mocked(runsOnDay).mockResolvedValue([]);
 
-    const found = await findServices(search);
+    const found = await darwinSource.findServices(search);
 
     expect(found.services).toEqual([]);
     expect(found.period).toEqual({ from: "2026-11-02", to: "2026-11-03" });
     expect(runsOfTrains).not.toHaveBeenCalled();
+  });
+});
+
+function storedRun(
+  rid: string,
+  date: string,
+  actualArrival: string,
+): DarwinRun {
+  return {
+    rid,
+    serviceDate: date,
+    uid: "W12345",
+    toc: "NT",
+    calls: [
+      { crs: "LIV", ptd: "0630", atd: "0630" },
+      { crs: "MIA", pta: "0721", ata: actualArrival },
+    ],
+  };
+}
+
+const service: ScheduledService = {
+  originCrs: "LIV",
+  destinationCrs: "MIA",
+  publicDeparture: "0630",
+  publicArrival: "0721",
+  operatorCode: "NT",
+  rids: ["202611020000001", "202611030000002", "202611040000003"],
+  days: ["weekdays"],
+};
+
+const stations = { boardingCrs: "LIV", destinationCrs: "MIA" };
+
+describe("calculateFromDarwin", () => {
+  it("classifies the runs its search read and counts a RID with none as no data", () => {
+    const runs = new Map([
+      ["202611020000001", storedRun("202611020000001", "2026-11-02", "0722")],
+    ]);
+
+    const { result } = calculateFromDarwin(service, stations, runs, NOW);
+
+    expect(result.withinFiveMinutes).toEqual({
+      count: 1,
+      total: 1,
+      percentage: 100,
+    });
+    expect(result.calendar.map((mark) => mark.kind)).toEqual([
+      "on_time",
+      "no_data",
+      "no_data",
+    ]);
+  });
+
+  it("leaves today's run out, since it may still be under way", () => {
+    const runs = new Map([
+      ["202611040000003", storedRun("202611040000003", "2026-11-04", "0750")],
+    ]);
+
+    const { result } = calculateFromDarwin(service, stations, runs, NOW);
+
+    expect(result.withinFiveMinutes.total).toBe(0);
   });
 });
