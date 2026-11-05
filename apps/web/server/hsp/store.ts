@@ -1,8 +1,7 @@
 import "server-only";
 import type { JSONValue, Sql } from "postgres";
 import { addCalendarDays, londonIsoDate } from "@railscore/core";
-import { decodeCalls, encodeCalls } from "../darwin/run";
-import { decodeReasons, encodeReasons, type HspRun } from "./details";
+import { decodeHspCalls, encodeHspCalls, type HspRun } from "./details";
 import { database } from "../db";
 import { errorText } from "../error-text";
 import type { HspService } from "./metrics";
@@ -261,14 +260,11 @@ export async function storedRuns(
     `,
   );
   for (const row of rows ?? []) {
-    const calls = decodeCalls(row.calls);
     found.set(row.rid, {
       rid: row.rid,
       serviceDate: row.service_date,
-      uid: "",
       toc: row.toc,
-      calls,
-      reasons: decodeReasons(row.reasons, calls.length),
+      calls: decodeHspCalls(row),
     });
   }
   return found;
@@ -285,8 +281,7 @@ export async function saveRuns(runs: readonly HspRun[]): Promise<void> {
     rid: run.rid,
     service_date: run.serviceDate,
     toc: run.toc,
-    calls: encodeCalls(run.calls),
-    reasons: encodeReasons(run.reasons),
+    ...encodeHspCalls(run.calls),
   }));
   await withDatabase(
     (sql) => sql`

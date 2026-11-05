@@ -4,7 +4,7 @@ import {
   serviceKey,
   type ListPunctuality,
   type ScheduledService,
-} from "@/server/services/map";
+} from "@/server/services/fold";
 import type { Station } from "@/server/stations";
 
 type MockProfile = "reliable" | "poor" | "sparse" | "partial" | "empty";

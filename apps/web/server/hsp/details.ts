@@ -1,27 +1,27 @@
-import type { HistoricalRun } from "@railscore/core";
 import {
-  detailsPayloadFromDarwin,
-  type DarwinRun,
-  type StoredCall,
-} from "../darwin/run";
-import { serviceDateOf, toHistoricalRun } from "../services/map";
-import { HspResponseError } from "./metrics";
+  classifyRun,
+  dateOfRid,
+  type Call,
+  type HistoricalRun,
+} from "@railscore/core";
+import { decodeCalls, encodeCalls } from "../darwin/run";
 import { record, text } from "../payload";
+import { HspResponseError } from "./metrics";
 import { darwinStationCode } from "./stations";
 
 /**
- * A run from HSP: the stored Darwin shape plus HSP's reason code at each call, "" where
- * there is none. HSP does not say whether a code is a late or a cancellation reason.
+ * A run from HSP serviceDetails. Each call carries HSP's reason code, when it gave one, in
+ * `reason`: HSP has no cancellation flag and does not say whether a code is a late or a
+ * cancellation reason. Stations keep Darwin's codes. HSP has no schedule UID.
  */
-export type HspRun = DarwinRun & { readonly reasons: readonly string[] };
+export type HspRun = {
+  readonly rid: string;
+  readonly serviceDate: string;
+  readonly toc: string;
+  readonly calls: readonly Call[];
+};
 
-/**
- * A serviceDetails answer in the stored Darwin shape, so it is kept as compact text and read
- * by the same rules. HSP gives a late or cancellation reason per call but no cancellation
- * flag; a call with a reason is stored with the `c` flag, which the rules read as a reason,
- * and the code itself is kept in `reasons`. HSP has no schedule UID, so `uid` is empty.
- * Stations keep Darwin's codes.
- */
+/** Reads a serviceDetails answer. Throws when it is not in that shape or has no date. */
 export function runFromDetails(payload: unknown, rid: string): HspRun {
   const details = record(record(payload)?.serviceAttributesDetails);
   if (!details || !Array.isArray(details.locations)) {
@@ -29,43 +29,36 @@ export function runFromDetails(payload: unknown, rid: string): HspRun {
       "A historical run was not in the expected shape.",
     );
   }
-  const serviceDate = serviceDateOf(payload, rid);
+  const stated = text(details.date_of_service);
+  const serviceDate = /^\d{4}-\d{2}-\d{2}$/.test(stated)
+    ? stated
+    : dateOfRid(rid);
   if (!serviceDate) {
     throw new HspResponseError("A historical run had no date.");
   }
-  const reasons: string[] = [];
-  const calls = details.locations.flatMap((value): StoredCall[] => {
+  const calls = details.locations.flatMap((value): Call[] => {
     const stop = record(value);
     const code = text(stop?.location);
     if (!stop || !/^[A-Z]{3}$/.test(code)) {
       return [];
     }
-    const crs = darwinStationCode(code);
     const pta = clock(stop.gbtt_pta);
     const ptd = clock(stop.gbtt_ptd);
     const ata = clock(stop.actual_ta);
     const atd = clock(stop.actual_td);
     const reason = text(stop.late_canc_reason);
-    reasons.push(reason);
     return [
       {
-        crs,
+        crs: darwinStationCode(code),
         ...(pta ? { pta } : {}),
         ...(ptd ? { ptd } : {}),
         ...(ata ? { ata } : {}),
         ...(atd ? { atd } : {}),
-        ...(reason ? { cancelled: true } : {}),
+        ...(reason ? { reason } : {}),
       },
     ];
   });
-  return {
-    rid,
-    serviceDate,
-    uid: "",
-    toc: text(details.toc_code),
-    calls,
-    reasons,
-  };
+  return { rid, serviceDate, toc: text(details.toc_code), calls };
 }
 
 /**
@@ -73,21 +66,45 @@ export function runFromDetails(payload: unknown, rid: string): HspRun {
  * no actual time anywhere did not run: it is cancelled.
  */
 export function historicalRunFromHsp(
-  run: DarwinRun,
-  stations: { boardingCrs: string; destinationCrs: string },
+  run: HspRun,
+  journey: { boardingCrs: string; destinationCrs: string },
 ): HistoricalRun {
-  return toHistoricalRun(detailsPayloadFromDarwin(run), stations, run.rid);
+  return classifyRun(
+    { id: run.rid, serviceDate: run.serviceDate, calls: run.calls },
+    journey,
+  );
 }
 
-/** Reason codes as stored: one per call, joined by `;`. Codes are letters and digits. */
-export function encodeReasons(reasons: readonly string[]): string {
-  return reasons.some(Boolean) ? reasons.join(";") : "";
+/**
+ * A run's calls as `hsp_backlog_runs` keeps them: the `darwin_runs` call text, where a call
+ * with a reason carries the `c` flag, and the codes one per call, joined by `;` ("" when the
+ * run has none). Codes are letters and digits.
+ */
+export function encodeHspCalls(calls: readonly Call[]): {
+  calls: string;
+  reasons: string;
+} {
+  const reasons = calls.map((call) => call.reason ?? "");
+  return {
+    calls: encodeCalls(
+      calls.map(({ reason, ...call }) =>
+        reason === undefined ? call : { ...call, cancelled: true },
+      ),
+    ),
+    reasons: reasons.some(Boolean) ? reasons.join(";") : "",
+  };
 }
 
-/** The stored codes for `callCount` calls. A run stored without codes has none. */
-export function decodeReasons(text: string, callCount: number): string[] {
-  const codes = text ? text.split(";") : [];
-  return Array.from({ length: callCount }, (_, index) => codes[index] ?? "");
+/** The calls `encodeHspCalls` stored. A flagged call stored without its code keeps `""`. */
+export function decodeHspCalls(stored: {
+  calls: string;
+  reasons: string;
+}): Call[] {
+  const codes = stored.reasons ? stored.reasons.split(";") : [];
+  return decodeCalls(stored.calls).map(
+    ({ cancelled, platform: _platform, ...call }, index) =>
+      cancelled ? { ...call, reason: codes[index] ?? "" } : call,
+  );
 }
 
 function clock(value: unknown): string {

@@ -7,7 +7,7 @@ import {
 import { formatDate } from "@/features/format";
 import type { HspCounts } from "@/server/hsp/metrics";
 import type { ServiceDay } from "@/server/day-type";
-import type { ListPunctuality } from "@/server/services/map";
+import type { ListPunctuality } from "@/server/services/fold";
 
 /** What HSP has said so far about one train's days before Darwin. */
 export type TrainBacklog = {

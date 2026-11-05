@@ -1,10 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { toHistoricalRun } from "../services/map";
 import type { DarwinUpdate } from "./push-port";
 import {
   decodeCalls,
   encodeCalls,
-  detailsPayloadFromDarwin,
   foldRepeatedCalls,
   historicalRunFromDarwin,
   mergeUpdate,
@@ -131,49 +129,6 @@ describe("mergeUpdate reasons and platforms", () => {
   });
 });
 
-describe("detailsPayloadFromDarwin", () => {
-  const stations = { boardingCrs: "CLJ", destinationCrs: "WAT" };
-  const scheduled = mergeUpdate(undefined, schedule)!;
-
-  it("classifies an arrival with the shared run rules", () => {
-    const run = mergeUpdate(
-      mergeUpdate(scheduled, arrived({ atd: "0813" })),
-      arrived({ ata: "0829" }),
-    )!;
-    expect(
-      toHistoricalRun(detailsPayloadFromDarwin(run), stations, rid),
-    ).toEqual({
-      id: rid,
-      serviceDate: "2026-11-02",
-      outcome: "arrived",
-      latenessMinutes: 6,
-    });
-  });
-
-  it("reads a fully cancelled run as cancelled", () => {
-    const run = mergeUpdate(undefined, {
-      ...schedule,
-      calls: schedule.calls.map((call) => ({ ...call, cancelled: true })),
-    })!;
-    expect(
-      toHistoricalRun(detailsPayloadFromDarwin(run), stations, rid).outcome,
-    ).toBe("cancelled");
-  });
-
-  it("reads a run cut short before the destination as a missed call", () => {
-    const shortened = mergeUpdate(scheduled, {
-      ...schedule,
-      calls: schedule.calls.map((call) =>
-        call.tpl === "WATRLMN" ? { ...call, cancelled: true } : call,
-      ),
-    });
-    const run = mergeUpdate(shortened, arrived({ atd: "0812" }))!;
-    expect(
-      toHistoricalRun(detailsPayloadFromDarwin(run), stations, rid).outcome,
-    ).toBe("did_not_call");
-  });
-});
-
 describe("historicalRunFromDarwin", () => {
   const stations = { boardingCrs: "CLJ", destinationCrs: "WAT" };
   const scheduled = mergeUpdate(undefined, schedule)!;
@@ -203,6 +158,17 @@ describe("historicalRunFromDarwin", () => {
       outcome: "arrived",
       latenessMinutes: 6,
     });
+  });
+
+  it("reads a run cut short before the destination as a missed call", () => {
+    const shortened = mergeUpdate(scheduled, {
+      ...schedule,
+      calls: schedule.calls.map((call) =>
+        call.tpl === "WATRLMN" ? { ...call, cancelled: true } : call,
+      ),
+    });
+    const run = mergeUpdate(shortened, arrived({ atd: "0812" }))!;
+    expect(historicalRunFromDarwin(run, stations).outcome).toBe("did_not_call");
   });
 });
 

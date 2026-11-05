@@ -21,3 +21,10 @@ export {
   type ReliabilityResult,
   type ReliabilityStatus,
 } from "./reliability";
+export {
+  classifyRun,
+  passengerLeg,
+  type Call,
+  type Journey,
+  type PassengerLeg,
+} from "./run-outcome";
