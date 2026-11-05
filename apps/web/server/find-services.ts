@@ -2,7 +2,7 @@ import "server-only";
 import { trailingDays } from "@railscore/core";
 import { findDarwinServices } from "./darwin/find";
 import type { DarwinRun } from "./darwin/run";
-import type { DateSpan } from "./hsp/period";
+import type { DateSpan } from "./periods";
 import { usesMockData } from "./env";
 import { mockServices, shiftClock } from "./mock/catalogue";
 import type { DayPattern } from "./day-type";

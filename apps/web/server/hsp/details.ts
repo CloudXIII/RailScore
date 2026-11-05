@@ -4,7 +4,7 @@ import {
   type Call,
   type HistoricalRun,
 } from "@railscore/core";
-import { decodeCalls, encodeCalls } from "../darwin/run";
+import { decodeCalls, encodeCalls } from "../call-text";
 import { record, text } from "../payload";
 import { HspResponseError } from "./metrics";
 import { darwinStationCode } from "./stations";

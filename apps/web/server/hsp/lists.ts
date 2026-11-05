@@ -5,7 +5,7 @@ import {
   type BacklogTrain,
   type Quarter,
 } from "./match";
-import type { DateSpan } from "./period";
+import type { DateSpan } from "../periods";
 import { hspStationCode } from "./stations";
 
 /** The searched stations, as Darwin or HSP names them. */
