@@ -4,7 +4,7 @@ import {
   journeyMinutes,
   minutesApart,
 } from "@railscore/core";
-import { orderedDays, type ServiceDay } from "../day-type";
+import { orderedDays, type ServiceDay } from "@/shared/day-type";
 
 export type ScheduledService = {
   readonly originCrs: string;

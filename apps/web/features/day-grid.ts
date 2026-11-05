@@ -1,6 +1,6 @@
 import { addCalendarDays, type CalendarMark } from "@railscore/core";
 import { formatClock } from "@/features/format";
-import type { DayPattern } from "@/server/day-type";
+import type { DayPattern } from "@/shared/day-type";
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 

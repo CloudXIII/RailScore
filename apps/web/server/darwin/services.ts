@@ -4,7 +4,7 @@ import {
   journeyMinutes,
   passengerLeg,
 } from "@railscore/core";
-import { dayTypeOf, dayTypesOf, type DayPattern } from "../day-type";
+import { dayTypeOf, dayTypesOf, type DayPattern } from "@/shared/day-type";
 import {
   listServices,
   type ListPunctuality,

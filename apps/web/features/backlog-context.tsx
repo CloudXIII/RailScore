@@ -1,11 +1,8 @@
 "use client";
 
 import { createContext, useContext, type ReactNode } from "react";
-import {
-  useBacklog,
-  type BacklogRequest,
-  type BacklogState,
-} from "@/features/use-backlog";
+import { useBacklog, type BacklogState } from "@/features/use-backlog";
+import type { BacklogRequest } from "@/shared/contracts";
 
 const BacklogContext = createContext<BacklogState | undefined>(undefined);
 

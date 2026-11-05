@@ -5,12 +5,8 @@ import {
   historicalRunFromHsp,
   runFromDetails,
 } from "./details";
-import {
-  matchBacklog,
-  quarterOf,
-  quartersOf,
-  type BacklogTrain,
-} from "./match";
+import type { BacklogTrain } from "@/shared/contracts";
+import { matchBacklog, quarterOf, quartersOf } from "./match";
 import { listTasks, tasksOf } from "./lists";
 import { addCounts, parseServiceMetrics, type HspService } from "./metrics";
 import { darwinStationCode, hspStationCode } from "./stations";

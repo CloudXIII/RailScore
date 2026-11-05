@@ -8,7 +8,7 @@ import {
 } from "@/features/day-grid";
 import { formatClock } from "@/features/format";
 import type { TimetableChange } from "@/features/timetable-changes";
-import type { DayPattern } from "@/server/day-type";
+import type { DayPattern } from "@/shared/day-type";
 
 export function DayCalendar({
   period,

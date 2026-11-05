@@ -5,7 +5,7 @@ import type { DarwinRun } from "./darwin/run";
 import type { DateSpan } from "./periods";
 import { usesMockData } from "./env";
 import { mockServices, shiftClock } from "./mock/catalogue";
-import type { DayPattern } from "./day-type";
+import type { DayPattern } from "@/shared/day-type";
 import type { ScheduledService } from "./services/fold";
 
 type ServiceSearch = {

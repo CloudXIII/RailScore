@@ -1,5 +1,5 @@
 import { clockMinutes, formatHhmm, type HistoricalRun } from "@railscore/core";
-import type { DayPattern, ServiceDay } from "@/server/day-type";
+import type { DayPattern, ServiceDay } from "@/shared/day-type";
 import {
   serviceKey,
   type ListPunctuality,
