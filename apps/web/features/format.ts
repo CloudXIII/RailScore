@@ -95,6 +95,7 @@ export function formatServiceFacts(
 export type ListScore = {
   readonly onTimePercent: number;
   readonly severe: number;
+  readonly runs: number;
 };
 
 /**
@@ -114,16 +115,30 @@ export function listScore(
   return {
     onTimePercent: onTime,
     severe: Math.max(0, punctuality.runs - punctuality.within29),
+    runs: punctuality.runs,
   };
 }
 
-/** The warning under a listed train. Empty when every journey was under 30 minutes late. */
-export function formatSevereJourneys(count: number): string {
-  if (count <= 0) {
+/** How a listed or headline on-time share reads at a glance. */
+export type ScoreTier = "good" | "fair" | "poor";
+
+/** 90% or more is good, 75% or more is fair. The figure stays on screen: colour is never the only signal. */
+export function scoreTier(percent: number): ScoreTier {
+  return percent >= 90 ? "good" : percent >= 75 ? "fair" : "poor";
+}
+
+/** Share of journeys cancelled or 30+ minutes late below which a listed train shows no warning. */
+const SEVERE_WARNING_SHARE = 0.1;
+
+/**
+ * The warning under a listed train. Empty unless at least one journey in ten was cancelled
+ * or 30 or more minutes late, so a single bad day does not mark every row.
+ */
+export function formatSevereJourneys(count: number, runs: number): string {
+  if (count <= 0 || runs <= 0 || count / runs < SEVERE_WARNING_SHARE) {
     return "";
   }
-  const journeys = count === 1 ? "journey" : "journeys";
-  return `${count} ${journeys} cancelled or over 30 minutes late`;
+  return `${count} of ${runs} journeys cancelled or over 30 minutes late`;
 }
 
 /**
@@ -171,7 +186,7 @@ export function timeSearchLabel(time: string): string {
 
 /** Help under the time field. */
 export function departureWindowHint(): string {
-  return "Shows the next direct trains from this time.";
+  return "Shows the next direct trains from this time. Journeys with a change are not included.";
 }
 
 /**
@@ -203,17 +218,16 @@ export function listIntro(input: {
   listed?: { from: string; to: string };
   sample: boolean;
 }): string {
-  const meaning = "On time means it arrived early or less than 5 minutes late.";
+  const meaning = "On time means no more than 5 minutes late.";
   if (input.sample) {
     return `Sample trains for trying the screens. ${meaning}`;
   }
   const listed = input.listed;
-  const window = !listed
-    ? `in the last ${input.periodDays} days`
-    : listed.from > addCalendarDays(listed.to, 1 - input.periodDays)
-      ? `from ${formatDate(listed.from)} to ${formatDate(listed.to)}, the days recorded so far`
-      : `in the last ${input.periodDays} days, up to ${formatDate(listed.to)}`;
-  return `How often each direct train arrived on time ${window}. ${meaning}`;
+  const window =
+    listed && listed.from > addCalendarDays(listed.to, 1 - input.periodDays)
+      ? `since ${formatDate(listed.from)}, the first day recorded`
+      : `over the last ${input.periodDays} days`;
+  return `Arrivals ${window}. ${meaning}`;
 }
 
 export function formatClock(hhmm: string): string {

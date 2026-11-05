@@ -3,12 +3,12 @@
 import { useState } from "react";
 import {
   formatClock,
-  formatDate,
   formatDuration,
   formatServiceFacts,
   formatSevereJourneys,
   listIntro,
   listScore,
+  scoreTier,
   operatorName,
   throughServiceLabel,
   trainListHeading,
@@ -17,7 +17,6 @@ import { stationName, type Station } from "@/server/stations";
 import { scheduleNotes, usualDays } from "@/features/timetable-changes";
 import { listHref } from "@/features/search-href";
 import {
-  lastRunDate,
   matchesServiceKey,
   serviceKey,
   type ScheduledService,
@@ -72,11 +71,6 @@ export function ServiceList({
   const from = query.from;
   const to = query.to;
   const backlog = useBacklogState();
-  const lastRetired = retired
-    .map(lastRunDate)
-    .filter((date): date is string => date !== undefined)
-    .sort()
-    .at(-1);
   const row = (service: ScheduledService) => (
     <ServiceRow
       key={serviceKey(service)}
@@ -111,7 +105,9 @@ export function ServiceList({
       <input type="hidden" name="days" value={query.days} />
       <input type="hidden" name="period" value={query.period} />
       <input type="hidden" name="calculate" value="1" />
-      <h2 id="trains-heading" tabIndex={-1}>
+      {/* The summary above already names the search. The heading stays for screen readers
+          and as the focus target when returning from a train. */}
+      <h2 id="trains-heading" className="visually-hidden" tabIndex={-1}>
         {trainListHeading(
           query.time,
           services.map((service) => service.publicDeparture),
@@ -151,7 +147,6 @@ export function ServiceList({
                 {retired.length === 1
                   ? "train no longer runs"
                   : "trains no longer run"}
-                {lastRetired ? `. Last ran ${formatDate(lastRetired)}.` : "."}
               </summary>
               {retired.map(row)}
             </details>
@@ -202,7 +197,7 @@ function ServiceRow({
     : listScore(listPunctuality(service.punctuality, backlog));
   const journeys =
     service.rids.length + (backlog ? backlogTotal(backlog).runs : 0);
-  const severe = score ? formatSevereJourneys(score.severe) : "";
+  const severe = score ? formatSevereJourneys(score.severe, score.runs) : "";
   return (
     <label className="card service">
       <input
@@ -223,13 +218,17 @@ function ServiceRow({
       </span>
       {score ? (
         <span className="service-score">
-          <span className="on-time-value">{score.onTimePercent}%</span>
+          <span
+            className={`on-time-value tier-${scoreTier(score.onTimePercent)}`}
+          >
+            {score.onTimePercent}%
+          </span>
           <span className="on-time-label">on time</span>
         </span>
       ) : waiting ? (
         <span className="service-score service-score-waiting" role="status">
           <span className="score-placeholder" aria-hidden="true" />
-          <span className="meta">Checking earlier journeys…</span>
+          <span className="meta">Loading earlier journeys…</span>
         </span>
       ) : null}
       {severe ? <span className="service-severe">{severe}</span> : null}
