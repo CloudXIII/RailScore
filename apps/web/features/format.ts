@@ -224,8 +224,7 @@ export function listIntro(input: {
   }
   const listed = input.listed;
   const window =
-    listed &&
-    listed.from > addCalendarDays(listed.to, 1 - input.periodDays)
+    listed && listed.from > addCalendarDays(listed.to, 1 - input.periodDays)
       ? `since ${formatDate(listed.from)}, the first day recorded`
       : `over the last ${input.periodDays} days`;
   return `Arrivals ${window}. ${meaning}`;

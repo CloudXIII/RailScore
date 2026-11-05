@@ -181,7 +181,10 @@ function dayCell(
 function describe(mark: CalendarMark): { text: string; label: string } {
   if (mark.kind === "cancelled") {
     // The full word does not fit a narrow cell. The cell label and the legend spell it out.
-    return { text: "canc.", label: "cancelled or did not reach the destination" };
+    return {
+      text: "canc.",
+      label: "cancelled or did not reach the destination",
+    };
   }
   if (mark.kind === "no_data") {
     return { text: "no data", label: "no arrival time recorded" };

@@ -218,7 +218,11 @@ function ServiceRow({
       </span>
       {score ? (
         <span className="service-score">
-          <span className={`on-time-value tier-${scoreTier(score.onTimePercent)}`}>{score.onTimePercent}%</span>
+          <span
+            className={`on-time-value tier-${scoreTier(score.onTimePercent)}`}
+          >
+            {score.onTimePercent}%
+          </span>
           <span className="on-time-label">on time</span>
         </span>
       ) : waiting ? (
