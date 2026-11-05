@@ -204,3 +204,79 @@ describe("historicalRunFromDarwin", () => {
     });
   });
 });
+
+describe("the passenger's leg on loops and repeated calls", () => {
+  it("reads a Kingston loop train at its arrival back into Waterloo", () => {
+    // 4 November 2026, Waterloo 05:30 round the Kingston loop and back to Waterloo.
+    const run: DarwinRun = {
+      rid: "202611047683639",
+      serviceDate: "2026-11-04",
+      uid: "W1",
+      toc: "SW",
+      calls: decodeCalls(
+        "WAT,,0530,,0529,,8;CLJ,0540,0540,0540,0541,,5;KNG,0616,0618,0615,0617,,3;CLJ,0639,0640,0637,0639,,10;WAT,0649,,0648,,,5",
+      ),
+    };
+    expect(
+      historicalRunFromDarwin(run, {
+        boardingCrs: "CLJ",
+        destinationCrs: "WAT",
+      }),
+    ).toMatchObject({ outcome: "arrived", latenessMinutes: -1 });
+  });
+
+  it("takes the arrival Darwin repeated at the end after a schedule change", () => {
+    // 4 November 2026, Paddington 06:20, cut short at Reading.
+    const run: DarwinRun = {
+      rid: "202611047115392",
+      serviceDate: "2026-11-04",
+      uid: "W2",
+      toc: "GW",
+      calls: decodeCalls(
+        "PAD,,0620,,0619,,11;SLO,0636,0639,0635,0638,,4;RDG,0700,0701,,,,14;TLH,0705,0705,,,c,3;DID,0726,,,,c,4;RDG,0700,,0657,,,12",
+      ),
+    };
+    expect(
+      historicalRunFromDarwin(run, {
+        boardingCrs: "PAD",
+        destinationCrs: "RDG",
+      }),
+    ).toMatchObject({ outcome: "arrived", latenessMinutes: -3 });
+  });
+
+  it("reads a Wirral line train at the destination after boarding", () => {
+    const run: DarwinRun = {
+      rid: "202611030000006",
+      serviceDate: "2026-11-03",
+      uid: "C08015",
+      toc: "ME",
+      calls: decodeCalls(
+        "CTR,,1842,,1842,,;PSL,1908,1908,1908,1908,,;LVC,1929,1929,1929,1929,,;PSL,1946,1947,1950,,,;CTR,2015,,,,,",
+      ),
+    };
+    expect(
+      historicalRunFromDarwin(run, {
+        boardingCrs: "LVC",
+        destinationCrs: "PSL",
+      }),
+    ).toMatchObject({ outcome: "arrived", latenessMinutes: 4 });
+  });
+
+  it("still reads the first arrival when it has an actual time", () => {
+    const run: DarwinRun = {
+      rid: "202611047115393",
+      serviceDate: "2026-11-04",
+      uid: "W3",
+      toc: "GW",
+      calls: decodeCalls(
+        "PAD,,0620,,0619,,;RDG,0700,0701,0702,0703,,;DID,0726,,0728,,,;RDG,0700,,0710,,,",
+      ),
+    };
+    expect(
+      historicalRunFromDarwin(run, {
+        boardingCrs: "PAD",
+        destinationCrs: "RDG",
+      }),
+    ).toMatchObject({ outcome: "arrived", latenessMinutes: 2 });
+  });
+});
