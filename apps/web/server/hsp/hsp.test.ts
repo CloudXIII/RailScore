@@ -5,8 +5,8 @@ import {
   historicalRunFromHsp,
   runFromDetails,
 } from "./details";
-import type { BacklogTrain } from "@/shared/contracts";
-import { matchBacklog, quarterOf, quartersOf } from "./match";
+import type { EarlierDaysTrain } from "@/shared/contracts";
+import { matchEarlierDays, quarterOf, quartersOf } from "./match";
 import { listTasks, tasksOf } from "./lists";
 import { parseServiceMetrics, type HspService } from "./metrics";
 import { darwinStationCode, hspStationCode } from "./stations";
@@ -86,7 +86,7 @@ describe("quarters", () => {
   it("cuts departures into shared quarter-hours", () => {
     expect(quarterOf("0707")).toEqual({ fromTime: "0700", toTime: "0714" });
     expect(quarterOf("2359")).toEqual({ fromTime: "2345", toTime: "2359" });
-    const trains: BacklogTrain[] = [
+    const trains: EarlierDaysTrain[] = [
       {
         key: "a",
         operatorCode: "NT",
@@ -110,12 +110,12 @@ describe("quarters", () => {
   });
 });
 
-describe("matchBacklog", () => {
+describe("matchEarlierDays", () => {
   const train = (
     key: string,
     departure: string,
-    extra: BacklogTrain["legs"] = [],
-  ): BacklogTrain => ({
+    extra: EarlierDaysTrain["legs"] = [],
+  ): EarlierDaysTrain => ({
     key,
     operatorCode: "NT",
     legs: [
@@ -133,7 +133,7 @@ describe("matchBacklog", () => {
       ]),
       train("1045", "1045"),
     ];
-    const joined = matchBacklog(
+    const joined = matchEarlierDays(
       trains,
       services([
         hspRow("1015", { rids: ["r1"] }),
@@ -156,12 +156,12 @@ describe("matchBacklog", () => {
   });
 
   it("takes the one train with another origin, and none when two could fit", () => {
-    const one = matchBacklog(
+    const one = matchEarlierDays(
       [train("1015", "1015")],
       services([hspRow("1015", { origin: "LVC" })]),
     );
     expect(one.get("1015")?.counts.runs).toBe(10);
-    const two = matchBacklog(
+    const two = matchEarlierDays(
       [
         train("x", "1015"),
         {
@@ -182,7 +182,7 @@ describe("matchBacklog", () => {
   });
 
   /** Paddington 07:50 to Great Malvern, which ran to Worcester Shrub Hill for a week of works. */
-  const paddington: BacklogTrain = {
+  const paddington: EarlierDaysTrain = {
     key: "0750-0816-GW-PAD-GMV",
     operatorCode: "GW",
     legs: [
@@ -213,7 +213,7 @@ describe("matchBacklog", () => {
     });
 
   it("joins the days a train ran to another destination at the same times", () => {
-    const joined = matchBacklog(
+    const joined = matchEarlierDays(
       [paddington],
       services([
         toMalvern(weekdays(["20261020", "20261021"])),
@@ -227,7 +227,7 @@ describe("matchBacklog", () => {
   });
 
   it("keeps apart a train on the same days, as another portion", () => {
-    const joined = matchBacklog(
+    const joined = matchEarlierDays(
       [paddington],
       services([
         toMalvern(weekdays(["20261020", "20261021"])),
@@ -240,7 +240,7 @@ describe("matchBacklog", () => {
   });
 
   it("joins another destination only at the same arrival, and not without one", () => {
-    const later = matchBacklog(
+    const later = matchEarlierDays(
       [paddington],
       services([
         hspRow("0750", {
@@ -254,7 +254,7 @@ describe("matchBacklog", () => {
     );
     expect(later.size).toBe(0);
     const { publicArrival: _, ...withoutArrival } = paddington.legs[0]!;
-    const older = matchBacklog(
+    const older = matchEarlierDays(
       [{ ...paddington, legs: [withoutArrival] }],
       services([toWorcester(weekdays(["20261026"]))]),
     );

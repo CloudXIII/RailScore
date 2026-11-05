@@ -1,0 +1,173 @@
+.services {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.services fieldset {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.services :global(#trains-heading) {
+  scroll-margin-top: 0.5rem;
+}
+
+.timeShift {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15rem;
+  min-height: 4.25rem;
+  padding: 0.7rem 1rem 0.85rem;
+  background: var(--card);
+  color: var(--ink);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-decoration: none;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.timeShift:hover {
+  background: var(--hover);
+  border-color: var(--line);
+  color: var(--ink);
+}
+
+.timeShift:active {
+  background: var(--selected);
+  border-color: var(--selected-line);
+}
+
+.timeShiftChevron {
+  width: 1.4rem;
+  height: 0.7rem;
+  color: var(--muted);
+}
+
+.timeShift.later .timeShiftChevron {
+  transform: rotate(180deg);
+}
+
+.timeShift:hover .timeShiftChevron,
+.timeShift:active .timeShiftChevron {
+  color: var(--selected-line);
+}
+
+.service {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.2rem 1rem;
+  align-items: center;
+  padding-left: 3rem;
+  cursor: pointer;
+}
+
+.service input {
+  position: absolute;
+  left: 1rem;
+  top: 1.1rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  min-height: 0;
+  margin: 0;
+  accent-color: var(--selected-line);
+}
+
+.service:has(input:checked) {
+  border-color: var(--selected-line);
+  box-shadow: inset 0 0 0 1px var(--selected-line);
+  background: var(--selected);
+}
+
+.serviceTimes {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 1.3rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.serviceLine {
+  flex: 0 1 3rem;
+  height: 2px;
+  background: var(--line);
+}
+
+.serviceDuration {
+  color: var(--muted);
+  font-weight: 600;
+  text-align: right;
+}
+
+.serviceDetail {
+  grid-column: 1 / -1;
+}
+
+.includedTime {
+  font-weight: 600;
+}
+
+.service :global(.meta) {
+  font-size: 0.85rem;
+}
+
+.serviceScore {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  margin-top: 0.15rem;
+}
+
+/* Same height as a loaded score, so the row does not jump when HSP answers. */
+.serviceScoreWaiting {
+  align-items: center;
+  min-height: calc(1.7rem * 1.15);
+}
+
+.onTimeValue {
+  font-size: 1.7rem;
+  font-weight: 700;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+}
+
+.onTimeLabel {
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.serviceSevere {
+  grid-column: 1 / -1;
+  color: var(--danger);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.serviceGroup {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.retiredServices summary {
+  cursor: pointer;
+  padding: 0.25rem 0;
+}
+
+.calculateBar {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0.5rem 0 0;
+  text-align: center;
+}
+
+/* Beside the result (train-detail.tsx, the only element with data-view). */
+@media (min-width: 64rem) {
+  :global([data-view]) .calculateBar {
+    margin: 0;
+    padding-inline: 0;
+  }
+}

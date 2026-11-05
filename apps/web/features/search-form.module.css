@@ -1,0 +1,168 @@
+/* Journey summary */
+
+.journeySummary {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: start;
+  column-gap: 0.75rem;
+  row-gap: 0.25rem;
+  border-left: 6px solid var(--brand-mark);
+}
+
+.journeyRoute {
+  display: grid;
+  font-size: 1.15rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.journeySummary :global(.link-button) {
+  align-self: center;
+}
+
+.journeyMeta {
+  grid-column: 1 / -1;
+}
+
+/* Planner */
+
+.planner {
+  display: grid;
+  gap: 1rem;
+  scroll-margin-top: 1rem;
+}
+
+.planner label {
+  font-weight: 700;
+}
+
+.stations {
+  position: relative;
+  display: grid;
+  gap: 0.75rem;
+  padding-right: 3.5rem;
+}
+
+.swap {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  width: 48px;
+  translate: 0 -25%;
+  background: var(--card);
+  border: 2px solid var(--line);
+  border-radius: 50%;
+  color: var(--ink);
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+.swap:hover {
+  border-color: var(--selected-line);
+  background: var(--hover);
+}
+
+.departAfter {
+  display: grid;
+  gap: 0.3rem;
+  width: max-content;
+  max-width: 100%;
+}
+
+.departAfter :global(.meta) {
+  max-width: 22rem;
+}
+
+.departAfter input[type="time"] {
+  width: 7.5rem;
+  padding: 0.6rem 0.75rem;
+  border: 2px solid var(--ink);
+  border-radius: 4px;
+  background: var(--card);
+  color: inherit;
+}
+
+.pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.pill {
+  position: relative;
+}
+
+.pill input {
+  position: absolute;
+  opacity: 0;
+  inset: 0;
+  margin: 0;
+}
+
+.pill span {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 1rem;
+  border: 2px solid var(--line);
+  border-radius: 999px;
+  background: var(--field);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.pill input:checked + span {
+  border-color: var(--brand);
+  background: var(--brand);
+  color: white;
+}
+
+:root[data-theme="dark"] .pill input:checked + span {
+  border-color: var(--selected-line);
+  background: var(--selected);
+  color: var(--ink);
+}
+
+.pill input:focus-visible + span {
+  outline: 3px solid var(--focus);
+  box-shadow: 0 0 0 6px var(--ink);
+}
+
+@media (min-width: 720px) {
+  .stations {
+    grid-template-columns: 1fr 1fr;
+    padding-right: 0;
+    column-gap: 4rem;
+  }
+
+  .swap {
+    left: 50%;
+    right: auto;
+    top: auto;
+    bottom: 0;
+    translate: -50% 0;
+    rotate: 90deg;
+  }
+}
+
+/* Beside a chosen train (train-detail.tsx, the only element with data-view), the form
+   spreads across the wide page. */
+@media (min-width: 64rem) {
+  :global(body:has([data-view])) .planner {
+    grid-template-columns: auto auto minmax(0, 1fr);
+    column-gap: 2.5rem;
+    align-items: start;
+  }
+
+  :global(body:has([data-view])) .planner .stations,
+  :global(body:has([data-view])) .planner :global(.errors),
+  :global(body:has([data-view])) .planner :global(.primary) {
+    grid-column: 1 / -1;
+  }
+
+  :global(body:has([data-view])) .planner :global(.primary) {
+    justify-self: start;
+    width: auto;
+    min-width: 18rem;
+  }
+}

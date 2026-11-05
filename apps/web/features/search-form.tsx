@@ -6,6 +6,7 @@ import { keepFieldInView } from "@/features/keep-field-in-view";
 import type { ParsedQuery } from "@/shared/search-query";
 import type { Station } from "@/shared/stations";
 import { StationField } from "@/features/station-field";
+import styles from "./search-form.module.css";
 
 const DAY_OPTIONS = [
   { value: "weekdays", label: "Weekdays" },
@@ -49,8 +50,11 @@ export function SearchForm({
       (option) => option.value === query.days,
     )?.label;
     return (
-      <section className="card journey-summary" aria-label="Your search">
-        <p className="journey-route">
+      <section
+        className={`card ${styles.journeySummary}`}
+        aria-label="Your search"
+      >
+        <p className={styles.journeyRoute}>
           <span>{query.from.name}</span>
           <span>
             <span aria-hidden="true">→ </span>
@@ -68,7 +72,7 @@ export function SearchForm({
         >
           Change
         </button>
-        <p className="meta journey-meta">
+        <p className={`meta ${styles.journeyMeta}`}>
           {timeSearchLabel(query.time)} · {days} · last {query.period} days
         </p>
       </section>
@@ -78,12 +82,12 @@ export function SearchForm({
   return (
     <form
       ref={formRef}
-      className="card planner"
+      className={`card ${styles.planner}`}
       method="get"
       action="/"
       autoComplete="off"
     >
-      <div className="stations">
+      <div className={styles.stations}>
         <StationField
           name="from"
           label="From"
@@ -101,7 +105,7 @@ export function SearchForm({
         />
         <button
           type="button"
-          className="swap"
+          className={styles.swap}
           aria-label="Swap departure and destination"
           onClick={() => {
             setFrom(to);
@@ -111,7 +115,7 @@ export function SearchForm({
           <span aria-hidden="true">⇅</span>
         </button>
       </div>
-      <div className="depart-after">
+      <div className={styles.departAfter}>
         <label htmlFor="departure-time">Earliest departure</label>
         <input
           id="departure-time"
@@ -130,9 +134,9 @@ export function SearchForm({
       </div>
       <fieldset className="days">
         <legend>Days</legend>
-        <div className="pills">
+        <div className={styles.pills}>
           {DAY_OPTIONS.map((option) => (
-            <label key={option.value} className="pill">
+            <label key={option.value} className={styles.pill}>
               <input
                 type="radio"
                 name="days"
@@ -146,9 +150,9 @@ export function SearchForm({
       </fieldset>
       <fieldset className="days">
         <legend>History</legend>
-        <div className="pills">
+        <div className={styles.pills}>
           {PERIOD_OPTIONS.map((option) => (
-            <label key={option.value} className="pill">
+            <label key={option.value} className={styles.pill}>
               <input
                 type="radio"
                 name="period"

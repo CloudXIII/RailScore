@@ -1,6 +1,8 @@
+import styles from "./data-notice.module.css";
+
 export function DataNotice({ sample }: { sample: boolean }) {
   return (
-    <footer className="site-footer">
+    <footer className={styles.siteFooter}>
       {sample ? (
         <>
           <h2>About these figures</h2>
@@ -13,7 +15,7 @@ export function DataNotice({ sample }: { sample: boolean }) {
       ) : (
         <>
           {/* The explanations wait behind a click. The data credit stays in view. */}
-          <details className="about-figures">
+          <details className={styles.aboutFigures}>
             <summary>
               <h2>About these figures</h2>
             </summary>

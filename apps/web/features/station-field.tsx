@@ -3,6 +3,7 @@
 import { useId, useState, type KeyboardEvent } from "react";
 import { keepFieldInView } from "@/features/keep-field-in-view";
 import { searchStations, stationLabel, type Station } from "@/shared/stations";
+import styles from "./station-field.module.css";
 
 export function StationField({
   name,
@@ -52,7 +53,7 @@ export function StationField({
   }
 
   return (
-    <div className="station-field">
+    <div className={styles.stationField}>
       <label htmlFor={inputId}>{label}</label>
       <input
         id={inputId}
@@ -90,11 +91,11 @@ export function StationField({
         <ul
           role="listbox"
           id={listId}
-          className="station-list"
+          className={styles.stationList}
           aria-label={label}
         >
           {matches.length === 0 ? (
-            <li className="station-empty">No stations match.</li>
+            <li className={styles.stationEmpty}>No stations match.</li>
           ) : (
             matches.map((station) => (
               <li
@@ -102,14 +103,14 @@ export function StationField({
                 id={`${listId}-${station.crs}`}
                 role="option"
                 aria-selected={station === current}
-                className="station-option"
+                className={styles.stationOption}
                 // Keeps focus in the input so blur does not close the list before the click lands.
                 onMouseDown={(event) => event.preventDefault()}
                 onMouseEnter={() => setActive(matches.indexOf(station))}
                 onClick={() => choose(station)}
               >
                 <span>{station.name}</span>
-                <span className="station-code">{station.crs}</span>
+                <span className={styles.stationCode}>{station.crs}</span>
               </li>
             ))
           )}
