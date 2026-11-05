@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { historicalRunFromDarwin } from "../darwin/run";
-import { historicalRunFromHsp, runFromDetails } from "./details";
+import {
+  decodeReasons,
+  encodeReasons,
+  historicalRunFromHsp,
+  runFromDetails,
+} from "./details";
 import {
   matchBacklog,
   quarterOf,
@@ -178,6 +183,13 @@ describe("matchBacklog", () => {
   });
 });
 
+describe("reason codes", () => {
+  it("stores nothing for a run without codes and reads it back as empty", () => {
+    expect(encodeReasons(["", ""])).toBe("");
+    expect(decodeReasons("", 3)).toEqual(["", "", ""]);
+  });
+});
+
 describe("HSP runs", () => {
   const stations = { boardingCrs: "LIV", destinationCrs: "MAN" };
   const details = (locations: object[]) => ({
@@ -218,7 +230,10 @@ describe("HSP runs", () => {
         { crs: "LIV", ptd: "1015", atd: "1016" },
         { crs: "MAN", pta: "1100", ata: "1108", cancelled: true },
       ],
+      reasons: ["", "IB"],
     });
+    expect(encodeReasons(run.reasons)).toBe(";IB");
+    expect(decodeReasons(";IB", 2)).toEqual(["", "IB"]);
     expect(historicalRunFromHsp(run, stations)).toMatchObject({
       outcome: "arrived",
       latenessMinutes: 8,

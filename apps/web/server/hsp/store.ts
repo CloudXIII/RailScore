@@ -1,7 +1,8 @@
 import "server-only";
 import type { JSONValue, Sql } from "postgres";
 import { addCalendarDays, londonIsoDate } from "@railscore/core";
-import { decodeCalls, encodeCalls, type DarwinRun } from "../darwin/run";
+import { decodeCalls, encodeCalls } from "../darwin/run";
+import { decodeReasons, encodeReasons, type HspRun } from "./details";
 import { database } from "../db";
 import { errorText } from "../error-text";
 import type { HspService } from "./metrics";
@@ -24,7 +25,7 @@ export const CALL_SLOTS = 2;
 
 const memoryMetrics = new Map<string, HspService[]>();
 const memoryClaims = new Map<string, number>();
-const memoryRuns = new Map<string, DarwinRun>();
+const memoryRuns = new Map<string, HspRun>();
 const memorySlots = Array.from({ length: CALL_SLOTS }, () => ({
   owner: "",
   until: 0,
@@ -230,8 +231,8 @@ export async function addCalls(count: number, now = new Date()): Promise<void> {
 /** Stored HSP runs by RID. */
 export async function storedRuns(
   rids: readonly string[],
-): Promise<Map<string, DarwinRun>> {
-  const found = new Map<string, DarwinRun>();
+): Promise<Map<string, HspRun>> {
+  const found = new Map<string, HspRun>();
   for (const rid of rids) {
     const run = memoryRuns.get(rid);
     if (run) {
@@ -244,25 +245,33 @@ export async function storedRuns(
   }
   const rows = await withDatabase(
     (sql) => sql<
-      { rid: string; service_date: string; toc: string; calls: string }[]
+      {
+        rid: string;
+        service_date: string;
+        toc: string;
+        calls: string;
+        reasons: string;
+      }[]
     >`
-      select rid, service_date::text as service_date, toc, calls
+      select rid, service_date::text as service_date, toc, calls, reasons
       from hsp_backlog_runs where rid in ${sql([...missing])}
     `,
   );
   for (const row of rows ?? []) {
+    const calls = decodeCalls(row.calls);
     found.set(row.rid, {
       rid: row.rid,
       serviceDate: row.service_date,
       uid: "",
       toc: row.toc,
-      calls: decodeCalls(row.calls),
+      calls,
+      reasons: decodeReasons(row.reasons, calls.length),
     });
   }
   return found;
 }
 
-export async function saveRuns(runs: readonly DarwinRun[]): Promise<void> {
+export async function saveRuns(runs: readonly HspRun[]): Promise<void> {
   if (runs.length === 0) {
     return;
   }
@@ -274,10 +283,11 @@ export async function saveRuns(runs: readonly DarwinRun[]): Promise<void> {
     service_date: run.serviceDate,
     toc: run.toc,
     calls: encodeCalls(run.calls),
+    reasons: encodeReasons(run.reasons),
   }));
   await withDatabase(
     (sql) => sql`
-      insert into hsp_backlog_runs ${sql(rows, "rid", "service_date", "toc", "calls")}
+      insert into hsp_backlog_runs ${sql(rows, "rid", "service_date", "toc", "calls", "reasons")}
       on conflict (rid) do nothing
     `,
   );
