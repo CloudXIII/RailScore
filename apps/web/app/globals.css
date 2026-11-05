@@ -22,6 +22,9 @@
   --warning-bg: #fff4d6;
   --danger: #8a1c12;
   --danger-bg: #fbe5e2;
+  --score-good: #00703c;
+  --score-fair: #8a5a00;
+  --score-poor: #a3261b;
   --on-time-bg: #8fceab;
   --on-time-ink: #0b3d24;
   --late-bg: #ffd15c;
@@ -56,6 +59,9 @@
   --warning-bg: #3a2a10;
   --danger: #ff8a80;
   --danger-bg: #4a1a18;
+  --score-good: #5fd18f;
+  --score-fair: #ffd27a;
+  --score-poor: #ff8a80;
   --on-time-bg: #1e6b42;
   --on-time-ink: #d8f5e6;
   --late-bg: #6f5010;
@@ -769,6 +775,18 @@ legend {
   font-weight: 700;
   line-height: 1.15;
   font-variant-numeric: tabular-nums;
+}
+
+.tier-good {
+  color: var(--score-good);
+}
+
+.tier-fair {
+  color: var(--score-fair);
+}
+
+.tier-poor {
+  color: var(--score-poor);
 }
 
 .on-time-label {

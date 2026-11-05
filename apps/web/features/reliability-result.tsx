@@ -5,6 +5,7 @@ import {
   formatDate,
   formatDuration,
   operatorName,
+  scoreTier,
   serviceDayNote,
   throughServiceLabel,
 } from "@/features/format";
@@ -14,7 +15,6 @@ import {
   scheduleNotes,
   usualDays,
 } from "@/features/timetable-changes";
-import type { DayTypeResult } from "@/server/day-split";
 import { stationName, type Station } from "@/server/stations";
 import type { ScheduledService } from "@/server/services/map";
 
@@ -24,7 +24,6 @@ export function ReliabilityResultView({
   toCrs,
   period,
   result,
-  byDay,
   stations,
   days,
   sample = false,
@@ -36,7 +35,6 @@ export function ReliabilityResultView({
   toCrs: string;
   period: { from: string; to: string };
   result: ReliabilityResult;
-  byDay: readonly DayTypeResult[];
   stations: readonly Station[];
   days: DayFilter;
   sample?: boolean;
@@ -83,9 +81,6 @@ export function ReliabilityResultView({
             <p className="meta backlog-progress" role="status">
               {progress}
             </p>
-          ) : null}
-          {!pending && days === "all" && byDay.length >= 2 ? (
-            <DayTypeTable byDay={byDay} />
           ) : null}
           {notes.length > 0 ? (
             <ul className="included-times">
@@ -158,7 +153,7 @@ function Distribution({ result }: { result: ReliabilityResult }) {
       band: "severe",
     },
     {
-      label: "Cancelled or did not arrive",
+      label: "Cancelled or did not reach your destination",
       count: distribution.cancelled,
       band: "cancelled",
     },
@@ -189,39 +184,6 @@ function Distribution({ result }: { result: ReliabilityResult }) {
   );
 }
 
-const DAY_TYPE_LABELS: Record<DayTypeResult["day"], string> = {
-  weekdays: "Weekdays",
-  saturday: "Saturdays",
-  sunday: "Sundays",
-};
-
-function DayTypeTable({ byDay }: { byDay: readonly DayTypeResult[] }) {
-  return (
-    <table className="distribution">
-      <caption>Early or within 5 minutes</caption>
-      <tbody>
-        {byDay.map(({ day, result }) => {
-          const within = result.withinFiveMinutes;
-          return (
-            <tr key={day}>
-              <th scope="row">
-                {DAY_TYPE_LABELS[day]}
-                <span className="meta">
-                  {" "}
-                  · {within.total} {within.total === 1 ? "journey" : "journeys"}
-                </span>
-              </th>
-              <td className="distribution-count">
-                {within.percentage === null ? "–" : `${within.percentage}%`}
-              </td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
-  );
-}
-
 function Headline({
   result,
   period,
@@ -235,7 +197,9 @@ function Headline({
   return (
     <div className="headline">
       {within.percentage !== null ? (
-        <p className="headline-value">{within.percentage}%</p>
+        <p className={`headline-value tier-${scoreTier(within.percentage)}`}>
+          {within.percentage}%
+        </p>
       ) : null}
       <p className="verdict">{punctualitySentence(result)}</p>
       <p className="meta">{sampleLine(result, period, days)}</p>
