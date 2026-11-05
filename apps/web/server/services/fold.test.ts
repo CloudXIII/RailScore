@@ -1,11 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { lastRunDate, listServices } from "./fold";
 import {
-  lastRunDate,
-  listServices,
   matchesServiceKey,
   serviceKey,
   type ScheduledService,
-} from "./fold";
+} from "@/shared/scheduled-service";
 import type { ServiceDay } from "@/shared/day-type";
 
 /** The list's folding alone: a period end so early that no train is set apart as retired. */

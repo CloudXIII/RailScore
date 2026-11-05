@@ -1,4 +1,4 @@
-import type { ParsedQuery } from "@/server/query";
+import type { ParsedQuery } from "@/shared/search-query";
 
 /** The train list for this search, without a chosen service. */
 export function listHref(

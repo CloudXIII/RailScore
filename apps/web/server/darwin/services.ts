@@ -7,7 +7,8 @@ import {
   type PunctualityTally,
 } from "@railscore/core";
 import { dayTypeOf, dayTypesOf, type DayPattern } from "@/shared/day-type";
-import { listServices, type ScheduledService } from "../services/fold";
+import { listServices } from "../services/fold";
+import { type ScheduledService } from "@/shared/scheduled-service";
 import { historicalRunFromDarwin, type DarwinRun } from "./run";
 
 export type DarwinSearch = {

@@ -5,7 +5,7 @@ import { darwinSource } from "./darwin/source";
 import { usesMockData } from "./env";
 import { mockSource } from "./mock/source";
 import type { DateSpan } from "./periods";
-import type { ScheduledService } from "./services/fold";
+import type { ScheduledService } from "@/shared/scheduled-service";
 
 /**
  * Where the trains and their runs come from: Darwin's import in Postgres, or made-up

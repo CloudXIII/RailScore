@@ -2,7 +2,8 @@ import "server-only";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { MissingEnvironmentError, stationsFeed } from "./env";
-import { parseStationFeed, type Station } from "./stations";
+import { parseStationFeed } from "@/server/station-feed";
+import { type Station } from "@/shared/stations";
 
 const MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const cachePath = path.join(process.cwd(), ".data", "stations.json");

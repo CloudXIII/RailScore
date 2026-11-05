@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { departureWindowHint, timeSearchLabel } from "@/features/format";
 import { keepFieldInView } from "@/features/keep-field-in-view";
-import type { ParsedQuery } from "@/server/query";
-import type { Station } from "@/server/stations";
+import type { ParsedQuery } from "@/shared/search-query";
+import type { Station } from "@/shared/stations";
 import { StationField } from "@/features/station-field";
 
 const DAY_OPTIONS = [
