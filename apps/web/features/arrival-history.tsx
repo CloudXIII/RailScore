@@ -56,10 +56,10 @@ export function ArrivalHistory({
     ? `Adding journeys before ${before}…`
     : backlog && !figures.complete
       ? state?.done
-        ? `${state.runs.length} of ${backlog.runCount} days before ${before} are on the calendar. The figures count them all.`
+        ? `${state.runs.length} of ${backlog.runCount} days before ${before} are on the calendar. The figures count them all. The rest could not be fetched just now: the data provider is busy. Reload in a few minutes to add them.`
         : `Filling in the calendar: ${state?.runs.length ?? 0} of ${backlog.runCount} days before ${before}…`
       : state?.missing.has(key)
-        ? `Journeys before ${before} could not be loaded, so they are left out.`
+        ? `Journeys before ${before} could not be loaded just now (the data provider is busy), so they are left out. Reload in a few minutes to try again.`
         : undefined;
   return (
     <ReliabilityResultView
