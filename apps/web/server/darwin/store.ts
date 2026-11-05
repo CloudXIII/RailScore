@@ -168,15 +168,24 @@ type RunRow = {
 };
 
 function runOf(row: RunRow): DarwinRun {
-  return {
+  return withFoldedCalls({
     rid: row.rid,
     serviceDate: row.service_date,
     uid: row.uid,
     toc: row.toc,
-    calls: foldRepeatedCalls(decodeCalls(row.calls)),
+    calls: decodeCalls(row.calls),
     ...(row.late_reason ? { lateReason: row.late_reason } : {}),
     ...(row.cancel_reason ? { cancelReason: row.cancel_reason } : {}),
-  };
+  });
+}
+
+/**
+ * Runs stored before `mergeUpdate` matched a call by one public time can hold a repeated last
+ * stop, so every read folds it. `scripts/fold-repeated-calls.ts` folds the stored rows once;
+ * when every database has been through it, this fold can go.
+ */
+function withFoldedCalls(run: DarwinRun): DarwinRun {
+  return { ...run, calls: foldRepeatedCalls(run.calls) };
 }
 
 /**
@@ -222,7 +231,8 @@ export async function runsOfTrains(
   ]);
   const runs = new Map<string, DarwinRun>();
   for (const row of months) {
-    for (const run of decodeMonth(row.month, row.uid, row.runs)) {
+    for (const packed of decodeMonth(row.month, row.uid, row.runs)) {
+      const run = withFoldedCalls(packed);
       if (
         run.serviceDate >= input.fromDate &&
         run.serviceDate <= input.toDate
