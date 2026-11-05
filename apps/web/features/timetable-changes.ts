@@ -5,7 +5,7 @@ import {
   SAME_TRAIN_MINUTES,
   type ScheduledService,
   type ServiceVariant,
-} from "@/server/services/map";
+} from "@/server/services/fold";
 
 /** An arrival this far from the usual one is worth naming. Smaller differences stay quiet. */
 const NOTABLE_ARRIVAL_MINUTES = 15;

@@ -6,7 +6,7 @@ import type { DateSpan } from "./hsp/period";
 import { usesMockData } from "./env";
 import { mockServices, shiftClock } from "./mock/catalogue";
 import type { DayPattern } from "./day-type";
-import type { ScheduledService } from "./services/map";
+import type { ScheduledService } from "./services/fold";
 
 type ServiceSearch = {
   services: ScheduledService[];

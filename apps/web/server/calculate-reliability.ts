@@ -9,7 +9,7 @@ import {
 import { historicalRunFromDarwin, type DarwinRun } from "./darwin/run";
 import { usesMockData } from "./env";
 import { mockRuns } from "./mock/catalogue";
-import { matchesServiceKey, type ScheduledService } from "./services/map";
+import { matchesServiceKey, type ScheduledService } from "./services/fold";
 
 type ServiceCalculation = {
   readonly result: ReliabilityResult;

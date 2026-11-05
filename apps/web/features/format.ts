@@ -5,7 +5,7 @@ import {
   type DayPattern,
   type ServiceDay,
 } from "@/server/day-type";
-import type { ListPunctuality, ScheduledService } from "@/server/services/map";
+import type { ListPunctuality, ScheduledService } from "@/server/services/fold";
 
 export const DAY_LABELS: Record<ServiceDay, string> = {
   weekdays: "Weekdays",

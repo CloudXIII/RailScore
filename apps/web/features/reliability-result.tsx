@@ -17,7 +17,7 @@ import {
   usualDays,
 } from "@/features/timetable-changes";
 import { stationName, type Station } from "@/server/stations";
-import type { ScheduledService } from "@/server/services/map";
+import type { ScheduledService } from "@/server/services/fold";
 
 export function ReliabilityResultView({
   service,
