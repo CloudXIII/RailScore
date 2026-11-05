@@ -120,10 +120,19 @@ export function listScore(
 }
 
 /** How a listed or headline on-time share reads at a glance. */
-export type ScoreTier = "good" | "fair" | "poor";
+export type ScoreTier = "good" | "fair" | "poor" | "few";
 
-/** 90% or more is good, 75% or more is fair. The figure stays on screen: colour is never the only signal. */
-export function scoreTier(percent: number): ScoreTier {
+/** Below this many journeys an on-time share is shown without a verdict colour. */
+export const FEW_JOURNEYS = 5;
+
+/**
+ * 90% or more is good, 75% or more is fair. Fewer than five journeys get no colour: 100% of one
+ * journey says little. The figure stays on screen: colour is never the only signal.
+ */
+export function scoreTier(percent: number, journeys: number): ScoreTier {
+  if (journeys < FEW_JOURNEYS) {
+    return "few";
+  }
   return percent >= 90 ? "good" : percent >= 75 ? "fair" : "poor";
 }
 
@@ -132,10 +141,15 @@ const SEVERE_WARNING_SHARE = 0.1;
 
 /**
  * The warning under a listed train. Empty unless at least one journey in ten was cancelled
- * or 30 or more minutes late, so a single bad day does not mark every row.
+ * or 30 or more minutes late, so a single bad day does not mark every row, and empty below
+ * five journeys, like the score's colour.
  */
 export function formatSevereJourneys(count: number, runs: number): string {
-  if (count <= 0 || runs <= 0 || count / runs < SEVERE_WARNING_SHARE) {
+  if (
+    count <= 0 ||
+    runs < FEW_JOURNEYS ||
+    count / runs < SEVERE_WARNING_SHARE
+  ) {
     return "";
   }
   return `${count} of ${runs} journeys cancelled or over 30 minutes late`;
@@ -181,7 +195,7 @@ function joinLabels(labels: readonly string[]): string {
 
 /** Collapsed search summary. */
 export function timeSearchLabel(time: string): string {
-  return `Departing from ${time}`;
+  return `${time} onwards`;
 }
 
 /** Help under the time field. */
@@ -209,25 +223,23 @@ export function trainListHeading(
 }
 
 /**
- * The sentence under the list heading. Names the period, then what on time means.
- * Before a full period of runs is stored, it names the days recorded so far.
+ * The sentence above the train list: what on time means. The summary above names the period,
+ * so it is repeated only when the runs recorded so far cover less of it.
  */
 export function listIntro(input: {
   periodDays: number;
   /** Dates the listed runs cover. */
   listed?: { from: string; to: string };
-  sample: boolean;
 }): string {
   const meaning = "On time means no more than 5 minutes late.";
-  if (input.sample) {
-    return `Sample trains for trying the screens. ${meaning}`;
-  }
   const listed = input.listed;
-  const window =
-    listed && listed.from > addCalendarDays(listed.to, 1 - input.periodDays)
-      ? `since ${formatDate(listed.from)}, the first day recorded`
-      : `over the last ${input.periodDays} days`;
-  return `Arrivals ${window}. ${meaning}`;
+  if (
+    listed &&
+    listed.from > addCalendarDays(listed.to, 1 - input.periodDays)
+  ) {
+    return `Arrivals since ${formatDate(listed.from)}, the first day recorded. ${meaning}`;
+  }
+  return meaning;
 }
 
 export function formatClock(hhmm: string): string {

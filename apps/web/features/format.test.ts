@@ -23,32 +23,25 @@ describe("train list copy", () => {
       listIntro({
         periodDays: 30,
         listed: { from: "2026-09-19", to: "2026-10-18" },
-        sample: false,
       }),
-    ).toBe(
-      "Arrivals over the last 30 days. On time means no more than 5 minutes late.",
-    );
+    ).toBe("On time means no more than 5 minutes late.");
     expect(
       listIntro({
         periodDays: 30,
         listed: { from: "2026-10-12", to: "2026-10-18" },
-        sample: false,
       }),
     ).toBe(
       "Arrivals since 12/10/2026, the first day recorded. On time means no more than 5 minutes late.",
     );
-    expect(listIntro({ periodDays: 30, sample: false })).toBe(
-      "Arrivals over the last 30 days. On time means no more than 5 minutes late.",
-    );
-    expect(listIntro({ periodDays: 30, sample: true })).toBe(
-      "Sample trains for trying the screens. On time means no more than 5 minutes late.",
+    expect(listIntro({ periodDays: 30 })).toBe(
+      "On time means no more than 5 minutes late.",
     );
   });
 });
 
 describe("departure time copy", () => {
   it("names the start time in the collapsed summary and the field hint", () => {
-    expect(timeSearchLabel("07:30")).toBe("Departing from 07:30");
+    expect(timeSearchLabel("07:30")).toBe("07:30 onwards");
     expect(departureWindowHint()).toBe(
       "Shows the next direct trains from this time. Journeys with a change are not included.",
     );
@@ -57,12 +50,18 @@ describe("departure time copy", () => {
 
 describe("scoreTier", () => {
   it("reads 90 and above as good, 75 and above as fair", () => {
-    expect(scoreTier(100)).toBe("good");
-    expect(scoreTier(90)).toBe("good");
-    expect(scoreTier(89)).toBe("fair");
-    expect(scoreTier(75)).toBe("fair");
-    expect(scoreTier(74)).toBe("poor");
-    expect(scoreTier(0)).toBe("poor");
+    expect(scoreTier(100, 20)).toBe("good");
+    expect(scoreTier(90, 20)).toBe("good");
+    expect(scoreTier(89, 20)).toBe("fair");
+    expect(scoreTier(75, 20)).toBe("fair");
+    expect(scoreTier(74, 20)).toBe("poor");
+    expect(scoreTier(0, 20)).toBe("poor");
+  });
+
+  it("gives no verdict to fewer than five journeys", () => {
+    expect(scoreTier(100, 1)).toBe("few");
+    expect(scoreTier(0, 4)).toBe("few");
+    expect(scoreTier(100, 5)).toBe("good");
   });
 });
 
@@ -93,6 +92,14 @@ describe("listScore", () => {
       }),
     ).toEqual({ onTimePercent: 99, severe: 0, runs: 300 });
     expect(formatSevereJourneys(0, 300)).toBe("");
+  });
+
+  it("says nothing about fewer than five journeys", () => {
+    expect(formatSevereJourneys(1, 1)).toBe("");
+    expect(formatSevereJourneys(4, 4)).toBe("");
+    expect(formatSevereJourneys(5, 5)).toBe(
+      "5 of 5 journeys cancelled or over 30 minutes late",
+    );
   });
 
   it("is empty without a count or without journeys", () => {

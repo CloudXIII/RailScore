@@ -77,27 +77,25 @@ export function DayCalendar({
           </table>
         ))}
       </div>
-      <ul className="day-legend">
-        <LegendItem swatch="day-on-time" label="Early or within 5 min" />
-        <LegendItem swatch="day-late" label="6–14 min late" />
-        <LegendItem swatch="day-later" label="15–29 min late" />
-        <LegendItem swatch="day-severe" label="30+ min late" />
-        <LegendItem
-          swatch="day-cancelled"
-          label="Cancelled or did not reach your destination"
-        />
-        {showMissing ? (
-          <LegendItem swatch="day-missing" label="No data" />
-        ) : null}
-        {showEmpty ? <LegendItem swatch="day-empty" label="No train" /> : null}
-        {footnotes.marks.map((mark) => (
-          <LegendItem
-            key={mark.number}
-            note={`*${mark.number}`}
-            label={`${formatClock(mark.publicDeparture)}–${formatClock(mark.publicArrival)}`}
-          />
-        ))}
-      </ul>
+      {/* The colours of the outcomes are keyed by the distribution above the calendar.
+          Only what it does not show is listed here. */}
+      {showMissing || showEmpty || footnotes.marks.length > 0 ? (
+        <ul className="day-legend">
+          {showMissing ? (
+            <LegendItem swatch="day-missing" label="No data" />
+          ) : null}
+          {showEmpty ? (
+            <LegendItem swatch="day-empty" label="No train" />
+          ) : null}
+          {footnotes.marks.map((mark) => (
+            <LegendItem
+              key={mark.number}
+              note={`*${mark.number}`}
+              label={`${formatClock(mark.publicDeparture)}–${formatClock(mark.publicArrival)}`}
+            />
+          ))}
+        </ul>
+      ) : null}
     </figure>
   );
 }

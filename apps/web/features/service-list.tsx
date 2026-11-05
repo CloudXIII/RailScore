@@ -37,7 +37,6 @@ export function ServiceList({
   earlier,
   later,
   stations,
-  sample = false,
 }: {
   query: ParsedQuery;
   services: readonly ScheduledService[];
@@ -49,7 +48,6 @@ export function ServiceList({
   /** HHMM time that lists the trains after these. None at the end of the day. */
   later?: string;
   stations: readonly Station[];
-  sample?: boolean;
 }) {
   const [pending, setPending] = useState(false);
   const [chosen, setChosen] = useState(() => {
@@ -71,6 +69,12 @@ export function ServiceList({
   const from = query.from;
   const to = query.to;
   const backlog = useBacklogState();
+  const waiting = (service: ScheduledService) =>
+    backlog !== undefined &&
+    !backlog.done &&
+    services.includes(service) &&
+    !backlog.trains.has(serviceKey(service));
+  const loading = services.some(waiting);
   const row = (service: ScheduledService) => (
     <ServiceRow
       key={serviceKey(service)}
@@ -80,12 +84,7 @@ export function ServiceList({
       )}
       searched={query.days}
       backlog={backlog?.trains.get(serviceKey(service))}
-      waiting={
-        backlog !== undefined &&
-        !backlog.done &&
-        services.includes(service) &&
-        !backlog.trains.has(serviceKey(service))
-      }
+      waiting={waiting(service)}
       chosen={chosen === serviceKey(service)}
       onChoose={() => setChosen(serviceKey(service))}
     />
@@ -116,9 +115,17 @@ export function ServiceList({
         {listIntro({
           periodDays: query.period,
           listed,
-          sample,
         })}
       </p>
+      {/* One line for the whole list. The rows keep only a placeholder for their figure. */}
+      {loading ? (
+        <p className="meta" role="status">
+          Loading older journeys…
+          {backlog?.busy
+            ? " The data provider is busy, so this may take a few minutes."
+            : ""}
+        </p>
+      ) : null}
       {earlier ? (
         <TimeShift
           href={listHref(query, formatClock(earlier))}
@@ -218,16 +225,16 @@ function ServiceRow({
       {score ? (
         <span className="service-score">
           <span
-            className={`on-time-value tier-${scoreTier(score.onTimePercent)}`}
+            className={`on-time-value tier-${scoreTier(score.onTimePercent, score.runs)}`}
           >
             {score.onTimePercent}%
           </span>
           <span className="on-time-label">on time</span>
         </span>
       ) : waiting ? (
-        <span className="service-score service-score-waiting" role="status">
+        <span className="service-score service-score-waiting">
           <span className="score-placeholder" aria-hidden="true" />
-          <span className="meta">Loading earlier journeys…</span>
+          <span className="visually-hidden">On-time share loading</span>
         </span>
       ) : null}
       {severe ? <span className="service-severe">{severe}</span> : null}
