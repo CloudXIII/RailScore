@@ -1,5 +1,6 @@
 import { addCalendarDays, type CalendarMark } from "@railscore/core";
 import { formatClock } from "@/features/format";
+import type { DayPattern } from "@/server/day-type";
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 
@@ -22,12 +23,10 @@ export type DayMonth = {
 };
 
 /** One month block, laid out like a calendar: weekdays across the top and weeks down the page. */
-export type DayFilter = "weekdays" | "saturday" | "sunday" | "all";
-
 export function calendarMonths(
   period: { from: string; to: string },
   marks: readonly CalendarMark[],
-  days: DayFilter = "all",
+  days: DayPattern = "all",
 ): DayMonth[] {
   const byDate = new Map(marks.map((mark) => [mark.serviceDate, mark]));
   const months: DayMonth[] = [];
@@ -76,7 +75,7 @@ function cellFor(
   date: string,
   month: string,
   period: { from: string; to: string },
-  days: DayFilter,
+  days: DayPattern,
   byDate: Map<string, CalendarMark>,
 ): DayCell {
   if (
@@ -91,7 +90,7 @@ function cellFor(
   return mark ? { kind: "run", date, mark } : { kind: "empty", date };
 }
 
-function matchesDays(iso: string, days: DayFilter): boolean {
+function matchesDays(iso: string, days: DayPattern): boolean {
   const index = weekdayIndex(iso);
   if (days === "weekdays") {
     return index < 5;

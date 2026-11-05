@@ -1,17 +1,17 @@
 import { addCalendarDays, counted, journeyMinutes } from "@railscore/core";
-import type {
-  ListPunctuality,
-  ScheduledService,
-  ServiceDay,
-} from "@/server/services/map";
+import {
+  DAY_TYPES,
+  dayTypesOf,
+  type DayPattern,
+  type ServiceDay,
+} from "@/server/day-type";
+import type { ListPunctuality, ScheduledService } from "@/server/services/map";
 
 export const DAY_LABELS: Record<ServiceDay, string> = {
   weekdays: "Weekdays",
   saturday: "Saturdays",
   sunday: "Sundays",
 };
-
-const DAY_ORDER: readonly ServiceDay[] = ["weekdays", "saturday", "sunday"];
 
 const OPERATORS: Record<string, string> = {
   AW: "Transport for Wales",
@@ -53,10 +53,10 @@ export function operatorName(code: string): string {
  */
 export function serviceDayNote(
   days: readonly ServiceDay[],
-  searched: ServiceDay | "all",
+  searched: DayPattern,
 ): string {
-  const present = DAY_ORDER.filter((day) => days.includes(day));
-  const searchedDays = searched === "all" ? DAY_ORDER : [searched];
+  const present = DAY_TYPES.filter((day) => days.includes(day));
+  const searchedDays = dayTypesOf(searched);
   const repeatsSearch =
     present.length === searchedDays.length &&
     present.every((day) => searchedDays.includes(day));
@@ -71,13 +71,13 @@ export function formatServiceFacts(
   /** Undefined while the count is still loading: the days alone are shown. */
   runCount: number | undefined,
   days: readonly ServiceDay[],
-  searched?: ServiceDay | "all",
+  searched?: DayPattern,
 ): string {
   const journeys =
     runCount === undefined
       ? ""
       : `${runCount} ${runCount === 1 ? "journey" : "journeys"}`;
-  const labels = DAY_ORDER.filter((day) => days.includes(day)).map(
+  const labels = DAY_TYPES.filter((day) => days.includes(day)).map(
     (day) => DAY_LABELS[day],
   );
   const note = searched
@@ -120,10 +120,19 @@ export function listScore(
 }
 
 /** How a listed or headline on-time share reads at a glance. */
-export type ScoreTier = "good" | "fair" | "poor";
+export type ScoreTier = "good" | "fair" | "poor" | "few";
 
-/** 90% or more is good, 75% or more is fair. The figure stays on screen: colour is never the only signal. */
-export function scoreTier(percent: number): ScoreTier {
+/** Below this many journeys an on-time share is shown without a verdict colour. */
+export const FEW_JOURNEYS = 5;
+
+/**
+ * 90% or more is good, 75% or more is fair. Fewer than five journeys get no colour: 100% of one
+ * journey says little. The figure stays on screen: colour is never the only signal.
+ */
+export function scoreTier(percent: number, journeys: number): ScoreTier {
+  if (journeys < FEW_JOURNEYS) {
+    return "few";
+  }
   return percent >= 90 ? "good" : percent >= 75 ? "fair" : "poor";
 }
 
@@ -132,10 +141,15 @@ const SEVERE_WARNING_SHARE = 0.1;
 
 /**
  * The warning under a listed train. Empty unless at least one journey in ten was cancelled
- * or 30 or more minutes late, so a single bad day does not mark every row.
+ * or 30 or more minutes late, so a single bad day does not mark every row, and empty below
+ * five journeys, like the score's colour.
  */
 export function formatSevereJourneys(count: number, runs: number): string {
-  if (count <= 0 || runs <= 0 || count / runs < SEVERE_WARNING_SHARE) {
+  if (
+    count <= 0 ||
+    runs < FEW_JOURNEYS ||
+    count / runs < SEVERE_WARNING_SHARE
+  ) {
     return "";
   }
   return `${count} of ${runs} journeys cancelled or over 30 minutes late`;
@@ -181,7 +195,7 @@ function joinLabels(labels: readonly string[]): string {
 
 /** Collapsed search summary. */
 export function timeSearchLabel(time: string): string {
-  return `Departing from ${time}`;
+  return `${time} onwards`;
 }
 
 /** Help under the time field. */
@@ -209,43 +223,27 @@ export function trainListHeading(
 }
 
 /**
- * The sentence under the list heading. Names the period, then what on time means.
- * Before a full period of runs is stored, it names the days recorded so far.
+ * The sentence above the train list: what on time means. The summary above names the period,
+ * so it is repeated only when the runs recorded so far cover less of it.
  */
 export function listIntro(input: {
   periodDays: number;
   /** Dates the listed runs cover. */
   listed?: { from: string; to: string };
-  sample: boolean;
 }): string {
   const meaning = "On time means no more than 5 minutes late.";
-  if (input.sample) {
-    return `Sample trains for trying the screens. ${meaning}`;
-  }
   const listed = input.listed;
-  const window =
-    listed && listed.from > addCalendarDays(listed.to, 1 - input.periodDays)
-      ? `since ${formatDate(listed.from)}, the first day recorded`
-      : `over the last ${input.periodDays} days`;
-  return `Arrivals ${window}. ${meaning}`;
+  if (
+    listed &&
+    listed.from > addCalendarDays(listed.to, 1 - input.periodDays)
+  ) {
+    return `Arrivals since ${formatDate(listed.from)}, the first day recorded. ${meaning}`;
+  }
+  return meaning;
 }
 
 export function formatClock(hhmm: string): string {
   return `${hhmm.slice(0, 2)}:${hhmm.slice(2, 4)}`;
-}
-
-/** Moves an `HH:MM` time by whole minutes, wrapping at midnight. */
-export function shiftTime(time: string, deltaMinutes: number): string {
-  const match = /^(\d{2}):(\d{2})$/.exec(time);
-  if (!match) {
-    return time;
-  }
-  const minutes = Number(match[1]) * 60 + Number(match[2]);
-  const wrapped =
-    (((minutes + deltaMinutes) % (24 * 60)) + 24 * 60) % (24 * 60);
-  const hours = Math.floor(wrapped / 60);
-  const mins = wrapped % 60;
-  return `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}`;
 }
 
 /** Journey length between two public HHMM times; an arrival before departure crosses midnight. */

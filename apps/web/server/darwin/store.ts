@@ -3,7 +3,13 @@ import type { Sql } from "postgres";
 import { addCalendarDays, londonIsoDate } from "@railscore/core";
 import { decodeMonth, encodeMonthChunk, monthOf } from "./month";
 import type { DarwinUpdate } from "./push-port";
-import { decodeCalls, encodeCalls, mergeUpdate, type DarwinRun } from "./run";
+import {
+  decodeCalls,
+  encodeCalls,
+  foldRepeatedCalls,
+  mergeUpdate,
+  type DarwinRun,
+} from "./run";
 
 /** Rows per statement. Postgres takes at most 65,535 parameters, seven per row here. */
 const WRITE_ROWS = 2_000;
@@ -15,7 +21,7 @@ const MONTH_ROWS = 500;
  * Days kept as one row per run: today and the 7 before it, so the latest day of every day type
  * is there for a search to start from. Older days are packed into `darwin_months`.
  */
-export const OPEN_DAYS = 8;
+const OPEN_DAYS = 8;
 
 /** First day still kept as one row per run. Earlier days are packed and no longer change. */
 export function openFrom(now: Date): string {
@@ -237,7 +243,7 @@ function runOf(row: RunRow): DarwinRun {
     serviceDate: row.service_date,
     uid: row.uid,
     toc: row.toc,
-    calls: decodeCalls(row.calls),
+    calls: foldRepeatedCalls(decodeCalls(row.calls)),
     ...(row.late_reason ? { lateReason: row.late_reason } : {}),
     ...(row.cancel_reason ? { cancelReason: row.cancel_reason } : {}),
   };

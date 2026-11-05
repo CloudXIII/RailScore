@@ -92,7 +92,7 @@ npm test
 npm run build -w @railscore/web
 ```
 
-Formatting is `npm run format`. There is no `lint` script.
+Formatting is `npm run format`. `npm run lint` runs ESLint with Next's rules, React hooks included. `npm run knip` lists unused files, exports and dependencies. CI runs all three.
 
 ## Deployment
 
@@ -146,7 +146,7 @@ Until Darwin covers the whole period (30 days from about 4 December 2026, 90 day
 
 - **List figures.** One `serviceMetrics` call per quarter-hour the listed trains leave in (and per day type), for the dates from the start of the period to 3 November, with tolerances of 5, 14, 29 and 999 minutes. HSP trains join the listed train with the same operator, origin, departure from the boarding station and destination (or the one listed train with the same operator, departure and destination), and their counts are added to Darwin's. A row shows a placeholder until its quarter-hours are in.
 - **Arrival history.** The figures come from those counts at once. The calendar then fills from `serviceDetails`, one run at a time, newest first. A run is stored in `hsp_backlog_runs` in the `darwin_runs` text form and classified by the same rules, except that a run HSP recorded with no actual time anywhere is cancelled (for Darwin it only means no movement was seen). Once every run is in, the figures come from the runs.
-- **Pacing.** HSP refuses a third call in flight, list or detail alike, so every server shares two slots in `hsp_slots`: a list call holds one for its call, a history holds one for its whole run of detail calls, retrying a refused one after about 300 ms. Two searches of the same quarter-hour share one call through a claim on its `hsp_metrics` row. Calls are counted once per answer in `hsp_usage`.
+- **Pacing.** At busy times HSP refuses a second call beside a list call, list or detail alike, so every server shares one slot in `hsp_slots`: one HSP call at a time. A list call holds it for its call, and a history holds it for its whole run of detail calls, asking a refused one again after 300 ms, then longer, up to 2 s. Two searches of the same quarter-hour share one call through a claim on its `hsp_metrics` row. Calls are counted once per answer in `hsp_usage`.
 - **Storage.** List answers depend on the day the period starts, so they are deleted after two days by the Darwin import. Runs never change, so a second visit makes no HSP call; they age out with `DARWIN_KEEP_DAYS`. A run is about 0.6 KB.
 
 If HSP is down or refuses after its retries, the trains keep Darwin's figures and the history says the earlier journeys could not be loaded.
@@ -182,12 +182,12 @@ The destination is the first call there after boarding, and boarding is the last
 
 `packages/core` then counts, with no I/O:
 
-- Within 5 minutes includes early arrivals. Cancelled and did-not-call runs count as not on time and in the cancellation figure. Both figures use that same total.
+- Within 5 minutes includes early arrivals. Cancelled and did-not-call runs count as not on time and in the cancelled band. The share uses every run with a known outcome.
 - Bands are within 5, 6–14, 15–29, 30 or more, and cancelled.
-- The longest delay is the latest arrival that is more than 5 minutes late, with its date when known.
 - Percentages are whole numbers. A non-zero count is not shown as 0%, and a count short of the total is not shown as 100%.
-- Below 20 runs with a known outcome, the page warns and still shows the figures.
 - There is no average and no composite score.
+
+Below 5 runs with a known outcome, the page says there are too few journeys, still shows the figures, and gives the on-time share no colour.
 
 "All days" lists weekday, Saturday and Sunday trains together. Departing after a time covers that minute and the following 59. The period ends yesterday in `Europe/London`.
 

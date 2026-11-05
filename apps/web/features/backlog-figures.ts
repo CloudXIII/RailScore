@@ -5,9 +5,9 @@ import {
   type ReliabilityResult,
 } from "@railscore/core";
 import { formatDate } from "@/features/format";
-import { reliabilityByDayType, type DayTypeResult } from "@/server/day-split";
 import type { HspCounts } from "@/server/hsp/metrics";
-import type { ListPunctuality, ServiceDay } from "@/server/services/map";
+import type { ServiceDay } from "@/server/day-type";
+import type { ListPunctuality } from "@/server/services/map";
 
 /** What HSP has said so far about one train's days before Darwin. */
 export type TrainBacklog = {
@@ -93,7 +93,6 @@ export function runsFromCounts(byDay: TrainBacklog["byDay"]): HistoricalRun[] {
 
 export type HistoryFigures = {
   readonly result: ReliabilityResult;
-  readonly byDay: readonly DayTypeResult[];
   /** True once every HSP run has been fetched and the figures come from the runs alone. */
   readonly complete: boolean;
 };
@@ -112,7 +111,6 @@ export function historyFigures(input: {
   if (!input.backlog || input.hspRuns.length >= input.backlog.runCount) {
     return {
       result: calculateReliability(fetched),
-      byDay: reliabilityByDayType(fetched),
       complete: true,
     };
   }
@@ -122,7 +120,6 @@ export function historyFigures(input: {
       ...calculateReliability(counted),
       calendar: calculateReliability(fetched).calendar,
     },
-    byDay: reliabilityByDayType(counted),
     complete: false,
   };
 }

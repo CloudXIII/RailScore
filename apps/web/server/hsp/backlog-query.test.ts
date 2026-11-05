@@ -36,8 +36,18 @@ describe("parseBacklogQuery", () => {
       key: "1000-1058-NT-LIV-MIA",
       operatorCode: "NT",
       legs: [
-        { originCrs: "LIV", destinationCrs: "MIA", publicDeparture: "1000" },
-        { originCrs: "LIV", destinationCrs: "MAN", publicDeparture: "1002" },
+        {
+          originCrs: "LIV",
+          destinationCrs: "MIA",
+          publicDeparture: "1000",
+          publicArrival: "1058",
+        },
+        {
+          originCrs: "LIV",
+          destinationCrs: "MAN",
+          publicDeparture: "1002",
+          publicArrival: "1050",
+        },
       ],
     });
     expect(parseBacklogQuery(JSON.parse(JSON.stringify(body)))).toEqual(body);

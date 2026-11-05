@@ -1,4 +1,4 @@
-import type { ServiceDay } from "../services/map";
+import type { ServiceDay } from "../day-type";
 import {
   quarterOf,
   quartersOf,

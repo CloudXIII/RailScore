@@ -1,14 +1,12 @@
 export {
   addCalendarDays,
-  DEPARTURE_WINDOW_MINUTES,
-  departureSlices,
-  departureWindows,
+  dateOfRid,
   londonIsoDate,
-  searchClockRange,
   trailingDays,
 } from "./analysis-period";
 export {
   clockMinutes,
+  formatHhmm,
   journeyMinutes,
   minutesApart,
   signedLatenessMinutes,

@@ -4,12 +4,13 @@ import {
   formatClock,
   formatDate,
   formatDuration,
+  FEW_JOURNEYS,
   operatorName,
   scoreTier,
   serviceDayNote,
   throughServiceLabel,
 } from "@/features/format";
-import type { DayFilter } from "@/features/day-grid";
+import type { DayPattern } from "@/server/day-type";
 import {
   notableChanges,
   scheduleNotes,
@@ -26,7 +27,6 @@ export function ReliabilityResultView({
   result,
   stations,
   days,
-  sample = false,
   progress,
   pending = false,
 }: {
@@ -36,11 +36,10 @@ export function ReliabilityResultView({
   period: { from: string; to: string };
   result: ReliabilityResult;
   stations: readonly Station[];
-  days: DayFilter;
-  sample?: boolean;
-  /** How far HSP's earlier journeys have got, while they load. */
+  days: DayPattern;
+  /** How far HSP's older journeys have got, while they load. */
   progress?: string;
-  /** The figures wait for HSP's earlier journeys: a placeholder stands in for them. */
+  /** The figures wait for HSP's older journeys: a placeholder stands in for them. */
   pending?: boolean;
 }) {
   const through = throughServiceLabel(service, fromCrs, toCrs, (crs) =>
@@ -119,12 +118,6 @@ export function ReliabilityResultView({
           />
         </section>
       ) : null}
-      {sample ? (
-        <p className="meta result-calculated">
-          These journeys are sample data for trying the screen. They are not
-          historical performance from Rail Delivery Group.
-        </p>
-      ) : null}
     </div>
   );
 }
@@ -166,7 +159,11 @@ function Distribution({ result }: { result: ReliabilityResult }) {
         {rows.map((row) => (
           <tr key={row.label}>
             <th scope="row">
-              <span className="distribution-label">{row.label}</span>
+              {/* The swatch doubles as the calendar's key: its cells use the same colours. */}
+              <span className="distribution-label">
+                <span className={`swatch day-${row.band}`} aria-hidden="true" />
+                {row.label}
+              </span>
               <span className="distribution-track" aria-hidden="true">
                 <span
                   className={`distribution-bar band-${row.band}`}
@@ -191,13 +188,15 @@ function Headline({
 }: {
   result: ReliabilityResult;
   period: { from: string; to: string };
-  days: DayFilter;
+  days: DayPattern;
 }) {
   const within = result.withinFiveMinutes;
   return (
     <div className="headline">
       {within.percentage !== null ? (
-        <p className={`headline-value tier-${scoreTier(within.percentage)}`}>
+        <p
+          className={`headline-value tier-${scoreTier(within.percentage, within.total)}`}
+        >
           {within.percentage}%
         </p>
       ) : null}
@@ -212,22 +211,25 @@ function punctualitySentence(result: ReliabilityResult): string {
   if (percentage === null) {
     return "There were no journeys with a known outcome, so there is no on-time figure.";
   }
-  return "of these journeys arrived on time.";
+  return "of these journeys arrived on time, no more than 5 minutes late.";
 }
 
 function sampleLine(
   result: ReliabilityResult,
   period: { from: string; to: string },
-  days: DayFilter,
+  days: DayPattern,
 ): string {
   const known = result.withinFiveMinutes.total;
   const excluded =
     result.excludedCount > 0 ? ` (${result.excludedCount} without data)` : "";
   const journeys = `${known} ${journeyNoun(known, days)}${excluded}`;
-  return `${journeys}, ${formatDate(period.from)} to ${formatDate(period.to)}.`;
+  const line = `${journeys}, ${formatDate(period.from)} to ${formatDate(period.to)}.`;
+  return known > 0 && known < FEW_JOURNEYS
+    ? `${line} Too few journeys to say much yet.`
+    : line;
 }
 
-function journeyNoun(count: number, days: DayFilter): string {
+function journeyNoun(count: number, days: DayPattern): string {
   const journeys = count === 1 ? "journey" : "journeys";
   if (days === "weekdays") {
     return `weekday ${journeys}`;

@@ -5,10 +5,10 @@ import {
   timetableChangeLabel,
   timetableMarks,
   type DayCell,
-  type DayFilter,
 } from "@/features/day-grid";
 import { formatClock } from "@/features/format";
 import type { TimetableChange } from "@/features/timetable-changes";
+import type { DayPattern } from "@/server/day-type";
 
 export function DayCalendar({
   period,
@@ -18,7 +18,7 @@ export function DayCalendar({
 }: {
   period: { from: string; to: string };
   marks: readonly CalendarMark[];
-  days: DayFilter;
+  days: DayPattern;
   changes?: readonly TimetableChange[];
 }) {
   const months = calendarMonths(period, marks, days);
@@ -77,27 +77,25 @@ export function DayCalendar({
           </table>
         ))}
       </div>
-      <ul className="day-legend">
-        <LegendItem swatch="day-on-time" label="Early or within 5 min" />
-        <LegendItem swatch="day-late" label="6–14 min late" />
-        <LegendItem swatch="day-later" label="15–29 min late" />
-        <LegendItem swatch="day-severe" label="30+ min late" />
-        <LegendItem
-          swatch="day-cancelled"
-          label="Cancelled or did not reach your destination"
-        />
-        {showMissing ? (
-          <LegendItem swatch="day-missing" label="No data" />
-        ) : null}
-        {showEmpty ? <LegendItem swatch="day-empty" label="No train" /> : null}
-        {footnotes.marks.map((mark) => (
-          <LegendItem
-            key={mark.number}
-            note={`*${mark.number}`}
-            label={`${formatClock(mark.publicDeparture)}–${formatClock(mark.publicArrival)}`}
-          />
-        ))}
-      </ul>
+      {/* The colours of the outcomes are keyed by the distribution above the calendar.
+          Only what it does not show is listed here. */}
+      {showMissing || showEmpty || footnotes.marks.length > 0 ? (
+        <ul className="day-legend">
+          {showMissing ? (
+            <LegendItem swatch="day-missing" label="No data" />
+          ) : null}
+          {showEmpty ? (
+            <LegendItem swatch="day-empty" label="No train" />
+          ) : null}
+          {footnotes.marks.map((mark) => (
+            <LegendItem
+              key={mark.number}
+              note={`*${mark.number}`}
+              label={`${formatClock(mark.publicDeparture)}–${formatClock(mark.publicArrival)}`}
+            />
+          ))}
+        </ul>
+      ) : null}
     </figure>
   );
 }
@@ -125,7 +123,7 @@ function LegendItem({
   );
 }
 
-function calendarCaption(days: DayFilter): string {
+function calendarCaption(days: DayPattern): string {
   if (days === "weekdays") {
     return "How each weekday went";
   }

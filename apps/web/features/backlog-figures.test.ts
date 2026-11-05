@@ -92,10 +92,6 @@ describe("historyFigures", () => {
       "2026-10-20",
       "2026-11-04",
     ]);
-    expect(figures.byDay.map((day) => day.day)).toEqual([
-      "weekdays",
-      "saturday",
-    ]);
   });
 
   it("uses the runs alone once every HSP run is in", () => {
