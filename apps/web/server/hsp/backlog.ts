@@ -1,25 +1,25 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
-import { dateOfRid, type HistoricalRun } from "@railscore/core";
+import { dateOfRid } from "@railscore/core";
 import { darwinFirstDay, hspConnection, hspDailyCallLimit } from "../env";
 import { errorText } from "../error-text";
-import {
-  DAY_TYPES,
-  dayTypesOf,
-  type DayPattern,
-  type ServiceDay,
-} from "../day-type";
+import { DAY_TYPES, dayTypesOf, type ServiceDay } from "@/shared/day-type";
+import type {
+  BacklogEvent,
+  BacklogRequest,
+  BacklogTrain,
+  HspCounts,
+} from "@/shared/contracts";
 import { HspCallError, postHsp, takeCallCount } from "./client";
 import { historicalRunFromHsp, runFromDetails, type HspRun } from "./details";
-import { matchBacklog, type BacklogTrain } from "./match";
+import { matchBacklog } from "./match";
 import { listTasks, tasksOf, type ListTask } from "./lists";
 import {
   METRIC_TOLERANCES,
   parseServiceMetrics,
-  type HspCounts,
   type HspService,
 } from "./metrics";
-import { searchPeriods, type DateSpan } from "./period";
+import { searchPeriods, type DateSpan } from "../periods";
 import {
   addCalls,
   callsToday,
@@ -33,31 +33,6 @@ import {
   storedRuns,
   takeCallSlot,
 } from "./store";
-
-export type BacklogQuery = {
-  readonly fromCrs: string;
-  readonly toCrs: string;
-  readonly days: DayPattern;
-  readonly periodDays: number;
-  readonly trains: readonly BacklogTrain[];
-  /** Key of the one train whose runs are fetched one by one, for its arrival history. */
-  readonly runsOf?: string;
-};
-
-export type BacklogEvent =
-  /** HSP's counts for one listed train, by day type, before Darwin's first day. */
-  | {
-      readonly type: "train";
-      readonly key: string;
-      readonly byDay: Partial<Record<ServiceDay, HspCounts>>;
-      /** Runs HSP listed for the train, each one fetched for the arrival history. */
-      readonly runCount: number;
-    }
-  /** HSP gave no answer for these trains in time. */
-  | { readonly type: "missing"; readonly keys: readonly string[] }
-  /** Runs of the history train, newest first, classified by the HSP rules. */
-  | { readonly type: "runs"; readonly runs: readonly HistoricalRun[] }
-  | { readonly type: "end" };
 
 const HSP_DAYS: Record<ServiceDay, "WEEKDAY" | "SATURDAY" | "SUNDAY"> = {
   weekdays: "WEEKDAY",
@@ -108,7 +83,7 @@ const SAVE_EVERY = 10;
  * after `deadline`, nor once `signal` aborts; a call in flight still finishes and is stored.
  */
 export async function streamBacklog(
-  query: BacklogQuery,
+  query: BacklogRequest,
   emit: (event: BacklogEvent) => void,
   options: { signal?: AbortSignal; deadline: number; now?: Date },
 ): Promise<void> {
@@ -203,7 +178,9 @@ export async function streamBacklog(
   } catch (error) {
     console.error("HSP backlog failed", errorText(error));
   } finally {
-    await addCalls(takeCallCount());
+    await addCalls(takeCallCount()).catch((error: unknown) => {
+      console.error("[hsp] the call count was not saved", errorText(error));
+    });
     emit({ type: "end" });
   }
 }
@@ -312,7 +289,7 @@ async function waitForSlot(
  * again. After a few such failures in a row the rest wait for the next visit.
  */
 async function streamRuns(
-  query: BacklogQuery,
+  query: BacklogRequest,
   rids: readonly string[],
   emit: (event: BacklogEvent) => void,
   stop: () => boolean,
@@ -342,7 +319,9 @@ async function streamRuns(
     return;
   }
   const renew = setInterval(() => {
-    void renewCallSlot(slot, owner);
+    renewCallSlot(slot, owner).catch((error: unknown) => {
+      console.error("[hsp] slot renewal failed", errorText(error));
+    });
   }, SLOT_RENEW_MS);
   const pending: HspRun[] = [];
   let failedInARow = 0;

@@ -6,7 +6,7 @@ import {
   serviceKey,
   type ScheduledService,
 } from "./fold";
-import type { ServiceDay } from "../day-type";
+import type { ServiceDay } from "@/shared/day-type";
 
 /** The list's folding alone: a period end so early that no train is set apart as retired. */
 function mergeServices(groups: ScheduledService[][]): ScheduledService[] {

@@ -1,28 +1,6 @@
 import { clockMinutes, dateOfRid, formatHhmm } from "@railscore/core";
-import {
-  addCounts,
-  NO_COUNTS,
-  type HspCounts,
-  type HspService,
-} from "./metrics";
-
-/** One public schedule of a listed train: the train itself or a schedule folded into it. */
-type BacklogLeg = {
-  readonly originCrs: string;
-  readonly destinationCrs: string;
-  /** Departure from the boarding station, HHMM. */
-  readonly publicDeparture: string;
-  /** Arrival at the searched destination, HHMM. Absent from pages sent before it was asked. */
-  readonly publicArrival?: string;
-};
-
-/** A listed Darwin train, as the page asks HSP about it. */
-export type BacklogTrain = {
-  /** The list's service key. */
-  readonly key: string;
-  readonly operatorCode: string;
-  readonly legs: readonly BacklogLeg[];
-};
+import type { BacklogLeg, BacklogTrain, HspCounts } from "@/shared/contracts";
+import { addCounts, NO_COUNTS, type HspService } from "./metrics";
 
 /** A quarter-hour of departures, both ends inclusive, HHMM. */
 export type Quarter = { readonly fromTime: string; readonly toTime: string };

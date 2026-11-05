@@ -1,3 +1,4 @@
+import type { HspCounts } from "@/shared/contracts";
 import { darwinStationCode } from "./stations";
 
 /**
@@ -9,19 +10,6 @@ import { record, text } from "../payload";
 
 /** Tolerances asked for, in minutes late at the destination. A high one counts every arrival. */
 export const METRIC_TOLERANCES = ["5", "14", "29", "999"] as const;
-
-/**
- * Runs of one HSP train in the period by arrival. `runs` includes cancellations and runs that
- * did not call at the boarding station, which HSP counts outside every tolerance.
- * `arrived` is every run within the high tolerance: it reached the destination.
- */
-export type HspCounts = {
-  readonly runs: number;
-  readonly within5: number;
-  readonly within14: number;
-  readonly within29: number;
-  readonly arrived: number;
-};
 
 export type HspService = {
   readonly originCrs: string;

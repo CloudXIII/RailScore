@@ -1,4 +1,5 @@
-import { foldRepeatedCalls, type DarwinRun, type StoredCall } from "./run";
+import type { StoredCall } from "../call-text";
+import { foldRepeatedCalls, type DarwinRun } from "./run";
 
 /**
  * Finished days of one schedule UID, packed into one text per calendar month.

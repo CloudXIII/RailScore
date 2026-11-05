@@ -147,7 +147,7 @@ Until Darwin covers the whole period (30 days from about 4 December 2026, 90 day
 - **List figures.** One `serviceMetrics` call per quarter-hour the listed trains leave in (and per day type), for the dates from the start of the period to 3 November, with tolerances of 5, 14, 29 and 999 minutes. HSP trains join the listed train with the same operator, origin, departure from the boarding station and destination (or the one listed train with the same operator, departure and destination), and their counts are added to Darwin's. A row shows a placeholder until its quarter-hours are in.
 - **Arrival history.** The figures come from those counts at once. The calendar then fills from `serviceDetails`, one run at a time, newest first. A run is stored in `hsp_backlog_runs` in the `darwin_runs` text form and classified by the same rules, except that a run HSP recorded with no actual time anywhere is cancelled (for Darwin it only means no movement was seen). Once every run is in, the figures come from the runs.
 - **Pacing.** At busy times HSP refuses a second call beside a list call, list or detail alike, so every server shares one slot in `hsp_slots`: one HSP call at a time. A list call holds it for its call, and a history holds it for its whole run of detail calls, asking a refused one again after 300 ms, then longer, up to 2 s. Two searches of the same quarter-hour share one call through a claim on its `hsp_metrics` row. Calls are counted once per answer in `hsp_usage`.
-- **Storage.** List answers depend on the day the period starts, so they are deleted after two days by the Darwin import. Runs never change, so a second visit makes no HSP call; they age out with `DARWIN_KEEP_DAYS`. A run is about 0.6 KB.
+- **Storage.** List answers depend on the day the period starts, so they are deleted after two days, by a maintenance step the import route runs after each import. Runs never change, so a second visit makes no HSP call; they age out with `DARWIN_KEEP_DAYS`. A run is about 0.6 KB.
 
 If HSP is down or refuses after its retries, the trains keep Darwin's figures and the history says the earlier journeys could not be loaded.
 
@@ -157,11 +157,14 @@ If HSP is down or refuses after its retries, the trains keep Darwin's figures an
 
 ```text
 packages/core/src/          run classification, punctuality rules and London dates, no Next.js or database
-apps/web/app/               home page, /api/import/darwin and /api/backlog
+apps/web/app/               home page (renders the search use case), /api/import/darwin and /api/backlog
 apps/web/features/          search, list, result, day grid
-apps/web/server/            search, calculation, station list
-apps/web/server/darwin/     Push Port parsing, run merge, store, import, lists from runs
-apps/web/server/hsp/        HSP for the days before Darwin: periods, list counts, matching, runs, store
+apps/web/shared/            types and helpers both sides use: the /api/backlog contract, day types
+apps/web/server/use-cases/  what a page asks for, as a view model: searching trains
+apps/web/server/            the train source port (Darwin or sample), search periods, call text, maintenance, station list
+apps/web/server/darwin/     Push Port parsing, run merge, run store, import state, import, lists from runs
+apps/web/server/hsp/        HSP for the days before Darwin: list counts, matching, runs, store (database only)
+apps/web/server/mock/       sample trains for RAILSCORE_DATA=mock
 apps/web/server/services/   train folding for the lists
 apps/web/db/schema.sql      tables for Darwin runs, the import state and HSP's answers
 apps/web/scripts/           database migrate, TIPLOC to CRS map

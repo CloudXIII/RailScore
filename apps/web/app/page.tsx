@@ -10,21 +10,15 @@ import { listHref } from "@/features/search-href";
 import { SearchForm } from "@/features/search-form";
 import { ServiceList } from "@/features/service-list";
 import { TrainDetail } from "@/features/train-detail";
-import {
-  calculateService,
-  findSelectedService,
-} from "@/server/calculate-reliability";
-import { usesMockData } from "@/server/env";
 import { errorText } from "@/server/error-text";
-import { findServices } from "@/server/find-services";
-import { backlogTrain } from "@/server/hsp/backlog-query";
-import { serviceKey } from "@/server/services/fold";
 import { parseQuery, timeHhmm, type ParsedQuery } from "@/server/query";
 import {
   loadStationDirectory,
   StationDirectoryError,
 } from "@/server/station-directory";
 import type { Station } from "@/server/stations";
+import { trainSource } from "@/server/train-source";
+import { searchTrains } from "@/server/use-cases/search-trains";
 
 export const dynamic = "force-dynamic";
 /** Next to Neon (eu-west-2). A US region adds an ocean to every database round trip. */
@@ -52,6 +46,7 @@ export default async function Home({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const sample = trainSource().sample;
   let stations: readonly Station[];
   try {
     stations = await loadStationDirectory();
@@ -69,13 +64,12 @@ export default async function Home({
             {message}
           </p>
         </main>
-        <DataNotice sample={usesMockData()} />
+        <DataNotice sample={sample} />
       </>
     );
   }
   const query = parseQuery(await searchParams, stations);
   const ready = Boolean(query.from && query.to && query.errors.length === 0);
-  const sample = usesMockData();
   return (
     <>
       <SiteHeader />
@@ -110,7 +104,7 @@ export default async function Home({
               </p>
             }
           >
-            <TrainPanel query={query} sample={sample} stations={stations} />
+            <TrainPanel query={query} stations={stations} />
           </Suspense>
         ) : null}
       </main>
@@ -121,94 +115,61 @@ export default async function Home({
 
 async function TrainPanel({
   query,
-  sample,
   stations,
 }: {
   query: ParsedQuery;
-  sample: boolean;
   stations: readonly Station[];
 }) {
   if (!query.from || !query.to) {
     return null;
   }
   try {
-    const found = await findServices({
+    const view = await searchTrains({
       fromCrs: query.from.crs,
       toCrs: query.to.crs,
       timeHhmm: timeHhmm(query.time),
       days: query.days,
       periodDays: query.period,
+      ...(query.serviceKey ? { serviceKey: query.serviceKey } : {}),
+      calculate: query.calculate,
     });
-    const selected = query.serviceKey
-      ? findSelectedService(
-          [...found.services, ...found.retired],
-          query.serviceKey,
-        )
-      : undefined;
-    const calculation =
-      query.calculate && selected
-        ? calculateService({
-            service: selected,
-            boardingCrs: query.from.crs,
-            destinationCrs: query.to.crs,
-            runs: found.runs,
-          })
-        : undefined;
-    // HSP fills the days before Darwin after the page is shown: the listed trains, and the
-    // chosen one first when its history is open.
-    const listed = [...found.services];
-    if (calculation && selected && !listed.includes(selected)) {
-      listed.unshift(selected);
-    }
-    const backlog =
-      found.hsp && !sample && listed.length > 0
-        ? {
-            fromCrs: query.from.crs,
-            toCrs: query.to.crs,
-            days: query.days,
-            periodDays: query.period,
-            trains: listed.map(backlogTrain),
-            ...(calculation && selected
-              ? { runsOf: serviceKey(selected) }
-              : {}),
-          }
-        : undefined;
     const trains = (
       <ServiceList
         query={query}
-        services={found.services}
-        retired={found.retired}
-        listed={found.period}
-        earlier={found.earlier}
-        later={found.later}
+        services={view.services}
+        retired={view.retired}
+        listed={view.period}
+        earlier={view.earlier}
+        later={view.later}
         stations={stations}
       />
     );
+    const history = view.history;
 
     return (
-      <BacklogProvider request={backlog}>
-        {query.calculate && query.serviceKey && !selected ? (
+      <BacklogProvider request={view.backlog}>
+        {view.notice === "train-not-found" ? (
           <p className="warning" role="status">
             That service was not in the historical results for this search.
           </p>
         ) : null}
-        {query.calculate && !query.serviceKey ? (
+        {view.notice === "choose-train" ? (
           <p className="warning" role="status">
             Choose a train.
           </p>
         ) : null}
-        {calculation && selected ? (
+        {history ? (
           <TrainDetail
             href={listHref(query)}
             result={
               <ArrivalHistory
-                service={selected}
+                service={history.service}
                 fromCrs={query.from.crs}
                 toCrs={query.to.crs}
-                period={found.period}
-                {...(found.hsp && !sample ? { hspDays: found.hsp } : {})}
-                darwinRuns={calculation.runs}
-                result={calculation.result}
+                period={view.period}
+                {...(history.hspDays ? { hspDays: history.hspDays } : {})}
+                darwinRuns={history.darwinRuns}
+                result={history.result}
                 stations={stations}
                 days={query.days}
               />

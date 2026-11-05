@@ -1,4 +1,4 @@
-import { isDayPattern, type DayPattern } from "./day-type";
+import { isDayPattern, type DayPattern } from "@/shared/day-type";
 import { resolveStation, type Station } from "./stations";
 
 /** Days of history. Finished days are packed into month rows, so 90 fit in Neon Free (0.5 GB). */
