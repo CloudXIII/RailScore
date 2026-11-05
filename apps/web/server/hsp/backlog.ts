@@ -6,7 +6,7 @@ import { errorText } from "../error-text";
 import type { DayPattern } from "../query";
 import { serviceDateOf, type ServiceDay } from "../services/map";
 import { HspCallError, postHsp, takeCallCount } from "./client";
-import { historicalRunFromHsp, runFromDetails } from "./details";
+import { historicalRunFromHsp, runFromDetails, type HspRun } from "./details";
 import {
   matchBacklog,
   quarterOf,
@@ -34,7 +34,6 @@ import {
   storedRuns,
   takeCallSlot,
 } from "./store";
-import type { DarwinRun } from "../darwin/run";
 
 export type BacklogQuery = {
   readonly fromCrs: string;
@@ -377,7 +376,7 @@ async function streamRuns(
   const renew = setInterval(() => {
     void renewCallSlot(slot, owner);
   }, SLOT_RENEW_MS);
-  const pending: DarwinRun[] = [];
+  const pending: HspRun[] = [];
   let refusedInARow = 0;
   try {
     for (const rid of missing) {
@@ -406,7 +405,7 @@ async function streamRuns(
 async function fetchRun(
   rid: string,
   stop: () => boolean,
-): Promise<DarwinRun | undefined> {
+): Promise<HspRun | undefined> {
   for (let attempt = 1; ; attempt += 1) {
     try {
       const payload = await postHsp(

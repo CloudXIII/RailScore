@@ -91,3 +91,7 @@ create table if not exists hsp_usage (
   day date primary key,
   calls integer not null default 0
 );
+
+-- HSP's late or cancellation reason code at each call of a stored run, joined by `;` in call
+-- order, "" when the run has none. HSP does not say which kind a code is.
+alter table hsp_backlog_runs add column if not exists reasons text not null default '';
