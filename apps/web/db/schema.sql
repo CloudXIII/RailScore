@@ -73,7 +73,7 @@ create table if not exists hsp_metrics (
   fetched_at timestamptz
 );
 
--- Runs from HSP serviceDetails, with calls in the darwin_runs text form (server/call-text.ts).
+-- Runs from HSP serviceDetails for the earlier days (the table keeps its first name), with calls in the darwin_runs text form (server/call-text.ts).
 -- `reasons` is HSP's late or cancellation reason code at each call, joined by `;` in call
 -- order, "" when the run has none. HSP does not say which kind a code is.
 create table if not exists hsp_backlog_runs (

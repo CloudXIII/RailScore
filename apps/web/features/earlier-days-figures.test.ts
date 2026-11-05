@@ -4,12 +4,12 @@ import {
   historyFigures,
   listPunctuality,
   shownPeriod,
-  type TrainBacklog,
-} from "./backlog-figures";
+  type TrainEarlierDays,
+} from "./earlier-days-figures";
 
 const NO_RUNS = { runs: 0, within5: 0, within14: 0, within29: 0, arrived: 0 };
 
-const backlog: TrainBacklog = {
+const earlierDays: TrainEarlierDays = {
   byDay: {
     weekdays: { runs: 10, within5: 6, within14: 8, within29: 9, arrived: 9 },
     saturday: { runs: 2, within5: 2, within14: 2, within29: 2, arrived: 2 },
@@ -22,7 +22,7 @@ describe("listPunctuality", () => {
     expect(
       listPunctuality(
         { runs: 3, within5: 1, within14: 2, within29: 3, arrived: 3 },
-        backlog,
+        earlierDays,
       ),
     ).toEqual({
       runs: 15,
@@ -42,7 +42,7 @@ describe("listPunctuality", () => {
       arrived: 3,
     };
     expect(listPunctuality(darwin, undefined)).toBe(darwin);
-    expect(listPunctuality(undefined, backlog)).toEqual({
+    expect(listPunctuality(undefined, earlierDays)).toEqual({
       runs: 12,
       within5: 8,
       within14: 10,
@@ -71,7 +71,7 @@ describe("historyFigures", () => {
   it("uses HSP's counts for the figures and fetched runs for the calendar while runs arrive", () => {
     const figures = historyFigures({
       darwinRuns,
-      backlog,
+      earlierDays,
       hspRuns: [hspRun],
     });
     expect(figures.complete).toBe(false);
@@ -93,7 +93,11 @@ describe("historyFigures", () => {
   });
 
   it("gives the same figures from the counts as one run per counted run would", () => {
-    const figures = historyFigures({ darwinRuns: [], backlog, hspRuns: [] });
+    const figures = historyFigures({
+      darwinRuns: [],
+      earlierDays,
+      hspRuns: [],
+    });
     expect(figures.complete).toBe(false);
     expect(figures.result.status).toBe("ok");
     expect(figures.result.withinFiveMinutes).toEqual({
@@ -114,7 +118,7 @@ describe("historyFigures", () => {
   it("never counts a band below zero when HSP's counts do not nest", () => {
     const figures = historyFigures({
       darwinRuns: [],
-      backlog: {
+      earlierDays: {
         byDay: {
           weekdays: {
             runs: 3,
@@ -141,7 +145,7 @@ describe("historyFigures", () => {
   it("uses the runs alone once every HSP run is in", () => {
     const figures = historyFigures({
       darwinRuns,
-      backlog: { ...backlog, runCount: 1 },
+      earlierDays: { ...earlierDays, runCount: 1 },
       hspRuns: [hspRun],
     });
     expect(figures.complete).toBe(true);
@@ -156,17 +160,20 @@ describe("historyFigures", () => {
 describe("shownPeriod", () => {
   const period = { from: "2026-10-06", to: "2026-11-04" };
   const hsp = { from: "2026-10-06", to: "2026-11-03" };
-  const noRecord: TrainBacklog = { byDay: { weekdays: NO_RUNS }, runCount: 0 };
+  const noRecord: TrainEarlierDays = {
+    byDay: { weekdays: NO_RUNS },
+    runCount: 0,
+  };
 
   it("keeps the whole period when HSP has the train's runs", () => {
-    expect(shownPeriod({ period, hsp, backlog, missing: false })).toEqual({
+    expect(shownPeriod({ period, hsp, earlierDays, missing: false })).toEqual({
       period,
     });
   });
 
   it("starts on Darwin's first day, with a note, when HSP has no record of the train", () => {
     expect(
-      shownPeriod({ period, hsp, backlog: noRecord, missing: false }),
+      shownPeriod({ period, hsp, earlierDays: noRecord, missing: false }),
     ).toEqual({
       period: { from: "2026-11-04", to: "2026-11-04" },
       note: "There is no record of this train before 04/11/2026, so its history starts then.",
@@ -175,19 +182,19 @@ describe("shownPeriod", () => {
 
   it("leaves out the days before Darwin when HSP gave no answer", () => {
     expect(
-      shownPeriod({ period, hsp, backlog: undefined, missing: true }),
+      shownPeriod({ period, hsp, earlierDays: undefined, missing: true }),
     ).toEqual({ period: { from: "2026-11-04", to: "2026-11-04" } });
   });
 
   it("keeps the period while HSP is still asked, and without HSP", () => {
     expect(
-      shownPeriod({ period, hsp, backlog: undefined, missing: false }),
+      shownPeriod({ period, hsp, earlierDays: undefined, missing: false }),
     ).toEqual({ period });
     expect(
       shownPeriod({
         period,
         hsp: undefined,
-        backlog: noRecord,
+        earlierDays: noRecord,
         missing: false,
       }),
     ).toEqual({ period });

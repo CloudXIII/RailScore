@@ -8,7 +8,7 @@ import type { HspService } from "./metrics";
 /**
  * What HSP said about the days before Darwin, kept so a second search asks it nothing:
  * list answers by route, day type, quarter-hour and dates, and runs in the stored Darwin shape.
- * The backlog runs only beside Darwin, which needs the database, so there is no other store.
+ * HSP runs only beside Darwin, which needs the database, so there is no other store.
  * A failed query throws: the search logs it and the page keeps Darwin's figures.
  */
 
@@ -27,7 +27,7 @@ const CALL_SLOTS = 1;
 function db(): Sql {
   const sql = database();
   if (!sql) {
-    throw new Error("The HSP backlog needs DATABASE_URL.");
+    throw new Error("HSP for the earlier days needs DATABASE_URL.");
   }
   return sql;
 }
@@ -195,7 +195,7 @@ export async function saveRuns(runs: readonly HspRun[]): Promise<void> {
  * start on a day no search asks for any more. Once Darwin covers every period nothing new
  * is stored, and the runs age out.
  */
-export async function deleteOldBacklog(
+export async function deleteOldEarlierDays(
   sql: Sql,
   keepDays: number,
   now: Date,

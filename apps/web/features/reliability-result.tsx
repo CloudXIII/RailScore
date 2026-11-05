@@ -77,7 +77,7 @@ export function ReliabilityResultView({
             <Headline result={result} period={period} days={days} />
           )}
           {progress ? (
-            <p className="meta backlog-progress" role="status">
+            <p className="meta earlier-days-progress" role="status">
               {progress}
             </p>
           ) : null}

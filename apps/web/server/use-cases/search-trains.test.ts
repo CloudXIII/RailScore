@@ -57,16 +57,16 @@ describe("searchTrains", () => {
     expect(view.services).toEqual([listed]);
     expect(view.history).toBeUndefined();
     expect(view.notice).toBeUndefined();
-    expect(view.backlog?.trains.map((t) => t.key)).toEqual([
+    expect(view.earlierDays?.trains.map((t) => t.key)).toEqual([
       serviceKey(listed),
     ]);
-    expect(view.backlog?.runsOf).toBeUndefined();
+    expect(view.earlierDays?.runsOf).toBeUndefined();
   });
 
   it("asks HSP nothing once Darwin covers the period", async () => {
     const view = await searchTrains(search, source());
 
-    expect(view.backlog).toBeUndefined();
+    expect(view.earlierDays).toBeUndefined();
   });
 
   it("shows a retired train's history and asks HSP about it first", async () => {
@@ -78,11 +78,11 @@ describe("searchTrains", () => {
     expect(view.history?.service).toBe(retired);
     expect(view.history?.darwinRuns).toEqual(runs);
     expect(view.history?.hspDays).toEqual(hsp);
-    expect(view.backlog?.trains.map((t) => t.key)).toEqual([
+    expect(view.earlierDays?.trains.map((t) => t.key)).toEqual([
       serviceKey(retired),
       serviceKey(listed),
     ]);
-    expect(view.backlog?.runsOf).toBe(serviceKey(retired));
+    expect(view.earlierDays?.runsOf).toBe(serviceKey(retired));
   });
 
   it("says when no train was chosen, or the chosen one is not there", async () => {

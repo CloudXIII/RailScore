@@ -10,14 +10,16 @@ import { formatDate } from "@/features/format";
 import type { ServiceDay } from "@/shared/day-type";
 
 /** What HSP has said so far about one train's days before Darwin. */
-export type TrainBacklog = {
+export type TrainEarlierDays = {
   readonly byDay: Partial<Record<ServiceDay, PunctualityTally>>;
   readonly runCount: number;
 };
 
 /** HSP's counts for a train, all day types together. */
-export function backlogTotal(backlog: TrainBacklog): PunctualityTally {
-  return sumTallies(Object.values(backlog.byDay));
+export function earlierDaysTotal(
+  earlierDays: TrainEarlierDays,
+): PunctualityTally {
+  return sumTallies(Object.values(earlierDays.byDay));
 }
 
 /**
@@ -26,12 +28,12 @@ export function backlogTotal(backlog: TrainBacklog): PunctualityTally {
  */
 export function listPunctuality(
   darwin: PunctualityTally | undefined,
-  backlog: TrainBacklog | undefined,
+  earlierDays: TrainEarlierDays | undefined,
 ): PunctualityTally | undefined {
-  if (!backlog) {
+  if (!earlierDays) {
     return darwin;
   }
-  return sumTallies([darwin, backlogTotal(backlog)]);
+  return sumTallies([darwin, earlierDaysTotal(earlierDays)]);
 }
 
 export type HistoryFigures = {
@@ -47,17 +49,20 @@ export type HistoryFigures = {
  */
 export function historyFigures(input: {
   darwinRuns: readonly HistoricalRun[];
-  backlog: TrainBacklog | undefined;
+  earlierDays: TrainEarlierDays | undefined;
   hspRuns: readonly HistoricalRun[];
 }): HistoryFigures {
   const fetched = [...input.darwinRuns, ...input.hspRuns];
-  if (!input.backlog || input.hspRuns.length >= input.backlog.runCount) {
+  if (
+    !input.earlierDays ||
+    input.hspRuns.length >= input.earlierDays.runCount
+  ) {
     return {
       result: calculateReliability(fetched),
       complete: true,
     };
   }
-  const tallies = Object.values(input.backlog.byDay).filter(
+  const tallies = Object.values(input.earlierDays.byDay).filter(
     (tally) => tally !== undefined,
   );
   return {
@@ -80,16 +85,16 @@ type Span = { readonly from: string; readonly to: string };
 export function shownPeriod(input: {
   period: Span;
   hsp: Span | undefined;
-  backlog: TrainBacklog | undefined;
+  earlierDays: TrainEarlierDays | undefined;
   /** HSP gave no answer for the train. */
   missing: boolean;
 }): { period: Span; note?: string } {
-  const { period, hsp, backlog } = input;
+  const { period, hsp, earlierDays } = input;
   const noRecord =
-    backlog !== undefined &&
-    backlog.runCount === 0 &&
-    backlogTotal(backlog).runs === 0;
-  if (!hsp || (!noRecord && (backlog || !input.missing))) {
+    earlierDays !== undefined &&
+    earlierDays.runCount === 0 &&
+    earlierDaysTotal(earlierDays).runs === 0;
+  if (!hsp || (!noRecord && (earlierDays || !input.missing))) {
     return { period };
   }
   const darwinFrom = addCalendarDays(hsp.to, 1);
