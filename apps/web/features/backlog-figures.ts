@@ -1,32 +1,23 @@
 import {
   addCalendarDays,
   calculateReliability,
+  sumTallies,
   type HistoricalRun,
+  type PunctualityTally,
   type ReliabilityResult,
 } from "@railscore/core";
 import { formatDate } from "@/features/format";
-import type { HspCounts } from "@/shared/contracts";
 import type { ServiceDay } from "@/shared/day-type";
-import type { ListPunctuality } from "@/server/services/fold";
 
 /** What HSP has said so far about one train's days before Darwin. */
 export type TrainBacklog = {
-  readonly byDay: Partial<Record<ServiceDay, HspCounts>>;
+  readonly byDay: Partial<Record<ServiceDay, PunctualityTally>>;
   readonly runCount: number;
 };
 
 /** HSP's counts for a train, all day types together. */
-export function backlogTotal(backlog: TrainBacklog): HspCounts {
-  const counts = Object.values(backlog.byDay);
-  const sum = (key: keyof HspCounts) =>
-    counts.reduce((total, count) => total + (count?.[key] ?? 0), 0);
-  return {
-    runs: sum("runs"),
-    within5: sum("within5"),
-    within14: sum("within14"),
-    within29: sum("within29"),
-    arrived: sum("arrived"),
-  };
+export function backlogTotal(backlog: TrainBacklog): PunctualityTally {
+  return sumTallies(Object.values(backlog.byDay));
 }
 
 /**
@@ -34,61 +25,13 @@ export function backlogTotal(backlog: TrainBacklog): HspCounts {
  * alone for a train with no counted Darwin run yet.
  */
 export function listPunctuality(
-  darwin: ListPunctuality | undefined,
+  darwin: PunctualityTally | undefined,
   backlog: TrainBacklog | undefined,
-): ListPunctuality | undefined {
+): PunctualityTally | undefined {
   if (!backlog) {
     return darwin;
   }
-  const hsp = backlogTotal(backlog);
-  return {
-    runs: (darwin?.runs ?? 0) + hsp.runs,
-    within5: (darwin?.within5 ?? 0) + hsp.within5,
-    within14: (darwin?.within14 ?? 0) + hsp.within14,
-    within29: (darwin?.within29 ?? 0) + hsp.within29,
-  };
-}
-
-/** A date of each day type, for runs known only by count. They are never shown on the calendar. */
-const DAY_OF_TYPE: Record<ServiceDay, string> = {
-  weekdays: "2026-11-02",
-  saturday: "2026-10-31",
-  sunday: "2026-11-01",
-};
-
-/**
- * Runs standing in for HSP's counts: one per counted run, at a lateness inside its band.
- * They give the totals and the bands before each run has been fetched.
- */
-export function runsFromCounts(byDay: TrainBacklog["byDay"]): HistoricalRun[] {
-  return (Object.entries(byDay) as [ServiceDay, HspCounts][]).flatMap(
-    ([day, counts]) => {
-      const serviceDate = DAY_OF_TYPE[day];
-      const bands: [number, number | undefined][] = [
-        [counts.within5, 0],
-        [counts.within14 - counts.within5, 10],
-        [counts.within29 - counts.within14, 20],
-        [counts.arrived - counts.within29, 30],
-        [counts.runs - counts.arrived, undefined],
-      ];
-      return bands.flatMap(([count, lateness], band) =>
-        Array.from({ length: Math.max(0, count) }, (_, index) =>
-          lateness === undefined
-            ? {
-                id: `count:${day}:${band}:${index}`,
-                serviceDate,
-                outcome: "cancelled" as const,
-              }
-            : {
-                id: `count:${day}:${band}:${index}`,
-                serviceDate,
-                outcome: "arrived" as const,
-                latenessMinutes: lateness,
-              },
-        ),
-      );
-    },
-  );
+  return sumTallies([darwin, backlogTotal(backlog)]);
 }
 
 export type HistoryFigures = {
@@ -114,10 +57,12 @@ export function historyFigures(input: {
       complete: true,
     };
   }
-  const counted = [...input.darwinRuns, ...runsFromCounts(input.backlog.byDay)];
+  const tallies = Object.values(input.backlog.byDay).filter(
+    (tally) => tally !== undefined,
+  );
   return {
     result: {
-      ...calculateReliability(counted),
+      ...calculateReliability(input.darwinRuns, tallies),
       calendar: calculateReliability(fetched).calendar,
     },
     complete: false,

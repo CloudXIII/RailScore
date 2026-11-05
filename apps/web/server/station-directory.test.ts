@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { parseStationFeed } from "./stations";
+import { parseStationFeed } from "@/server/station-feed";
 
 const fsMock = vi.hoisted(() => ({
   mkdir: vi.fn(async () => undefined),

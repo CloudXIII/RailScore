@@ -4,7 +4,7 @@
   "workspaces": {
     ".": {},
     "apps/web": {
-      "entry": ["scripts/*.mjs", "test/server-only-stub.ts"]
+      "entry": ["scripts/*.{mjs,ts}", "test/server-only-stub.ts"]
     },
     "packages/core": {}
   }

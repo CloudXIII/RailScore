@@ -3,46 +3,15 @@ import {
   dateOfRid,
   journeyMinutes,
   minutesApart,
+  sumTallies,
 } from "@railscore/core";
 import { orderedDays, type ServiceDay } from "@/shared/day-type";
-
-export type ScheduledService = {
-  readonly originCrs: string;
-  readonly destinationCrs: string;
-  readonly publicDeparture: string;
-  readonly publicArrival: string;
-  readonly operatorCode: string;
-  readonly rids: readonly string[];
-  readonly days: readonly ServiceDay[];
-  /** Other public schedules folded into this train, with their run counts. Absent when there are none. */
-  readonly variants?: readonly ServiceVariant[];
-  /** Counts of these runs by lateness. Absent when any part of the train came without one. */
-  readonly punctuality?: ListPunctuality;
-};
-
-/**
- * Runs reaching the destination at most 5, 14 and 29 minutes late, counted for the list.
- * A cancelled run is outside every tolerance. So is a run with no actual departure at the
- * boarding stop. The full calculation treats that the same way: the passenger could not board, so it is a missed call, not an arrival.
- */
-export type ListPunctuality = {
-  readonly runs: number;
-  readonly within5: number;
-  readonly within14: number;
-  readonly within29: number;
-};
-
-export type ServiceVariant = {
-  readonly originCrs: string;
-  readonly destinationCrs: string;
-  readonly publicDeparture: string;
-  readonly publicArrival: string;
-  readonly runCount: number;
-  readonly rids: readonly string[];
-};
-
-/** Minutes either way a departure may differ and still be the same train. */
-export const SAME_TRAIN_MINUTES = 2;
+import {
+  SAME_TRAIN_MINUTES,
+  serviceKey,
+  type ScheduledService,
+  type ServiceVariant,
+} from "@/shared/scheduled-service";
 
 /** Minutes a journey may differ in length and still be the same train. */
 const SAME_JOURNEY_MINUTES = 15;
@@ -52,36 +21,6 @@ const OTHER_DAYS_TRAIN_MINUTES = 10;
 
 /** A train with no run in this many days before the period ends no longer runs. Two weeks, as recent days can lag. */
 const RETIRED_AFTER_DAYS = 14;
-
-export function serviceKey(service: {
-  publicDeparture: string;
-  publicArrival: string;
-  operatorCode: string;
-  originCrs: string;
-  destinationCrs: string;
-}): string {
-  return [
-    service.publicDeparture,
-    service.publicArrival,
-    service.operatorCode,
-    service.originCrs,
-    service.destinationCrs,
-  ].join("-");
-}
-
-/** True when `key` names this train or one of the schedules folded into it. */
-export function matchesServiceKey(
-  service: ScheduledService,
-  key: string,
-): boolean {
-  if (serviceKey(service) === key) {
-    return true;
-  }
-  return (service.variants ?? []).some(
-    (variant) =>
-      serviceKey({ ...variant, operatorCode: service.operatorCode }) === key,
-  );
-}
 
 /**
  * Pools identical schedules across day types, then folds near-identical ones into the
@@ -442,17 +381,7 @@ function withPunctuality(
   if (counts.some((count) => count === undefined)) {
     return rest;
   }
-  const total = (key: keyof ListPunctuality) =>
-    counts.reduce((sum, count) => sum + (count?.[key] ?? 0), 0);
-  return {
-    ...rest,
-    punctuality: {
-      runs: total("runs"),
-      within5: total("within5"),
-      within14: total("within14"),
-      within29: total("within29"),
-    },
-  };
+  return { ...rest, punctuality: sumTallies(counts) };
 }
 
 function runDates(rids: readonly string[]): Set<string> | undefined {
