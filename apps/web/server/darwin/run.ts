@@ -38,7 +38,9 @@ export function crsOf(tpl: string): string | undefined {
  * Folds one update into a run. A schedule replaces the calling pattern and its cancellation
  * reason, and keeps the actual times and platforms already seen at calls it still has. A train
  * status adds actual times, platforms and a late reason, and a call the schedule never gave is
- * added at the end. Undefined when there is still no public call.
+ * added at the end. A call is the same when its station and one of its public times match, as
+ * when Darwin cuts a train short and reports its new last stop with the arrival alone.
+ * Undefined when there is still no public call.
  */
 export function mergeUpdate(
   run: DarwinRun | undefined,
@@ -48,13 +50,10 @@ export function mergeUpdate(
     .map(toStoredCall)
     .filter((call) => call !== undefined);
   if (update.kind === "schedule") {
-    const previous = new Map(
-      (run?.calls ?? []).map((call) => [callKey(call), call]),
+    const previous = run?.calls ?? [];
+    const calls = incoming.map((call) =>
+      withActuals(call, previous[sameCallIndex(previous, call)]),
     );
-    const calls = incoming.map((call) => {
-      const seen = previous.get(callKey(call));
-      return withActuals(call, seen);
-    });
     if (calls.length === 0) {
       return run;
     }
@@ -70,7 +69,7 @@ export function mergeUpdate(
   }
   const calls = [...(run?.calls ?? [])];
   for (const call of incoming) {
-    const index = calls.findIndex((known) => callKey(known) === callKey(call));
+    const index = sameCallIndex(calls, call);
     if (index === -1) {
       calls.push(call);
     } else {
@@ -111,6 +110,46 @@ function toStoredCall(call: DarwinCall): StoredCall | undefined {
 /** Station and public times, so a circular route's two calls at one station stay apart. */
 function callKey(call: StoredCall): string {
   return `${call.crs}|${call.pta ?? ""}|${call.ptd ?? ""}`;
+}
+
+/**
+ * Where `call` is in `calls`: the call with the same station and public times, or else the
+ * first at the same station with the same public arrival or departure. A train cut short at a
+ * stop loses its public departure there, and one started short loses its public arrival.
+ * The two calls of a loop at one station have different times, so they stay apart. -1 when
+ * there is none.
+ */
+function sameCallIndex(calls: readonly StoredCall[], call: StoredCall): number {
+  const exact = calls.findIndex((known) => callKey(known) === callKey(call));
+  if (exact !== -1) {
+    return exact;
+  }
+  return calls.findIndex(
+    (known) =>
+      known.crs === call.crs &&
+      ((call.pta !== undefined && known.pta === call.pta) ||
+        (call.ptd !== undefined && known.ptd === call.ptd)),
+  );
+}
+
+/**
+ * Calls with the repeats Darwin left at the end folded back into their first call. Runs stored
+ * before `mergeUpdate` matched a call by one public time kept the new last stop of a train cut
+ * short as an extra call after the cancelled ones, which read as a different destination. The
+ * first call keeps its place and public times, and takes the repeat's actual times and platform,
+ * the newer report, as a train status would give them.
+ */
+export function foldRepeatedCalls(calls: readonly StoredCall[]): StoredCall[] {
+  const folded: StoredCall[] = [];
+  for (const call of calls) {
+    const index = sameCallIndex(folded, call);
+    if (index === -1) {
+      folded.push(call);
+    } else {
+      folded[index] = withActuals(folded[index]!, call);
+    }
+  }
+  return folded;
 }
 
 /** `call` with the actual times and platform of `from`, where `from` has them. */

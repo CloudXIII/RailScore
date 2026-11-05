@@ -21,6 +21,7 @@ export function backlogTrain(service: ScheduledService): BacklogTrain {
       originCrs: leg.originCrs,
       destinationCrs: leg.destinationCrs,
       publicDeparture: leg.publicDeparture,
+      publicArrival: leg.publicArrival,
     })),
   };
 }
@@ -81,11 +82,15 @@ function parseTrain(value: unknown): BacklogTrain | undefined {
     return fields &&
       isCrs(fields.originCrs) &&
       isCrs(fields.destinationCrs) &&
-      isClock(fields.publicDeparture)
+      isClock(fields.publicDeparture) &&
+      (fields.publicArrival === undefined || isClock(fields.publicArrival))
       ? {
           originCrs: fields.originCrs,
           destinationCrs: fields.destinationCrs,
           publicDeparture: fields.publicDeparture,
+          ...(fields.publicArrival === undefined
+            ? {}
+            : { publicArrival: fields.publicArrival }),
         }
       : undefined;
   });

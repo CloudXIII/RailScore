@@ -69,7 +69,7 @@ export function SearchForm({
           Change
         </button>
         <p className="meta journey-meta">
-          {timeSearchLabel(query.time)} · {days} · {query.period} days
+          {timeSearchLabel(query.time)} · {days} · last {query.period} days
         </p>
       </section>
     );
@@ -112,7 +112,7 @@ export function SearchForm({
         </button>
       </div>
       <div className="depart-after">
-        <label htmlFor="departure-time">Departing from</label>
+        <label htmlFor="departure-time">Earliest departure</label>
         <input
           id="departure-time"
           name="time"

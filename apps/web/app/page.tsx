@@ -181,7 +181,6 @@ async function TrainPanel({
         earlier={found.earlier}
         later={found.later}
         stations={stations}
-        sample={sample}
       />
     );
 
@@ -210,7 +209,6 @@ async function TrainPanel({
                 result={calculation.result}
                 stations={stations}
                 days={query.days}
-                sample={sample}
               />
             }
             trains={trains}
@@ -248,7 +246,7 @@ function Intro() {
     <header className="intro">
       <h1>How reliable is your train?</h1>
       <p className="lede">
-        See how often a direct train has arrived on time on its recent journeys.
+        See how often a train has arrived on time on its recent journeys.
       </p>
     </header>
   );

@@ -24,14 +24,20 @@ function metric(tolerance: string, within: number, outside: number) {
 
 function hspRow(
   departure: string,
-  options: { origin?: string; toc?: string; rids?: string[] } = {},
+  options: {
+    origin?: string;
+    destination?: string;
+    arrival?: string;
+    toc?: string;
+    rids?: string[];
+  } = {},
 ) {
   return {
     serviceAttributesMetrics: {
       origin_location: options.origin ?? "LIV",
-      destination_location: "MAN",
+      destination_location: options.destination ?? "MAN",
       gbtt_ptd: departure,
-      gbtt_pta: "1100",
+      gbtt_pta: options.arrival ?? "1100",
       toc_code: options.toc ?? "NT",
       matched_services: "3",
       rids: options.rids ?? ["202610200000001", "202610210000001"],
@@ -180,6 +186,86 @@ describe("matchBacklog", () => {
       services([hspRow("1015", { origin: "LVC" })]),
     );
     expect(two.size).toBe(0);
+  });
+
+  /** Paddington 07:50 to Great Malvern, which ran to Worcester Shrub Hill for a week of works. */
+  const paddington: BacklogTrain = {
+    key: "0750-0816-GW-PAD-GMV",
+    operatorCode: "GW",
+    legs: [
+      {
+        originCrs: "PAD",
+        destinationCrs: "GMV",
+        publicDeparture: "0750",
+        publicArrival: "0816",
+      },
+    ],
+  };
+  const weekdays = (dates: string[]) => dates.map((date) => `${date}8915414`);
+  const toMalvern = (rids: string[]) =>
+    hspRow("0750", {
+      origin: "PAD",
+      destination: "GMV",
+      arrival: "0816",
+      toc: "GW",
+      rids,
+    });
+  const toWorcester = (rids: string[]) =>
+    hspRow("0750", {
+      origin: "PAD",
+      destination: "WOS",
+      arrival: "0816",
+      toc: "GW",
+      rids,
+    });
+
+  it("joins the days a train ran to another destination at the same times", () => {
+    const joined = matchBacklog(
+      [paddington],
+      services([
+        toMalvern(weekdays(["20261020", "20261021"])),
+        toWorcester(weekdays(["20261026", "20261027"])),
+      ]),
+    );
+    expect(joined.get(paddington.key)?.rids).toEqual(
+      weekdays(["20261020", "20261021", "20261026", "20261027"]),
+    );
+    expect(joined.get(paddington.key)?.counts.runs).toBe(20);
+  });
+
+  it("keeps apart a train on the same days, as another portion", () => {
+    const joined = matchBacklog(
+      [paddington],
+      services([
+        toMalvern(weekdays(["20261020", "20261021"])),
+        toWorcester(weekdays(["20261021", "20261022"])),
+      ]),
+    );
+    expect(joined.get(paddington.key)?.rids).toEqual(
+      weekdays(["20261020", "20261021"]),
+    );
+  });
+
+  it("joins another destination only at the same arrival, and not without one", () => {
+    const later = matchBacklog(
+      [paddington],
+      services([
+        hspRow("0750", {
+          origin: "PAD",
+          destination: "WOS",
+          arrival: "0818",
+          toc: "GW",
+          rids: weekdays(["20261026"]),
+        }),
+      ]),
+    );
+    expect(later.size).toBe(0);
+    const { publicArrival: _, ...withoutArrival } = paddington.legs[0]!;
+    const older = matchBacklog(
+      [{ ...paddington, legs: [withoutArrival] }],
+      services([toWorcester(weekdays(["20261026"]))]),
+    );
+    expect(older.size).toBe(0);
   });
 });
 

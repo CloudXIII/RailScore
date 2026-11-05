@@ -299,8 +299,22 @@ main.landing .planner {
   margin-bottom: 0.35rem;
 }
 
-.site-footer p + p {
+.site-footer p + p,
+.about-figures + p {
   margin-top: 0.5rem;
+}
+
+.about-figures summary {
+  cursor: pointer;
+  width: fit-content;
+}
+
+.about-figures summary h2 {
+  display: inline;
+}
+
+.about-figures[open] summary {
+  margin-bottom: 0.35rem;
 }
 
 .intro {
@@ -789,6 +803,10 @@ legend {
   color: var(--score-poor);
 }
 
+.tier-few {
+  color: var(--ink);
+}
+
 .on-time-label {
   font-size: 1.05rem;
   font-weight: 600;
@@ -1111,7 +1129,9 @@ legend {
 }
 
 .distribution-label {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
 }
 
 .distribution-count {
