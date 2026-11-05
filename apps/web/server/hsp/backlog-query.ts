@@ -4,7 +4,7 @@ import { serviceKey } from "../services/map";
 import type { BacklogQuery } from "./backlog";
 import { quartersOf, type BacklogTrain } from "./match";
 
-/** A page lists eight trains, a few more when several leave at the same minute. */
+/** A page lists six trains, a few more when several leave at the same minute. */
 const MAX_TRAINS = 16;
 const MAX_LEGS = 8;
 /** Quarter-hours one request may ask HSP about. Eight trains every half hour need eight. */
