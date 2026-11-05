@@ -12,7 +12,9 @@ import {
   quartersOf,
   type BacklogTrain,
 } from "./match";
+import { listTasks, tasksOf } from "./lists";
 import { addCounts, parseServiceMetrics, type HspService } from "./metrics";
+import { darwinStationCode, hspStationCode } from "./stations";
 
 function metric(tolerance: string, within: number, outside: number) {
   return {
@@ -69,6 +71,15 @@ describe("parseServiceMetrics", () => {
     const row = { ...hspRow("1015"), Metrics: [metric("5", 1, 1)] };
     const [service] = parseServiceMetrics({ Services: [row] });
     expect(service?.counts).toBeUndefined();
+  });
+
+  it("gives Elizabeth line platforms Darwin's station codes", () => {
+    const [service] = parseServiceMetrics({
+      Services: [
+        hspRow("0814", { origin: "ABX", destination: "PAA", toc: "XR" }),
+      ],
+    });
+    expect(service).toMatchObject({ originCrs: "ABW", destinationCrs: "PAD" });
   });
 
   it("rejects an answer with no service list", () => {
@@ -337,6 +348,28 @@ describe("HSP runs", () => {
     );
   });
 
+  it("reads an Elizabeth line run at Paddington under Darwin's code", () => {
+    // Calls as HSP gave them for the 07:44 Abbey Wood to Reading on 2026-10-21.
+    const run = runFromDetails(
+      details([
+        stop("ABX", { ptd: "0744", atd: "0744" }),
+        stop("BSZ", { pta: "0809", ptd: "0809", ata: "0810", atd: "0811" }),
+        stop("PAA", { pta: "0813", ptd: "0813", ata: "0813", atd: "0815" }),
+        stop("RDG", { pta: "0911", ata: "0917" }, "586"),
+      ]),
+      "202610216737246",
+    );
+    expect(run.calls.map((call) => call.crs)).toEqual([
+      "ABW",
+      "BDS",
+      "PAD",
+      "RDG",
+    ]);
+    expect(
+      historicalRunFromHsp(run, { boardingCrs: "PAD", destinationCrs: "RDG" }),
+    ).toMatchObject({ outcome: "arrived", latenessMinutes: 6 });
+  });
+
   it("counts a run that never left the boarding station as not calling", () => {
     const run = runFromDetails(
       details([
@@ -347,5 +380,66 @@ describe("HSP runs", () => {
       "202610200000001",
     );
     expect(historicalRunFromHsp(run, stations).outcome).toBe("did_not_call");
+  });
+});
+
+describe("Elizabeth line station codes", () => {
+  it("asks HSP for an Elizabeth line train under its own codes", () => {
+    expect(hspStationCode("PAD", "XR")).toBe("PAA");
+    expect(hspStationCode("ABW", "XR")).toBe("ABX");
+    expect(hspStationCode("RDG", "XR")).toBe("RDG");
+    expect(hspStationCode("PAD", "GW")).toBe("PAD");
+  });
+
+  it("reads HSP's codes back as Darwin's and leaves the rest", () => {
+    expect(darwinStationCode("PAA")).toBe("PAD");
+    expect(darwinStationCode("LIX")).toBe("LST");
+    expect(darwinStationCode("RDG")).toBe("RDG");
+  });
+});
+
+describe("listTasks", () => {
+  const span = { from: "2026-10-06", to: "2026-11-03" };
+  const train = (key: string, operatorCode: string, departure: string) => ({
+    key,
+    operatorCode,
+    legs: [
+      { originCrs: "PAD", destinationCrs: "RDG", publicDeparture: departure },
+    ],
+  });
+  const greatWestern = train("gw", "GW", "0738");
+  const elizabeth = train("xr", "XR", "0731");
+
+  it("gives an Elizabeth line train its own list at the stations HSP names", () => {
+    const route = { fromCrs: "PAD", toCrs: "RDG" };
+    const tasks = listTasks(
+      route,
+      [greatWestern, elizabeth],
+      ["weekdays"],
+      span,
+    );
+    expect(tasks.map((task) => task.key)).toEqual([
+      "PAD|RDG|weekdays|0730|2026-10-06|2026-11-03",
+      "PAA|RDG|weekdays|0730|2026-10-06|2026-11-03",
+    ]);
+    expect(tasksOf(route, elizabeth, tasks).map((task) => task.key)).toEqual([
+      "PAA|RDG|weekdays|0730|2026-10-06|2026-11-03",
+    ]);
+    expect(tasksOf(route, greatWestern, tasks)).toHaveLength(1);
+  });
+
+  it("shares one list where both operators use the same codes", () => {
+    const route = { fromCrs: "RDG", toCrs: "TWY" };
+    const tasks = listTasks(
+      route,
+      [greatWestern, elizabeth],
+      ["weekdays", "saturday"],
+      span,
+    );
+    expect(tasks.map((task) => task.key)).toEqual([
+      "RDG|TWY|weekdays|0730|2026-10-06|2026-11-03",
+      "RDG|TWY|saturday|0730|2026-10-06|2026-11-03",
+    ]);
+    expect(tasksOf(route, elizabeth, tasks)).toEqual(tasks);
   });
 });

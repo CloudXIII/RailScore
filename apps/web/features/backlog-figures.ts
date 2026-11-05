@@ -1,8 +1,10 @@
 import {
+  addCalendarDays,
   calculateReliability,
   type HistoricalRun,
   type ReliabilityResult,
 } from "@railscore/core";
+import { formatDate } from "@/features/format";
 import type { HspCounts } from "@/server/hsp/metrics";
 import type { ServiceDay } from "@/server/day-type";
 import type { ListPunctuality } from "@/server/services/map";
@@ -120,4 +122,40 @@ export function historyFigures(input: {
     },
     complete: false,
   };
+}
+
+type Span = { readonly from: string; readonly to: string };
+
+/**
+ * The days a train's history covers. HSP fills the days before Darwin, `hsp`. When HSP knows
+ * no run of the train there, or gave no answer, nothing is known about those days: they are
+ * left out, and the history starts on Darwin's first day, rather than showing days without
+ * the train. Some trains are missing from HSP, so "no record" never means it did not run.
+ */
+export function shownPeriod(input: {
+  period: Span;
+  hsp: Span | undefined;
+  backlog: TrainBacklog | undefined;
+  /** HSP gave no answer for the train. */
+  missing: boolean;
+}): { period: Span; note?: string } {
+  const { period, hsp, backlog } = input;
+  const noRecord =
+    backlog !== undefined &&
+    backlog.runCount === 0 &&
+    backlogTotal(backlog).runs === 0;
+  if (!hsp || (!noRecord && (backlog || !input.missing))) {
+    return { period };
+  }
+  const darwinFrom = addCalendarDays(hsp.to, 1);
+  if (darwinFrom <= period.from || darwinFrom > period.to) {
+    return { period };
+  }
+  const shown = { from: darwinFrom, to: period.to };
+  return noRecord
+    ? {
+        period: shown,
+        note: `There is no record of this train before ${formatDate(darwinFrom)}, so its history starts then.`,
+      }
+    : { period: shown };
 }

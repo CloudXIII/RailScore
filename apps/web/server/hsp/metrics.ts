@@ -1,3 +1,5 @@
+import { darwinStationCode } from "./stations";
+
 /**
  * HSP serviceMetrics: the trains between two stations in a clock window and date range,
  * each with its run identifiers and how many runs arrived within each asked tolerance.
@@ -43,7 +45,10 @@ export const NO_COUNTS: HspCounts = {
   arrived: 0,
 };
 
-/** Reads a serviceMetrics answer. A row with no departure, operator, origin or destination is dropped. */
+/**
+ * Reads a serviceMetrics answer, with Darwin's station codes. A row with no departure,
+ * operator, origin or destination is dropped.
+ */
 export function parseServiceMetrics(payload: unknown): HspService[] {
   const root = record(payload);
   if (!root || !Array.isArray(root.Services)) {
@@ -67,8 +72,8 @@ export function parseServiceMetrics(payload: unknown): HspService[] {
     const counts = parseCounts(service?.Metrics);
     return [
       {
-        originCrs: origin,
-        destinationCrs: destination,
+        originCrs: darwinStationCode(origin),
+        destinationCrs: darwinStationCode(destination),
         publicDeparture: departure,
         publicArrival: field(attributes.gbtt_pta),
         operatorCode: operator,

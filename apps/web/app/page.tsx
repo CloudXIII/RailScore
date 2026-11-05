@@ -206,6 +206,7 @@ async function TrainPanel({
                 fromCrs={query.from.crs}
                 toCrs={query.to.crs}
                 period={found.period}
+                {...(found.hsp && !sample ? { hspDays: found.hsp } : {})}
                 darwinRuns={calculation.runs}
                 result={calculation.result}
                 stations={stations}
