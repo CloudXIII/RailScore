@@ -1,6 +1,13 @@
-import { clockMinutes, dateOfRid, formatHhmm } from "@railscore/core";
-import type { BacklogLeg, BacklogTrain, HspCounts } from "@/shared/contracts";
-import { addCounts, NO_COUNTS, type HspService } from "./metrics";
+import {
+  clockMinutes,
+  dateOfRid,
+  formatHhmm,
+  NO_RUNS,
+  sumTallies,
+  type PunctualityTally,
+} from "@railscore/core";
+import type { BacklogLeg, BacklogTrain } from "@/shared/contracts";
+import type { HspService } from "./metrics";
 
 /** A quarter-hour of departures, both ends inclusive, HHMM. */
 export type Quarter = { readonly fromTime: string; readonly toTime: string };
@@ -22,7 +29,7 @@ export function quartersOf(trains: readonly BacklogTrain[]): Quarter[] {
 }
 
 export type TrainBacklog = {
-  readonly counts: HspCounts;
+  readonly counts: PunctualityTally;
   readonly rids: readonly string[];
 };
 
@@ -46,11 +53,14 @@ export function matchBacklog(
   trains: readonly BacklogTrain[],
   services: readonly HspService[],
 ): Map<string, TrainBacklog> {
-  const joined = new Map<string, { counts: HspCounts; rids: string[] }>();
+  const joined = new Map<
+    string,
+    { counts: PunctualityTally; rids: string[] }
+  >();
   const join = (train: BacklogTrain, service: HspService) => {
-    const current = joined.get(train.key) ?? { counts: NO_COUNTS, rids: [] };
+    const current = joined.get(train.key) ?? { counts: NO_RUNS, rids: [] };
     joined.set(train.key, {
-      counts: addCounts(current.counts, service.counts),
+      counts: sumTallies([current.counts, service.counts]),
       rids: [...current.rids, ...service.rids],
     });
   };

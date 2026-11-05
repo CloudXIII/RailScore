@@ -3,7 +3,6 @@ import type { HistoricalRun } from "@railscore/core";
 import {
   historyFigures,
   listPunctuality,
-  runsFromCounts,
   shownPeriod,
   type TrainBacklog,
 } from "./backlog-figures";
@@ -22,35 +21,34 @@ describe("listPunctuality", () => {
   it("adds HSP's counts to Darwin's", () => {
     expect(
       listPunctuality(
-        { runs: 3, within5: 1, within14: 2, within29: 3 },
+        { runs: 3, within5: 1, within14: 2, within29: 3, arrived: 3 },
         backlog,
       ),
-    ).toEqual({ runs: 15, within5: 9, within14: 12, within29: 14 });
+    ).toEqual({
+      runs: 15,
+      within5: 9,
+      within14: 12,
+      within29: 14,
+      arrived: 14,
+    });
   });
 
   it("keeps Darwin's alone before HSP answers, and HSP's alone without Darwin", () => {
-    const darwin = { runs: 3, within5: 1, within14: 2, within29: 3 };
+    const darwin = {
+      runs: 3,
+      within5: 1,
+      within14: 2,
+      within29: 3,
+      arrived: 3,
+    };
     expect(listPunctuality(darwin, undefined)).toBe(darwin);
     expect(listPunctuality(undefined, backlog)).toEqual({
       runs: 12,
       within5: 8,
       within14: 10,
       within29: 11,
+      arrived: 11,
     });
-  });
-});
-
-describe("runsFromCounts", () => {
-  it("stands one run in for each counted run, in its band", () => {
-    const runs = runsFromCounts(backlog.byDay);
-    expect(runs).toHaveLength(12);
-    const outcomes = runs.map((run) =>
-      run.outcome === "arrived" ? run.latenessMinutes : run.outcome,
-    );
-    expect(outcomes.filter((value) => value === 0)).toHaveLength(8);
-    expect(outcomes.filter((value) => value === 10)).toHaveLength(2);
-    expect(outcomes.filter((value) => value === 20)).toHaveLength(1);
-    expect(outcomes.filter((value) => value === "cancelled")).toHaveLength(1);
   });
 });
 
@@ -92,6 +90,52 @@ describe("historyFigures", () => {
       "2026-10-20",
       "2026-11-04",
     ]);
+  });
+
+  it("gives the same figures from the counts as one run per counted run would", () => {
+    const figures = historyFigures({ darwinRuns: [], backlog, hspRuns: [] });
+    expect(figures.complete).toBe(false);
+    expect(figures.result.status).toBe("ok");
+    expect(figures.result.withinFiveMinutes).toEqual({
+      count: 8,
+      total: 12,
+      percentage: 67,
+    });
+    expect(figures.result.distribution).toEqual({
+      withinFive: 8,
+      sixToFourteen: 2,
+      fifteenToTwentyNine: 1,
+      thirtyOrMore: 0,
+      cancelled: 1,
+    });
+    expect(figures.result.calendar).toEqual([]);
+  });
+
+  it("never counts a band below zero when HSP's counts do not nest", () => {
+    const figures = historyFigures({
+      darwinRuns: [],
+      backlog: {
+        byDay: {
+          weekdays: {
+            runs: 3,
+            within5: 2,
+            within14: 1,
+            within29: 1,
+            arrived: 3,
+          },
+        },
+        runCount: 3,
+      },
+      hspRuns: [],
+    });
+    expect(figures.result.distribution).toEqual({
+      withinFive: 2,
+      sixToFourteen: 0,
+      fifteenToTwentyNine: 0,
+      thirtyOrMore: 2,
+      cancelled: 0,
+    });
+    expect(figures.result.withinFiveMinutes.total).toBe(4);
   });
 
   it("uses the runs alone once every HSP run is in", () => {

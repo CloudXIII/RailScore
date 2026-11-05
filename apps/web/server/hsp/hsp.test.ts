@@ -8,7 +8,7 @@ import {
 import type { BacklogTrain } from "@/shared/contracts";
 import { matchBacklog, quarterOf, quartersOf } from "./match";
 import { listTasks, tasksOf } from "./lists";
-import { addCounts, parseServiceMetrics, type HspService } from "./metrics";
+import { parseServiceMetrics, type HspService } from "./metrics";
 import { darwinStationCode, hspStationCode } from "./stations";
 
 function metric(tolerance: string, within: number, outside: number) {
@@ -79,19 +79,6 @@ describe("parseServiceMetrics", () => {
 
   it("rejects an answer with no service list", () => {
     expect(() => parseServiceMetrics({})).toThrow();
-  });
-});
-
-describe("addCounts", () => {
-  it("adds every field", () => {
-    const one = { runs: 3, within5: 1, within14: 2, within29: 2, arrived: 3 };
-    expect(addCounts(one, one)).toEqual({
-      runs: 6,
-      within5: 2,
-      within14: 4,
-      within29: 4,
-      arrived: 6,
-    });
   });
 });
 

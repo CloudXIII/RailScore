@@ -2,14 +2,12 @@ import {
   clockMinutes,
   dateOfRid,
   journeyMinutes,
+  NO_RUNS,
   passengerLeg,
+  type PunctualityTally,
 } from "@railscore/core";
 import { dayTypeOf, dayTypesOf, type DayPattern } from "@/shared/day-type";
-import {
-  listServices,
-  type ListPunctuality,
-  type ScheduledService,
-} from "../services/fold";
+import { listServices, type ScheduledService } from "../services/fold";
 import { historicalRunFromDarwin, type DarwinRun } from "./run";
 
 export type DarwinSearch = {
@@ -189,13 +187,6 @@ export function servicesFromRuns(
  */
 const LONG_WAY_ROUND_FACTOR = 2;
 
-const NO_RUNS: ListPunctuality = {
-  runs: 0,
-  within5: 0,
-  within14: 0,
-  within29: 0,
-};
-
 /**
  * The planned leg from boarding to destination, by the shared rule (`passengerLeg`): a
  * public departure, then a later public arrival. A train that passes the boarding station
@@ -234,7 +225,7 @@ function legOf(
 }
 
 /** The list's counts for one run. A run with no known outcome is not counted. */
-function punctualityOf(run: DarwinRun, search: DarwinSearch): ListPunctuality {
+function punctualityOf(run: DarwinRun, search: DarwinSearch): PunctualityTally {
   const outcome = historicalRunFromDarwin(run, {
     boardingCrs: search.fromCrs,
     destinationCrs: search.toCrs,
@@ -249,6 +240,7 @@ function punctualityOf(run: DarwinRun, search: DarwinSearch): ListPunctuality {
     within5: lateness <= 5 ? 1 : 0,
     within14: lateness <= 14 ? 1 : 0,
     within29: lateness <= 29 ? 1 : 0,
+    arrived: outcome.outcome === "arrived" ? 1 : 0,
   };
 }
 

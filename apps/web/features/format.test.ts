@@ -73,6 +73,7 @@ describe("listScore", () => {
         within5: 19,
         within14: 19,
         within29: 19,
+        arrived: 20,
       }),
     ).toEqual({ onTimePercent: 95, severe: 1, runs: 20 });
     // 1 in 20 is under one in ten: no warning on the row.
@@ -89,6 +90,7 @@ describe("listScore", () => {
         within5: 299,
         within14: 300,
         within29: 300,
+        arrived: 300,
       }),
     ).toEqual({ onTimePercent: 99, severe: 0, runs: 300 });
     expect(formatSevereJourneys(0, 300)).toBe("");
@@ -105,7 +107,7 @@ describe("listScore", () => {
   it("is empty without a count or without journeys", () => {
     expect(listScore(undefined)).toBeUndefined();
     expect(
-      listScore({ runs: 0, within5: 0, within14: 0, within29: 0 }),
+      listScore({ runs: 0, within5: 0, within14: 0, within29: 0, arrived: 0 }),
     ).toBeUndefined();
   });
 });

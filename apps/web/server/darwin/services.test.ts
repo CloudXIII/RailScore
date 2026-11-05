@@ -112,7 +112,13 @@ describe("servicesFromRuns", () => {
       operatorCode: "SW",
       rids: ["202611020000001", "202611030000001"],
       days: ["weekdays"],
-      punctuality: { runs: 2, within5: 1, within14: 1, within29: 2 },
+      punctuality: {
+        runs: 2,
+        within5: 1,
+        within14: 1,
+        within29: 2,
+        arrived: 2,
+      },
     });
     expect(list?.period).toEqual({ from: "2026-11-02", to: "2026-11-03" });
   });
@@ -129,7 +135,13 @@ describe("servicesFromRuns", () => {
     );
     expect(list?.services[0]).toMatchObject({
       rids: ["202611030000001"],
-      punctuality: { runs: 1, within5: 0, within14: 0, within29: 1 },
+      punctuality: {
+        runs: 1,
+        within5: 0,
+        within14: 0,
+        within29: 1,
+        arrived: 1,
+      },
     });
     expect(list?.period).toEqual({ from: "2026-11-03", to: "2026-11-03" });
   });
@@ -148,6 +160,7 @@ describe("servicesFromRuns", () => {
       within5: 0,
       within14: 0,
       within29: 0,
+      arrived: 0,
     });
   });
 
@@ -283,8 +296,16 @@ describe("servicesFromRuns", () => {
         service.punctuality,
       ]),
     ).toEqual([
-      ["0812", "0823", { runs: 1, within5: 1, within14: 1, within29: 1 }],
-      ["0840", "0849", { runs: 1, within5: 1, within14: 1, within29: 1 }],
+      [
+        "0812",
+        "0823",
+        { runs: 1, within5: 1, within14: 1, within29: 1, arrived: 1 },
+      ],
+      [
+        "0840",
+        "0849",
+        { runs: 1, within5: 1, within14: 1, within29: 1, arrived: 1 },
+      ],
     ]);
   });
 

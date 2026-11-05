@@ -66,21 +66,39 @@ describe("mergeServices", () => {
       publicDeparture: "1020",
       rids: ["202610051020001", "202610061020002"],
       days: ["weekdays"],
-      punctuality: { runs: 2, within5: 1, within14: 2, within29: 2 },
+      punctuality: {
+        runs: 2,
+        within5: 1,
+        within14: 2,
+        within29: 2,
+        arrived: 2,
+      },
     };
     const saturday: ScheduledService = {
       ...base,
       publicDeparture: "1020",
       rids: ["202610031020003"],
       days: ["saturday"],
-      punctuality: { runs: 1, within5: 0, within14: 0, within29: 1 },
+      punctuality: {
+        runs: 1,
+        within5: 0,
+        within14: 0,
+        within29: 1,
+        arrived: 1,
+      },
     };
     const once: ScheduledService = {
       ...base,
       publicDeparture: "1021",
       rids: ["202610071021004"],
       days: ["weekdays"],
-      punctuality: { runs: 1, within5: 1, within14: 1, within29: 1 },
+      punctuality: {
+        runs: 1,
+        within5: 1,
+        within14: 1,
+        within29: 1,
+        arrived: 1,
+      },
     };
     const [merged] = mergeServices([[weekday, once], [saturday]]);
     expect(merged?.rids).toHaveLength(4);
@@ -89,6 +107,7 @@ describe("mergeServices", () => {
       within5: 2,
       within14: 3,
       within29: 4,
+      arrived: 4,
     });
   });
 
@@ -101,7 +120,13 @@ describe("mergeServices", () => {
       operatorCode: "TP",
       rids: ["202610051020001"],
       days: ["weekdays"],
-      punctuality: { runs: 1, within5: 1, within14: 1, within29: 1 },
+      punctuality: {
+        runs: 1,
+        within5: 1,
+        within14: 1,
+        within29: 1,
+        arrived: 1,
+      },
     };
     const uncounted: ScheduledService = {
       ...counted,

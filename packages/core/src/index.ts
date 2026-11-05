@@ -21,6 +21,7 @@ export {
   type ReliabilityResult,
   type ReliabilityStatus,
 } from "./reliability";
+export { NO_RUNS, sumTallies, type PunctualityTally } from "./tally";
 export {
   classifyRun,
   passengerLeg,

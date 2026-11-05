@@ -1,4 +1,4 @@
-import type { HspCounts } from "@/shared/contracts";
+import type { PunctualityTally } from "@railscore/core";
 import { darwinStationCode } from "./stations";
 
 /**
@@ -20,18 +20,10 @@ export type HspService = {
   readonly operatorCode: string;
   readonly rids: readonly string[];
   /** Absent when a tolerance came back missing or unreadable. */
-  readonly counts?: HspCounts;
+  readonly counts?: PunctualityTally;
 };
 
 export class HspResponseError extends Error {}
-
-export const NO_COUNTS: HspCounts = {
-  runs: 0,
-  within5: 0,
-  within14: 0,
-  within29: 0,
-  arrived: 0,
-};
 
 /**
  * Reads a serviceMetrics answer, with Darwin's station codes. A row with no departure,
@@ -72,7 +64,7 @@ export function parseServiceMetrics(payload: unknown): HspService[] {
   });
 }
 
-function parseCounts(value: unknown): HspCounts | undefined {
+function parseCounts(value: unknown): PunctualityTally | undefined {
   if (!Array.isArray(value)) {
     return undefined;
   }
@@ -99,22 +91,6 @@ function parseCounts(value: unknown): HspCounts | undefined {
     within14: fourteen.within,
     within29: twentyNine.within,
     arrived: all.within,
-  };
-}
-
-export function addCounts(
-  left: HspCounts,
-  right: HspCounts | undefined,
-): HspCounts {
-  if (!right) {
-    return left;
-  }
-  return {
-    runs: left.runs + right.runs,
-    within5: left.within5 + right.within5,
-    within14: left.within14 + right.within14,
-    within29: left.within29 + right.within29,
-    arrived: left.arrived + right.arrived,
   };
 }
 
