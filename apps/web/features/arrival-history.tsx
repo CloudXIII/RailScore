@@ -4,9 +4,7 @@ import type { HistoricalRun } from "@railscore/core";
 import { useBacklogState } from "@/features/backlog-context";
 import { historyFigures } from "@/features/backlog-figures";
 import type { DayFilter } from "@/features/day-grid";
-import { formatDate } from "@/features/format";
 import { ReliabilityResultView } from "@/features/reliability-result";
-import type { DayTypeResult } from "@/server/day-split";
 import { serviceKey, type ScheduledService } from "@/server/services/map";
 import type { Station } from "@/server/stations";
 import type { ReliabilityResult } from "@railscore/core";
@@ -21,10 +19,8 @@ export function ArrivalHistory({
   fromCrs,
   toCrs,
   period,
-  darwinFrom,
   darwinRuns,
   result,
-  byDay,
   stations,
   days,
   sample,
@@ -33,12 +29,9 @@ export function ArrivalHistory({
   fromCrs: string;
   toCrs: string;
   period: { from: string; to: string };
-  /** First day counted from Darwin. HSP covers the days before it. */
-  darwinFrom: string;
   darwinRuns: readonly HistoricalRun[];
   /** Darwin's figures alone, shown when there is no HSP answer. */
   result: ReliabilityResult;
-  byDay: readonly DayTypeResult[];
   stations: readonly Station[];
   days: DayFilter;
   sample: boolean;
@@ -50,16 +43,15 @@ export function ArrivalHistory({
     state !== undefined && !state.done && !backlog && !state.missing.has(key);
   const figures = backlog
     ? historyFigures({ darwinRuns, backlog, hspRuns: state?.runs ?? [] })
-    : { result, byDay, complete: true };
-  const before = formatDate(darwinFrom);
+    : { result, complete: true };
   const progress = waiting
-    ? `Adding journeys before ${before}…`
+    ? "Loading earlier journeys…"
     : backlog && !figures.complete
       ? state?.done
-        ? `${state.runs.length} of ${backlog.runCount} days before ${before} are on the calendar. The figures count them all. The rest could not be fetched just now: the data provider is busy. Reload in a few minutes to add them.`
-        : `Filling in the calendar: ${state?.runs.length ?? 0} of ${backlog.runCount} days before ${before}…`
+        ? `${state.runs.length} of ${backlog.runCount} earlier days are on the calendar. The figures count them all. The rest could not be loaded just now because the data provider is busy. Reload in a few minutes to add them.`
+        : `Loading earlier journeys: ${state?.runs.length ?? 0} of ${backlog.runCount} days…`
       : state?.missing.has(key)
-        ? `Journeys before ${before} could not be loaded just now (the data provider is busy), so they are left out. Reload in a few minutes to try again.`
+        ? "Earlier journeys could not be loaded just now because the data provider is busy, so they are left out. Reload in a few minutes to try again."
         : undefined;
   return (
     <ReliabilityResultView
@@ -68,7 +60,6 @@ export function ArrivalHistory({
       toCrs={toCrs}
       period={period}
       result={figures.result}
-      byDay={figures.byDay}
       stations={stations}
       days={days}
       sample={sample}
