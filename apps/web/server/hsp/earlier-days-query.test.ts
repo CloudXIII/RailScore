@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { backlogTrain, parseBacklogQuery } from "./backlog-query";
+import { earlierDaysTrain, parseEarlierDaysQuery } from "./earlier-days-query";
 
-const train = backlogTrain({
+const train = earlierDaysTrain({
   originCrs: "LIV",
   destinationCrs: "MIA",
   publicDeparture: "1000",
@@ -30,7 +30,7 @@ const body = {
   runsOf: train.key,
 };
 
-describe("parseBacklogQuery", () => {
+describe("parseEarlierDaysQuery", () => {
   it("sends each train with the schedules folded into it", () => {
     expect(train).toEqual({
       key: "1000-1058-NT-LIV-MIA",
@@ -50,14 +50,16 @@ describe("parseBacklogQuery", () => {
         },
       ],
     });
-    expect(parseBacklogQuery(JSON.parse(JSON.stringify(body)))).toEqual(body);
+    expect(parseEarlierDaysQuery(JSON.parse(JSON.stringify(body)))).toEqual(
+      body,
+    );
   });
 
   it("refuses a request out of shape or too large", () => {
-    expect(parseBacklogQuery({ ...body, periodDays: 7 })).toBeUndefined();
-    expect(parseBacklogQuery({ ...body, fromCrs: "liv" })).toBeUndefined();
+    expect(parseEarlierDaysQuery({ ...body, periodDays: 7 })).toBeUndefined();
+    expect(parseEarlierDaysQuery({ ...body, fromCrs: "liv" })).toBeUndefined();
     expect(
-      parseBacklogQuery({
+      parseEarlierDaysQuery({
         ...body,
         trains: [
           { ...train, legs: [{ ...train.legs[0], publicDeparture: "2460" }] },
@@ -75,9 +77,9 @@ describe("parseBacklogQuery", () => {
         },
       ],
     }));
-    expect(parseBacklogQuery({ ...body, trains: spread })).toBeDefined();
+    expect(parseEarlierDaysQuery({ ...body, trains: spread })).toBeDefined();
     expect(
-      parseBacklogQuery({
+      parseEarlierDaysQuery({
         ...body,
         trains: [
           ...spread,

@@ -3,7 +3,7 @@ import { PERIOD_LENGTHS } from "@/shared/search-query";
 import { record } from "../payload";
 import type { ScheduledService } from "@/shared/scheduled-service";
 import { serviceKey } from "@/shared/scheduled-service";
-import type { BacklogRequest, BacklogTrain } from "@/shared/contracts";
+import type { EarlierDaysRequest, EarlierDaysTrain } from "@/shared/contracts";
 import { quartersOf } from "./match";
 
 /** A page lists six trains, a few more when several leave at the same minute. */
@@ -13,7 +13,7 @@ const MAX_LEGS = 8;
 const MAX_QUARTERS = 16;
 
 /** What the page sends for its trains: each train with the schedules folded into it. */
-export function backlogTrain(service: ScheduledService): BacklogTrain {
+export function earlierDaysTrain(service: ScheduledService): EarlierDaysTrain {
   return {
     key: serviceKey(service),
     operatorCode: service.operatorCode,
@@ -27,7 +27,9 @@ export function backlogTrain(service: ScheduledService): BacklogTrain {
 }
 
 /** The request body, checked. Undefined when anything is out of shape or too large. */
-export function parseBacklogQuery(value: unknown): BacklogRequest | undefined {
+export function parseEarlierDaysQuery(
+  value: unknown,
+): EarlierDaysRequest | undefined {
   const body = record(value);
   if (!body) {
     return undefined;
@@ -49,7 +51,7 @@ export function parseBacklogQuery(value: unknown): BacklogRequest | undefined {
   if (trains.some((train) => train === undefined)) {
     return undefined;
   }
-  const checked = trains as BacklogTrain[];
+  const checked = trains as EarlierDaysTrain[];
   if (quartersOf(checked).length > MAX_QUARTERS) {
     return undefined;
   }
@@ -63,7 +65,7 @@ export function parseBacklogQuery(value: unknown): BacklogRequest | undefined {
   };
 }
 
-function parseTrain(value: unknown): BacklogTrain | undefined {
+function parseTrain(value: unknown): EarlierDaysTrain | undefined {
   const train = record(value);
   if (
     !train ||
@@ -100,7 +102,7 @@ function parseTrain(value: unknown): BacklogTrain | undefined {
   return {
     key: train.key,
     operatorCode: train.operatorCode,
-    legs: legs as BacklogTrain["legs"],
+    legs: legs as EarlierDaysTrain["legs"],
   };
 }
 

@@ -6,7 +6,7 @@ import {
   sumTallies,
   type PunctualityTally,
 } from "@railscore/core";
-import type { BacklogLeg, BacklogTrain } from "@/shared/contracts";
+import type { EarlierDaysLeg, EarlierDaysTrain } from "@/shared/contracts";
 import type { HspService } from "./metrics";
 
 /** A quarter-hour of departures, both ends inclusive, HHMM. */
@@ -19,7 +19,7 @@ export function quarterOf(hhmm: string): Quarter {
 }
 
 /** Quarter-hours the trains leave in, earliest first, each once. */
-export function quartersOf(trains: readonly BacklogTrain[]): Quarter[] {
+export function quartersOf(trains: readonly EarlierDaysTrain[]): Quarter[] {
   const starts = new Set(
     trains.flatMap((train) =>
       train.legs.map((leg) => quarterOf(leg.publicDeparture).fromTime),
@@ -28,7 +28,7 @@ export function quartersOf(trains: readonly BacklogTrain[]): Quarter[] {
   return [...starts].sort().map((fromTime) => quarterOf(fromTime));
 }
 
-export type TrainBacklog = {
+export type TrainEarlierDays = {
   readonly counts: PunctualityTally;
   readonly rids: readonly string[];
 };
@@ -49,15 +49,15 @@ export type TrainBacklog = {
  * Counts of every HSP train joined to one listed train are added. An HSP train with no count
  * adds none, and one that joins no listed train is left out.
  */
-export function matchBacklog(
-  trains: readonly BacklogTrain[],
+export function matchEarlierDays(
+  trains: readonly EarlierDaysTrain[],
   services: readonly HspService[],
-): Map<string, TrainBacklog> {
+): Map<string, TrainEarlierDays> {
   const joined = new Map<
     string,
     { counts: PunctualityTally; rids: string[] }
   >();
-  const join = (train: BacklogTrain, service: HspService) => {
+  const join = (train: EarlierDaysTrain, service: HspService) => {
     const current = joined.get(train.key) ?? { counts: NO_RUNS, rids: [] };
     joined.set(train.key, {
       counts: sumTallies([current.counts, service.counts]),
@@ -89,9 +89,9 @@ export function matchBacklog(
 
 /** The one listed train leaving and arriving at the searched stations at the same times. */
 function samePassengerTrain(
-  trains: readonly BacklogTrain[],
+  trains: readonly EarlierDaysTrain[],
   service: HspService,
-): BacklogTrain | undefined {
+): EarlierDaysTrain | undefined {
   if (!service.publicArrival) {
     return undefined;
   }
@@ -113,10 +113,10 @@ function dayOfRid(rid: string): string {
 }
 
 function matchingTrain(
-  trains: readonly BacklogTrain[],
+  trains: readonly EarlierDaysTrain[],
   service: HspService,
-): BacklogTrain | undefined {
-  const sameRun = (leg: BacklogLeg) =>
+): EarlierDaysTrain | undefined {
+  const sameRun = (leg: EarlierDaysLeg) =>
     leg.publicDeparture === service.publicDeparture &&
     leg.destinationCrs === service.destinationCrs;
   const candidates = trains.filter(

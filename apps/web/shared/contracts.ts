@@ -2,12 +2,12 @@ import type { HistoricalRun, PunctualityTally } from "@railscore/core";
 import type { DayPattern, ServiceDay } from "./day-type";
 
 /**
- * What the page and `/api/backlog` exchange: the request body, and the newline-delimited
+ * What the page and `/api/earlier-days` exchange: the request body, and the newline-delimited
  * events of the answer. Types only, shared by the client hook and the server.
  */
 
 /** One public schedule of a listed train: the train itself or a schedule folded into it. */
-export type BacklogLeg = {
+export type EarlierDaysLeg = {
   readonly originCrs: string;
   readonly destinationCrs: string;
   /** Departure from the boarding station, HHMM. */
@@ -17,25 +17,25 @@ export type BacklogLeg = {
 };
 
 /** A listed Darwin train, as the page asks HSP about it. */
-export type BacklogTrain = {
+export type EarlierDaysTrain = {
   /** The list's service key. */
   readonly key: string;
   readonly operatorCode: string;
-  readonly legs: readonly BacklogLeg[];
+  readonly legs: readonly EarlierDaysLeg[];
 };
 
 /** What the page asks HSP about: the listed trains, and the train whose runs it shows. */
-export type BacklogRequest = {
+export type EarlierDaysRequest = {
   readonly fromCrs: string;
   readonly toCrs: string;
   readonly days: DayPattern;
   readonly periodDays: number;
-  readonly trains: readonly BacklogTrain[];
+  readonly trains: readonly EarlierDaysTrain[];
   /** Key of the one train whose runs are fetched one by one, for its arrival history. */
   readonly runsOf?: string;
 };
 
-export type BacklogEvent =
+export type EarlierDaysEvent =
   /**
    * HSP's counts for one listed train, by day type, before Darwin's first day. HSP counts a
    * run within its high tolerance as arrived.

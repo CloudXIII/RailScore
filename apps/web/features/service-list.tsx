@@ -22,12 +22,12 @@ import {
   type ScheduledService,
 } from "@/shared/scheduled-service";
 import type { ParsedQuery } from "@/shared/search-query";
-import { useBacklogState } from "@/features/backlog-context";
+import { useEarlierDaysState } from "@/features/earlier-days-context";
 import {
-  backlogTotal,
+  earlierDaysTotal,
   listPunctuality,
-  type TrainBacklog,
-} from "@/features/backlog-figures";
+  type TrainEarlierDays,
+} from "@/features/earlier-days-figures";
 
 export function ServiceList({
   query,
@@ -63,17 +63,17 @@ export function ServiceList({
     const only = services.length === 1 ? services[0] : undefined;
     return only ? serviceKey(only) : undefined;
   });
-  const backlog = useBacklogState();
+  const earlierDays = useEarlierDaysState();
   if (!query.from || !query.to) {
     return null;
   }
   const from = query.from;
   const to = query.to;
   const waiting = (service: ScheduledService) =>
-    backlog !== undefined &&
-    !backlog.done &&
+    earlierDays !== undefined &&
+    !earlierDays.done &&
     services.includes(service) &&
-    !backlog.trains.has(serviceKey(service));
+    !earlierDays.trains.has(serviceKey(service));
   const loading = services.some(waiting);
   const row = (service: ScheduledService) => (
     <ServiceRow
@@ -83,7 +83,7 @@ export function ServiceList({
         stationName(crs, stations),
       )}
       searched={query.days}
-      backlog={backlog?.trains.get(serviceKey(service))}
+      earlierDays={earlierDays?.trains.get(serviceKey(service))}
       waiting={waiting(service)}
       chosen={chosen === serviceKey(service)}
       onChoose={() => setChosen(serviceKey(service))}
@@ -121,7 +121,7 @@ export function ServiceList({
       {loading ? (
         <p className="meta" role="status">
           Loading older journeys…
-          {backlog?.busy
+          {earlierDays?.busy
             ? " The data provider is busy, so this may take a few minutes."
             : ""}
         </p>
@@ -183,7 +183,7 @@ function ServiceRow({
   service,
   through,
   searched,
-  backlog,
+  earlierDays,
   waiting,
   chosen,
   onChoose,
@@ -192,7 +192,7 @@ function ServiceRow({
   through: string;
   searched: ParsedQuery["days"];
   /** HSP's counts for the days before Darwin, once they arrive. */
-  backlog: TrainBacklog | undefined;
+  earlierDays: TrainEarlierDays | undefined;
   /** HSP has not answered for this train yet. */
   waiting: boolean;
   chosen: boolean;
@@ -200,9 +200,10 @@ function ServiceRow({
 }) {
   const score = waiting
     ? undefined
-    : listScore(listPunctuality(service.punctuality, backlog));
+    : listScore(listPunctuality(service.punctuality, earlierDays));
   const journeys =
-    service.rids.length + (backlog ? backlogTotal(backlog).runs : 0);
+    service.rids.length +
+    (earlierDays ? earlierDaysTotal(earlierDays).runs : 0);
   const severe = score ? formatSevereJourneys(score.severe, score.runs) : "";
   return (
     <label className="card service">

@@ -8,7 +8,7 @@ The Darwin import began on 4 November 2026 ([ADR 1](0001-darwin-import-instead-o
 
 ## Decision
 
-Show the page from Darwin first, then fill the days of the period before `DARWIN_FIRST_DAY` from HSP through `/api/backlog`: list counts from `serviceMetrics`, then the history train's runs from `serviceDetails`, one at a time. Store every answer (`hsp_metrics` for two days, `hsp_backlog_runs` until they age out), so a second visit makes no HSP call. HSP counts become `PunctualityTally`s and go through the same `calculateReliability` as Darwin's runs.
+Show the page from Darwin first, then fill the days of the period before `DARWIN_FIRST_DAY` from HSP through `/api/earlier-days`: list counts from `serviceMetrics`, then the history train's runs from `serviceDetails`, one at a time. Store every answer (`hsp_metrics` for two days, `hsp_backlog_runs` until they age out), so a second visit makes no HSP call. HSP counts become `PunctualityTally`s and go through the same `calculateReliability` as Darwin's runs.
 
 ## Consequences
 

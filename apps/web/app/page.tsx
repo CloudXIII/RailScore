@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrivalHistory } from "@/features/arrival-history";
-import { BacklogProvider } from "@/features/backlog-context";
+import { EarlierDaysProvider } from "@/features/earlier-days-context";
 import { ThemeMenu } from "@/features/theme-menu";
 import { DataNotice } from "@/features/data-notice";
 import { pageTitle } from "@/features/page-title";
@@ -148,7 +148,7 @@ async function TrainPanel({
     const history = view.history;
 
     return (
-      <BacklogProvider request={view.backlog}>
+      <EarlierDaysProvider request={view.earlierDays}>
         {view.notice === "train-not-found" ? (
           <p className="warning" role="status">
             That service was not in the historical results for this search.
@@ -180,7 +180,7 @@ async function TrainPanel({
         ) : (
           trains
         )}
-      </BacklogProvider>
+      </EarlierDaysProvider>
     );
   } catch (error) {
     console.error("The search failed", errorText(error));

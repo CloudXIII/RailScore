@@ -1,15 +1,15 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { HistoricalRun } from "@railscore/core";
-import type { BacklogTrain } from "@/shared/contracts";
+import type { EarlierDaysTrain } from "@/shared/contracts";
 import {
   apply,
   finished,
-  followBacklog,
+  followEarlierDays,
   isComplete,
-  type BacklogState,
-} from "./use-backlog";
+  type EarlierDaysState,
+} from "./use-earlier-days";
 
-const empty: BacklogState = {
+const empty: EarlierDaysState = {
   trains: new Map(),
   missing: new Set(),
   runs: [],
@@ -26,9 +26,9 @@ const run = (id: string): HistoricalRun => ({
   latenessMinutes: 1,
 });
 
-const trains = [{ key: "A" }, { key: "B" }] as unknown as BacklogTrain[];
+const trains = [{ key: "A" }, { key: "B" }] as unknown as EarlierDaysTrain[];
 
-describe("a backlog asked again", () => {
+describe("earlier days asked again", () => {
   it("takes a train out of missing once a later attempt answers it", () => {
     const missed = apply(empty, { type: "missing", keys: ["A", "B"] });
     const answered = apply(missed, {
@@ -70,7 +70,7 @@ describe("a backlog asked again", () => {
   });
 });
 
-describe("followBacklog", () => {
+describe("followEarlierDays", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });
@@ -115,8 +115,8 @@ describe("followBacklog", () => {
         ),
       );
     vi.stubGlobal("fetch", fetch);
-    const states: BacklogState[] = [];
-    await followBacklog(
+    const states: EarlierDaysState[] = [];
+    await followEarlierDays(
       JSON.stringify({ trains, runsOf: "A" }),
       new AbortController().signal,
       (state) => states.push(state),
@@ -138,8 +138,8 @@ describe("followBacklog", () => {
         answer({ type: "missing", keys: ["A", "B"] }, { type: "end" }),
       );
     vi.stubGlobal("fetch", fetch);
-    const states: BacklogState[] = [];
-    await followBacklog(
+    const states: EarlierDaysState[] = [];
+    await followEarlierDays(
       JSON.stringify({ trains }),
       new AbortController().signal,
       (state) => states.push(state),
@@ -156,7 +156,7 @@ describe("followBacklog", () => {
       .fn()
       .mockResolvedValue(answer(train("A", 0), train("B", 0), { type: "end" }));
     vi.stubGlobal("fetch", fetch);
-    await followBacklog(
+    await followEarlierDays(
       JSON.stringify({ trains }),
       new AbortController().signal,
       () => undefined,
