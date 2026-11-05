@@ -2,7 +2,7 @@ import "server-only";
 import { database } from "./db";
 import { darwinKeepDays } from "./env";
 import { errorText } from "./error-text";
-import { deleteOldBacklog } from "./hsp/store";
+import { deleteOldEarlierDays } from "./hsp/store";
 
 /**
  * Housekeeping the import route runs after a Darwin import: HSP rows the searches no longer
@@ -14,7 +14,7 @@ export async function deleteOldRows(now = new Date()): Promise<void> {
     return;
   }
   try {
-    await deleteOldBacklog(sql, darwinKeepDays(), now);
+    await deleteOldEarlierDays(sql, darwinKeepDays(), now);
   } catch (error) {
     console.error("Old HSP rows could not be deleted", errorText(error));
   }

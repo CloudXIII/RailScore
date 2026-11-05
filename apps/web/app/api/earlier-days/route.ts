@@ -1,6 +1,6 @@
 import { errorText } from "@/server/error-text";
-import { parseBacklogQuery } from "@/server/hsp/backlog-query";
-import { streamBacklog } from "@/server/hsp/backlog";
+import { parseEarlierDaysQuery } from "@/server/hsp/earlier-days-query";
+import { streamEarlierDays } from "@/server/hsp/earlier-days";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -13,10 +13,12 @@ const BUDGET_MS = 60_000;
 
 /**
  * HSP figures for the days before Darwin, for trains a page already listed. The answer is
- * newline-delimited JSON, one event per line as each result arrives (see BacklogEvent).
+ * newline-delimited JSON, one event per line as each result arrives (see EarlierDaysEvent).
  */
 export async function POST(request: Request): Promise<Response> {
-  const query = parseBacklogQuery(await request.json().catch(() => undefined));
+  const query = parseEarlierDaysQuery(
+    await request.json().catch(() => undefined),
+  );
   if (!query) {
     return new Response("Bad request", { status: 400 });
   }
@@ -43,9 +45,9 @@ export async function POST(request: Request): Promise<Response> {
         }
       };
       try {
-        await streamBacklog(query, emit, { signal: gone.signal, deadline });
+        await streamEarlierDays(query, emit, { signal: gone.signal, deadline });
       } catch (error) {
-        console.error("The HSP backlog failed", errorText(error));
+        console.error("The HSP earlier days failed", errorText(error));
       } finally {
         if (open) {
           open = false;

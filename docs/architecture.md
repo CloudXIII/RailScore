@@ -6,10 +6,10 @@ How RailScore is put together. How to install, run and deploy it is in the [READ
 
 ```text
 packages/core/src/          run classification, punctuality tallies and figures, London dates
-apps/web/app/               home page (renders the search use case), /api/import/darwin and /api/backlog
+apps/web/app/               home page (renders the search use case), /api/import/darwin and /api/earlier-days
 apps/web/features/          the page's components and their pure helpers: search, list, result, day grid
 apps/web/shared/            types and pure helpers both sides use: listed trains, stations, the search
-                            query, day types, the /api/backlog contract
+                            query, day types, the /api/earlier-days contract
 apps/web/server/use-cases/  what a page asks for, as a view model: searching trains
 apps/web/server/            the train source port (Darwin or sample), search periods, call text,
                             maintenance, the station feed and directory, environment
@@ -35,7 +35,7 @@ packages/core  ──► nothing
 - `features/` and `shared/` run in the browser too, so they never import `server/`. ESLint enforces this (`no-restricted-imports` in `eslint.config.mjs`), and also that `packages/core` imports neither the app nor a framework.
 - The use case `server/use-cases/search-trains.ts` reads trains through the `TrainSource` port. `server/train-source.ts` picks the Darwin source or the sample one once, from `RAILSCORE_DATA`.
 - Darwin and HSP do not import each other. What both need sits in `server/`: search periods (`periods.ts`), the call text (`call-text.ts`) and maintenance (`maintenance.ts`).
-- The page and `/api/backlog` exchange the types in `shared/contracts.ts`.
+- The page and `/api/earlier-days` exchange the types in `shared/contracts.ts`.
 
 ## Darwin import
 
@@ -61,7 +61,7 @@ Runs stored before `mergeUpdate` matched a call by one public time could hold a 
 
 ## Days before Darwin (HSP)
 
-Until Darwin covers the whole period (30 days from about 4 December 2026, 90 days from about 2 February 2027), the page fills the days before `DARWIN_FIRST_DAY` from HSP ([ADR 0004](adr/0004-hsp-for-the-days-before-darwin.md)). The list and the history are first shown from Darwin; the page then reads `/api/backlog`, which answers one line of JSON per result as it arrives:
+Until Darwin covers the whole period (30 days from about 4 December 2026, 90 days from about 2 February 2027), the page fills the days before `DARWIN_FIRST_DAY` from HSP ([ADR 0004](adr/0004-hsp-for-the-days-before-darwin.md)). The list and the history are first shown from Darwin; the page then reads `/api/earlier-days`, which answers one line of JSON per result as it arrives:
 
 - **List figures.** One `serviceMetrics` call per quarter-hour the listed trains leave in (and per day type), for the dates from the start of the period to the day before Darwin, with tolerances of 5, 14, 29 and 999 minutes. HSP trains join the listed train with the same operator, origin, departure from the boarding station and destination (or the one listed train with the same operator, departure and destination), and their tallies are added to Darwin's. A row shows a placeholder until its quarter-hours are in.
 - **Arrival history.** The figures come from those tallies at once: `calculateReliability` takes the Darwin runs and HSP's tallies together. The calendar then fills from `serviceDetails`, one run at a time, newest first. A run is stored in `hsp_backlog_runs` in the `darwin_runs` text form and classified by the same rules, with one difference described in [data rules](data-rules.md). Once every run is in, the figures come from the runs.

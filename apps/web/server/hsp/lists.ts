@@ -1,5 +1,5 @@
 import type { ServiceDay } from "@/shared/day-type";
-import type { BacklogTrain } from "@/shared/contracts";
+import type { EarlierDaysTrain } from "@/shared/contracts";
 import { quarterOf, quartersOf, type Quarter } from "./match";
 import type { DateSpan } from "../periods";
 import { hspStationCode } from "./stations";
@@ -22,7 +22,7 @@ export type ListTask = {
  */
 export function listTasks(
   route: RouteCodes,
-  trains: readonly BacklogTrain[],
+  trains: readonly EarlierDaysTrain[],
   days: readonly ServiceDay[],
   span: DateSpan,
 ): ListTask[] {
@@ -51,7 +51,7 @@ export function listTasks(
 /** The lists that answer for one train. */
 export function tasksOf<T extends ListTask>(
   route: RouteCodes,
-  train: BacklogTrain,
+  train: EarlierDaysTrain,
   tasks: readonly T[],
 ): T[] {
   const stations = hspRoute(route, train);
@@ -63,14 +63,14 @@ export function tasksOf<T extends ListTask>(
   );
 }
 
-function hspRoute(route: RouteCodes, train: BacklogTrain): RouteCodes {
+function hspRoute(route: RouteCodes, train: EarlierDaysTrain): RouteCodes {
   return {
     fromCrs: hspStationCode(route.fromCrs, train.operatorCode),
     toCrs: hspStationCode(route.toCrs, train.operatorCode),
   };
 }
 
-function leavesIn(train: BacklogTrain, quarter: Quarter): boolean {
+function leavesIn(train: EarlierDaysTrain, quarter: Quarter): boolean {
   return train.legs.some(
     (leg) => quarterOf(leg.publicDeparture).fromTime === quarter.fromTime,
   );

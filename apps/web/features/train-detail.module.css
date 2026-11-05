@@ -1,0 +1,57 @@
+.detailScreen {
+  display: grid;
+}
+
+.detailScreen[data-view="result"] .detailTrains,
+.detailScreen[data-view="trains"] .detailResult {
+  display: none;
+}
+
+.detailResult {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.backTrains {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  justify-self: start;
+  min-height: 44px;
+  padding: 0.15rem 0.15rem;
+  color: var(--selected-line);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.backTrains:hover {
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.backChevron {
+  width: 0.7rem;
+  height: 1.15rem;
+}
+
+@media (min-width: 64rem) {
+  :global(body):has(.detailScreen) {
+    --content-width: 72rem;
+  }
+
+  .detailScreen {
+    grid-template-columns: minmax(20rem, 1fr) minmax(0, 2fr);
+    gap: 1.5rem;
+    align-items: start;
+  }
+
+  .detailScreen[data-view] .detailTrains,
+  .detailScreen[data-view] .detailResult {
+    display: grid;
+  }
+
+  .detailScreen .backTrains {
+    display: none;
+  }
+}
