@@ -57,7 +57,7 @@ Each run keeps its RID, date, operator, reason codes and every call with its pla
 
 ### One-off data fixes
 
-Runs stored before `mergeUpdate` matched a call by one public time can hold a repeated last stop. Until every database has been through `npm run db:fold-calls -w @railscore/web -- --write` (`apps/web/scripts/fold-repeated-calls.ts`), every read folds it (`withFoldedCalls` in `server/darwin/store.ts`). Without `--write` the script only counts the rows it would change; a second run changes nothing.
+Runs stored before `mergeUpdate` matched a call by one public time could hold a repeated last stop. `npm run db:fold-calls -w @railscore/web -- --write` (`apps/web/scripts/fold-repeated-calls.ts`) folded them into the stored rows once; production and the development branch went through it on 5 November 2026, so reads no longer fold. A database restored from before then needs it again. Without `--write` the script only counts the rows it would change; a second run changes nothing.
 
 ## Days before Darwin (HSP)
 

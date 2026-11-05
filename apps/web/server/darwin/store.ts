@@ -4,7 +4,7 @@ import { addCalendarDays, londonIsoDate } from "@railscore/core";
 import { decodeMonth, encodeMonthChunk, monthOf } from "./month";
 import type { DarwinUpdate } from "./push-port";
 import { decodeCalls, encodeCalls } from "../call-text";
-import { foldRepeatedCalls, mergeUpdate, type DarwinRun } from "./run";
+import { mergeUpdate, type DarwinRun } from "./run";
 
 /** Rows per statement. Postgres takes at most 65,535 parameters, seven per row here. */
 const WRITE_ROWS = 2_000;
@@ -168,7 +168,7 @@ type RunRow = {
 };
 
 function runOf(row: RunRow): DarwinRun {
-  return withFoldedCalls({
+  return {
     rid: row.rid,
     serviceDate: row.service_date,
     uid: row.uid,
@@ -176,16 +176,7 @@ function runOf(row: RunRow): DarwinRun {
     calls: decodeCalls(row.calls),
     ...(row.late_reason ? { lateReason: row.late_reason } : {}),
     ...(row.cancel_reason ? { cancelReason: row.cancel_reason } : {}),
-  });
-}
-
-/**
- * Runs stored before `mergeUpdate` matched a call by one public time can hold a repeated last
- * stop, so every read folds it. `scripts/fold-repeated-calls.ts` folds the stored rows once;
- * when every database has been through it, this fold can go.
- */
-function withFoldedCalls(run: DarwinRun): DarwinRun {
-  return { ...run, calls: foldRepeatedCalls(run.calls) };
+  };
 }
 
 /**
@@ -231,8 +222,7 @@ export async function runsOfTrains(
   ]);
   const runs = new Map<string, DarwinRun>();
   for (const row of months) {
-    for (const packed of decodeMonth(row.month, row.uid, row.runs)) {
-      const run = withFoldedCalls(packed);
+    for (const run of decodeMonth(row.month, row.uid, row.runs)) {
       if (
         run.serviceDate >= input.fromDate &&
         run.serviceDate <= input.toDate
