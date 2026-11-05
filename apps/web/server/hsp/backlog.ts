@@ -178,7 +178,9 @@ export async function streamBacklog(
   } catch (error) {
     console.error("HSP backlog failed", errorText(error));
   } finally {
-    await addCalls(takeCallCount());
+    await addCalls(takeCallCount()).catch((error: unknown) => {
+      console.error("[hsp] the call count was not saved", errorText(error));
+    });
     emit({ type: "end" });
   }
 }
@@ -317,7 +319,9 @@ async function streamRuns(
     return;
   }
   const renew = setInterval(() => {
-    void renewCallSlot(slot, owner);
+    renewCallSlot(slot, owner).catch((error: unknown) => {
+      console.error("[hsp] slot renewal failed", errorText(error));
+    });
   }, SLOT_RENEW_MS);
   const pending: HspRun[] = [];
   let failedInARow = 0;
