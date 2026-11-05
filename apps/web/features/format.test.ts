@@ -4,6 +4,7 @@ import {
   formatSevereJourneys,
   listIntro,
   listScore,
+  scoreTier,
   serviceDayNote,
   throughServiceLabel,
   departureWindowHint,
@@ -12,7 +13,7 @@ import {
 } from "./format";
 
 describe("train list copy", () => {
-  it("names the listed departures in the heading and explains on time once", () => {
+  it("names the listed departures in the heading and explains on time briefly", () => {
     expect(trainListHeading("07:00", ["0742", "0712", "0905"])).toBe(
       "Trains from 07:12 to 09:05",
     );
@@ -25,7 +26,7 @@ describe("train list copy", () => {
         sample: false,
       }),
     ).toBe(
-      "How often each direct train arrived on time in the last 30 days, up to 18/10/2026. On time means it arrived early or less than 5 minutes late.",
+      "Arrivals over the last 30 days. On time means no more than 5 minutes late.",
     );
     expect(
       listIntro({
@@ -34,13 +35,13 @@ describe("train list copy", () => {
         sample: false,
       }),
     ).toBe(
-      "How often each direct train arrived on time from 12/10/2026 to 18/10/2026, the days recorded so far. On time means it arrived early or less than 5 minutes late.",
+      "Arrivals since 12/10/2026, the first day recorded. On time means no more than 5 minutes late.",
     );
     expect(listIntro({ periodDays: 30, sample: false })).toBe(
-      "How often each direct train arrived on time in the last 30 days. On time means it arrived early or less than 5 minutes late.",
+      "Arrivals over the last 30 days. On time means no more than 5 minutes late.",
     );
     expect(listIntro({ periodDays: 30, sample: true })).toBe(
-      "Sample trains for trying the screens. On time means it arrived early or less than 5 minutes late.",
+      "Sample trains for trying the screens. On time means no more than 5 minutes late.",
     );
   });
 });
@@ -49,8 +50,19 @@ describe("departure time copy", () => {
   it("names the start time in the collapsed summary and the field hint", () => {
     expect(timeSearchLabel("07:30")).toBe("Departing from 07:30");
     expect(departureWindowHint()).toBe(
-      "Shows the next direct trains from this time.",
+      "Shows the next direct trains from this time. Journeys with a change are not included.",
     );
+  });
+});
+
+describe("scoreTier", () => {
+  it("reads 90 and above as good, 75 and above as fair", () => {
+    expect(scoreTier(100)).toBe("good");
+    expect(scoreTier(90)).toBe("good");
+    expect(scoreTier(89)).toBe("fair");
+    expect(scoreTier(75)).toBe("fair");
+    expect(scoreTier(74)).toBe("poor");
+    expect(scoreTier(0)).toBe("poor");
   });
 });
 
@@ -63,9 +75,11 @@ describe("listScore", () => {
         within14: 19,
         within29: 19,
       }),
-    ).toEqual({ onTimePercent: 95, severe: 1 });
-    expect(formatSevereJourneys(1)).toBe(
-      "1 journey cancelled or over 30 minutes late",
+    ).toEqual({ onTimePercent: 95, severe: 1, runs: 20 });
+    // 1 in 20 is under one in ten: no warning on the row.
+    expect(formatSevereJourneys(1, 20)).toBe("");
+    expect(formatSevereJourneys(3, 20)).toBe(
+      "3 of 20 journeys cancelled or over 30 minutes late",
     );
   });
 
@@ -77,8 +91,8 @@ describe("listScore", () => {
         within14: 300,
         within29: 300,
       }),
-    ).toEqual({ onTimePercent: 99, severe: 0 });
-    expect(formatSevereJourneys(0)).toBe("");
+    ).toEqual({ onTimePercent: 99, severe: 0, runs: 300 });
+    expect(formatSevereJourneys(0, 300)).toBe("");
   });
 
   it("is empty without a count or without journeys", () => {

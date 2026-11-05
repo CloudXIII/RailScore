@@ -1,6 +1,5 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
-import { addCalendarDays } from "@railscore/core";
 import { ArrivalHistory } from "@/features/arrival-history";
 import { BacklogProvider } from "@/features/backlog-context";
 import { ThemeMenu } from "@/features/theme-menu";
@@ -173,9 +172,6 @@ async function TrainPanel({
               : {}),
           }
         : undefined;
-    const darwinFrom = found.hsp
-      ? addCalendarDays(found.hsp.to, 1)
-      : found.period.from;
     const trains = (
       <ServiceList
         query={query}
@@ -210,10 +206,8 @@ async function TrainPanel({
                 fromCrs={query.from.crs}
                 toCrs={query.to.crs}
                 period={found.period}
-                darwinFrom={darwinFrom}
                 darwinRuns={calculation.runs}
                 result={calculation.result}
-                byDay={calculation.byDay}
                 stations={stations}
                 days={query.days}
                 sample={sample}

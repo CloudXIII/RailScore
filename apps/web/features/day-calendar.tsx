@@ -84,7 +84,7 @@ export function DayCalendar({
         <LegendItem swatch="day-severe" label="30+ min late" />
         <LegendItem
           swatch="day-cancelled"
-          label="Cancelled or did not arrive"
+          label="Cancelled or did not reach your destination"
         />
         {showMissing ? (
           <LegendItem swatch="day-missing" label="No data" />
@@ -180,7 +180,11 @@ function dayCell(
 
 function describe(mark: CalendarMark): { text: string; label: string } {
   if (mark.kind === "cancelled") {
-    return { text: "cancelled", label: "cancelled or did not arrive" };
+    // The full word does not fit a narrow cell. The cell label and the legend spell it out.
+    return {
+      text: "canc.",
+      label: "cancelled or did not reach the destination",
+    };
   }
   if (mark.kind === "no_data") {
     return { text: "no data", label: "no arrival time recorded" };
