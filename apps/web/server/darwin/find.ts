@@ -13,13 +13,8 @@ import {
   type DarwinServiceList,
 } from "./services";
 import type { DarwinRun } from "./run";
-import {
-  oldestRunDate,
-  openFrom,
-  runsOfTrains,
-  runsOnDay,
-  timetableDate,
-} from "./store";
+import { timetableDate } from "./import-state";
+import { oldestRunDate, openFrom, runsOfTrains, runsOnDay } from "./store";
 
 /** Days of the chosen type tried, newest first, for one with a timetable on this route. */
 const TIMETABLE_DAYS_TRIED = 3;

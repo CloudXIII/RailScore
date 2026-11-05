@@ -3,7 +3,8 @@ import { database } from "../db";
 import type { ScheduledService } from "../services/fold";
 import type { DarwinRun } from "./run";
 import { calculateFromDarwin, darwinSource } from "./source";
-import { oldestRunDate, runsOfTrains, runsOnDay, timetableDate } from "./store";
+import { timetableDate } from "./import-state";
+import { oldestRunDate, runsOfTrains, runsOnDay } from "./store";
 
 vi.mock("../db", () => ({ database: vi.fn() }));
 vi.mock("./store", async (importOriginal) => ({
@@ -11,8 +12,8 @@ vi.mock("./store", async (importOriginal) => ({
   oldestRunDate: vi.fn(),
   runsOfTrains: vi.fn(),
   runsOnDay: vi.fn(),
-  timetableDate: vi.fn(),
 }));
+vi.mock("./import-state", () => ({ timetableDate: vi.fn() }));
 
 /** Wednesday 4 November 2026, after the morning timetable is read. */
 const NOW = new Date("2026-11-04T12:00:00Z");

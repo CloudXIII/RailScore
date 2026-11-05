@@ -11,17 +11,15 @@ import {
 } from "./snapshot";
 import {
   acquireImport,
-  applyUpdates,
-  deleteOldRuns,
   importState,
   noteGap,
   noteGapFilled,
   noteProgress,
   noteTimetable,
-  packFinishedDays,
   releaseImport,
   timetableDate,
-} from "./store";
+} from "./import-state";
+import { applyUpdates, deleteOldRuns, packFinishedDays } from "./store";
 
 /** Messages folded into one database write and offset commit. */
 const FLUSH_MESSAGES = 5_000;
