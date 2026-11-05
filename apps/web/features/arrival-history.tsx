@@ -5,8 +5,8 @@ import { useBacklogState } from "@/features/backlog-context";
 import { historyFigures, shownPeriod } from "@/features/backlog-figures";
 import type { DayPattern } from "@/shared/day-type";
 import { ReliabilityResultView } from "@/features/reliability-result";
-import { serviceKey, type ScheduledService } from "@/server/services/fold";
-import type { Station } from "@/server/stations";
+import { serviceKey, type ScheduledService } from "@/shared/scheduled-service";
+import type { Station } from "@/shared/stations";
 import type { ReliabilityResult } from "@railscore/core";
 
 /**

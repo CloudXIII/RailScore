@@ -1,11 +1,12 @@
-import { clockMinutes, formatHhmm, type HistoricalRun } from "@railscore/core";
-import type { DayPattern, ServiceDay } from "@/shared/day-type";
 import {
-  serviceKey,
-  type ListPunctuality,
-  type ScheduledService,
-} from "@/server/services/fold";
-import type { Station } from "@/server/stations";
+  clockMinutes,
+  formatHhmm,
+  type HistoricalRun,
+  type PunctualityTally,
+} from "@railscore/core";
+import type { DayPattern, ServiceDay } from "@/shared/day-type";
+import { serviceKey, type ScheduledService } from "@/shared/scheduled-service";
+import type { Station } from "@/shared/stations";
 
 type MockProfile = "reliable" | "poor" | "sparse" | "partial" | "empty";
 
@@ -127,7 +128,7 @@ export function mockRuns(service: ScheduledService): HistoricalRun[] {
 }
 
 /** The list's count for sample runs. Runs with no data are left out, as for real runs. */
-function mockPunctuality(runs: readonly HistoricalRun[]): ListPunctuality {
+function mockPunctuality(runs: readonly HistoricalRun[]): PunctualityTally {
   const known = runs.filter((run) => run.outcome !== "missing_actual");
   const within = (minutes: number) =>
     known.filter(
@@ -138,6 +139,7 @@ function mockPunctuality(runs: readonly HistoricalRun[]): ListPunctuality {
     within5: within(5),
     within14: within(14),
     within29: within(29),
+    arrived: within(Infinity),
   };
 }
 

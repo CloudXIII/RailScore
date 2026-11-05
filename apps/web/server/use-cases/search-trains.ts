@@ -8,7 +8,7 @@ import {
   matchesServiceKey,
   serviceKey,
   type ScheduledService,
-} from "../services/fold";
+} from "@/shared/scheduled-service";
 import { trainSource, type TrainSource } from "../train-source";
 
 export type TrainSearch = {

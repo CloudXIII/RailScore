@@ -5,7 +5,7 @@ import {
   londonIsoDate,
   type HistoricalRun,
 } from "@railscore/core";
-import type { ScheduledService } from "../services/fold";
+import type { ScheduledService } from "@/shared/scheduled-service";
 import type { ServiceCalculation, TrainSource } from "../train-source";
 import { findDarwinServices } from "./find";
 import { historicalRunFromDarwin, type DarwinRun } from "./run";

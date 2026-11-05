@@ -1,22 +1,10 @@
 import { isDayPattern, type DayPattern } from "@/shared/day-type";
-import { resolveStation, type Station } from "./stations";
-
-/** Days of history. Finished days are packed into month rows, so 90 fit in Neon Free (0.5 GB). */
-export const PERIOD_LENGTHS = [30, 60, 90] as const;
-type PeriodLength = (typeof PERIOD_LENGTHS)[number];
-
-export type ParsedQuery = {
-  fromText: string;
-  toText: string;
-  time: string;
-  days: DayPattern;
-  period: PeriodLength;
-  from?: Station;
-  to?: Station;
-  serviceKey?: string;
-  calculate: boolean;
-  errors: string[];
-};
+import {
+  PERIOD_LENGTHS,
+  type ParsedQuery,
+  type PeriodLength,
+} from "@/shared/search-query";
+import { resolveStation, type Station } from "@/shared/stations";
 
 export function parseQuery(
   params: Record<string, string | string[] | undefined>,

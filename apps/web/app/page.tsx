@@ -11,12 +11,13 @@ import { SearchForm } from "@/features/search-form";
 import { ServiceList } from "@/features/service-list";
 import { TrainDetail } from "@/features/train-detail";
 import { errorText } from "@/server/error-text";
-import { parseQuery, timeHhmm, type ParsedQuery } from "@/server/query";
+import { parseQuery, timeHhmm } from "@/server/query";
+import { type ParsedQuery } from "@/shared/search-query";
 import {
   loadStationDirectory,
   StationDirectoryError,
 } from "@/server/station-directory";
-import type { Station } from "@/server/stations";
+import type { Station } from "@/shared/stations";
 import { trainSource } from "@/server/train-source";
 import { searchTrains } from "@/server/use-cases/search-trains";
 

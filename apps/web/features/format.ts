@@ -1,11 +1,16 @@
-import { addCalendarDays, counted, journeyMinutes } from "@railscore/core";
+import {
+  addCalendarDays,
+  counted,
+  journeyMinutes,
+  type PunctualityTally,
+} from "@railscore/core";
 import {
   DAY_TYPES,
   dayTypesOf,
   type DayPattern,
   type ServiceDay,
 } from "@/shared/day-type";
-import type { ListPunctuality, ScheduledService } from "@/server/services/fold";
+import type { ScheduledService } from "@/shared/scheduled-service";
 
 export const DAY_LABELS: Record<ServiceDay, string> = {
   weekdays: "Weekdays",
@@ -103,7 +108,7 @@ export type ListScore = {
  * Severe journeys are those outside 29 minutes: cancelled or 30 or more minutes late.
  */
 export function listScore(
-  punctuality: ListPunctuality | undefined,
+  punctuality: PunctualityTally | undefined,
 ): ListScore | undefined {
   if (!punctuality || punctuality.runs === 0) {
     return undefined;

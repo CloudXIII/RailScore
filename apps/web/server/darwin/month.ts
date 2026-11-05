@@ -1,5 +1,5 @@
 import type { StoredCall } from "../call-text";
-import { foldRepeatedCalls, type DarwinRun } from "./run";
+import type { DarwinRun } from "./run";
 
 /**
  * Finished days of one schedule UID, packed into one text per calendar month.
@@ -111,8 +111,7 @@ export function decodeMonth(
       serviceDate,
       uid,
       toc,
-      // Months packed before calls matched by one public time can hold a repeated last stop.
-      calls: foldRepeatedCalls(calls),
+      calls,
       ...(lateReason ? { lateReason } : {}),
       ...(cancelReason ? { cancelReason } : {}),
     };

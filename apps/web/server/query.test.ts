@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { parseQuery, type ParsedQuery } from "./query";
-import type { Station } from "./stations";
+import { parseQuery } from "./query";
+import { type ParsedQuery } from "@/shared/search-query";
+import type { Station } from "@/shared/stations";
 
 const STATIONS: readonly Station[] = [
   { crs: "EUS", name: "London Euston" },
