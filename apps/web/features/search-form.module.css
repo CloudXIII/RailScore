@@ -70,7 +70,7 @@
 }
 
 .departAfter :global(.meta) {
-  max-width: 22rem;
+  max-width: 26rem;
 }
 
 .departAfter input[type="time"] {

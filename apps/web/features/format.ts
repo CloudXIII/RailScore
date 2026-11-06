@@ -205,7 +205,7 @@ export function timeSearchLabel(time: string): string {
 
 /** Help under the time field. */
 export function departureWindowHint(): string {
-  return "Shows the next direct trains from this time. Journeys with a change are not included.";
+  return "Direct trains only, leaving from this time.";
 }
 
 /**
