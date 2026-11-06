@@ -43,7 +43,7 @@ describe("departure time copy", () => {
   it("names the start time in the collapsed summary and the field hint", () => {
     expect(timeSearchLabel("07:30")).toBe("07:30 onwards");
     expect(departureWindowHint()).toBe(
-      "Shows the next direct trains from this time. Journeys with a change are not included.",
+      "Direct trains only, leaving from this time.",
     );
   });
 });
