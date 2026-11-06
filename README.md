@@ -4,20 +4,15 @@
 
 RailScore shows how a direct UK train has performed on its recent runs: arrivals within 5 minutes, cancellations, and a delay distribution. It is not a journey planner. Journeys with a change are out of scope. There is no single score.
 
+<img src="docs/arrival-history.png" alt="Trains from London Euston to Manchester Piccadilly, with the arrival history of the 06:46" width="100%">
+
+On a phone: search, trains, arrival history.
+
 <table>
   <tr>
-    <td valign="top">
-      <img src="docs/search.png" alt="Search" width="230">
-    </td>
-    <td valign="top">
-      <img src="docs/train-list.png" alt="Trains" width="312">
-    </td>
-    <td valign="top">
-      <img src="docs/arrival-history.png" alt="Arrival history" width="302">
-    </td>
-    <td valign="top">
-      <img src="docs/arrival-history-mobile.png" alt="Arrival history on a phone" width="56">
-    </td>
+    <td><img src="docs/search.png" alt="Search" width="260"></td>
+    <td><img src="docs/train-list.png" alt="Trains" width="260"></td>
+    <td><img src="docs/arrival-history-mobile.png" alt="Arrival history on a phone" width="260"></td>
   </tr>
 </table>
 
