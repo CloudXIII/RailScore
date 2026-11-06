@@ -5,8 +5,6 @@ export type DateSpan = { readonly from: string; readonly to: string };
 export type SearchPeriods = {
   /** Dates the figures cover. */
   readonly period: DateSpan;
-  /** First day counted from Darwin. */
-  readonly darwinFrom: string;
   /** Days before Darwin that HSP fills. Absent once Darwin covers the whole period, or without HSP. */
   readonly hsp?: DateSpan;
 };
@@ -35,7 +33,6 @@ export function searchPeriods(
       from: hsp || trailing.from > darwinFrom ? trailing.from : darwinFrom,
       to: trailing.to,
     },
-    darwinFrom,
     ...(hsp ? { hsp } : {}),
   };
 }
