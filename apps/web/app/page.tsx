@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ArrivalHistory } from "@/features/arrival-history";
 import { EarlierDaysProvider } from "@/features/earlier-days-context";
 import { ThemeMenu } from "@/features/theme-menu";
-import { DataNotice } from "@/features/data-notice";
+import { AboutFigures, DataNotice } from "@/features/data-notice";
 import { pageTitle } from "@/features/page-title";
 import { listHref } from "@/features/search-href";
 import { SearchForm } from "@/features/search-form";
@@ -181,6 +181,11 @@ async function TrainPanel({
         ) : (
           trains
         )}
+        {/* Sample data has its own notice in the footer. */}
+        {!trainSource().sample &&
+        (history || view.services.length > 0 || view.retired.length > 0) ? (
+          <AboutFigures />
+        ) : null}
       </EarlierDaysProvider>
     );
   } catch (error) {
