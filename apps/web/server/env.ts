@@ -70,14 +70,16 @@ export function stationsFeed(): { baseUrl: string; apiKey: string } {
 
 export type DarwinKafka = {
   brokers: string[];
-  mechanism: "plain";
   username: string;
   password: string;
   groupId: string;
   topic: string;
 };
 
-/** Darwin Push Port on the Rail Data Marketplace, from the product's Pub/Sub tab. The XML topic. */
+/**
+ * Darwin Push Port on the Rail Data Marketplace, from the product's Pub/Sub tab. The XML topic.
+ * The tab gives SASL PLAIN over SSL, so the import sets both itself.
+ */
 export function darwinKafka(): DarwinKafka {
   const values = {
     DARWIN_KAFKA_BOOTSTRAP: read("DARWIN_KAFKA_BOOTSTRAP"),
@@ -89,10 +91,6 @@ export function darwinKafka(): DarwinKafka {
   const absent = Object.entries(values)
     .filter(([, value]) => value === undefined)
     .map(([name]) => name);
-  const mechanism = read("DARWIN_KAFKA_SASL_MECHANISM") ?? "PLAIN";
-  if (mechanism.toUpperCase() !== "PLAIN") {
-    throw new Error(`Unsupported DARWIN_KAFKA_SASL_MECHANISM: ${mechanism}`);
-  }
   if (absent.length > 0) {
     throw new MissingEnvironmentError(absent.join(", "));
   }
@@ -100,7 +98,6 @@ export function darwinKafka(): DarwinKafka {
     brokers: values
       .DARWIN_KAFKA_BOOTSTRAP!.split(",")
       .map((broker) => broker.trim()),
-    mechanism: "plain",
     username: values.DARWIN_KAFKA_USERNAME!,
     password: values.DARWIN_KAFKA_PASSWORD!,
     groupId: values.DARWIN_KAFKA_GROUP!,
