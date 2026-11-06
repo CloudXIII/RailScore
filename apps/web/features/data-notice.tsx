@@ -8,9 +8,9 @@ export function DataNotice({ sample }: { sample: boolean }) {
           <>
             <h2>About these figures</h2>
             <p>
-              These screens use sample data. The trains and figures are made
-              up. They are not historical performance from Rail Delivery Group.
-              Only direct trains are shown.
+              These screens use sample data. The trains and figures are made up.
+              They are not historical performance from Rail Delivery Group. Only
+              direct trains are shown.
             </p>
           </>
         ) : (
