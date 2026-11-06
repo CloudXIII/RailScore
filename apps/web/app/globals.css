@@ -126,6 +126,7 @@ p {
 .meta {
   color: var(--muted);
   font-size: 0.925rem;
+  text-wrap: pretty;
 }
 
 .visually-hidden {
