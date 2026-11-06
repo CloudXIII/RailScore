@@ -125,7 +125,7 @@ async function readKafka(
     brokers: config.brokers,
     ssl: true,
     sasl: {
-      mechanism: config.mechanism,
+      mechanism: "plain",
       username: config.username,
       password: config.password,
     },
