@@ -30,7 +30,7 @@ RailScore shows how a direct UK train has performed on its recent runs: arrivals
 - Train lists start from today's Darwin timetable and pool each train's past runs by schedule UID.
 - Runs on free tiers only: Vercel Hobby, Neon Free (0.5 GB: 90 days of the whole network, packed into month rows), and cron-job.org.
 
-Built with AI-assisted development (Cursor).
+Built with AI-assisted development (Cursor, Claude Code).
 
 How it is built is in [docs/architecture.md](docs/architecture.md), the classification and counting rules in [docs/data-rules.md](docs/data-rules.md), and the main decisions in [docs/adr/](docs/adr/).
 
