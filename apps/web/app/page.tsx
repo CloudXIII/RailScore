@@ -13,6 +13,7 @@ import { TrainDetail } from "@/features/train-detail";
 import { errorText } from "@/server/error-text";
 import { parseQuery, timeHhmm } from "@/server/query";
 import { type ParsedQuery } from "@/shared/search-query";
+import { ownDays, type DayPattern, type ServiceDay } from "@/shared/day-type";
 import {
   loadStationDirectory,
   StationDirectoryError,
@@ -139,10 +140,12 @@ async function TrainPanel({
       <ServiceList
         query={query}
         services={view.services}
+        {...(view.overnight ? { overnight: view.overnight } : {})}
         retired={view.retired}
         listed={view.period}
         earlier={view.earlier}
         later={view.later}
+        {...(view.laterDays ? { laterDays: view.laterDays } : {})}
         {...(view.darwinFrom ? { darwinFrom: view.darwinFrom } : {})}
         stations={stations}
       />
@@ -174,7 +177,7 @@ async function TrainPanel({
                 darwinRuns={history.darwinRuns}
                 result={history.result}
                 stations={stations}
-                days={query.days}
+                days={historyDays(history.service.days, query.days)}
               />
             }
             trains={trains}
@@ -184,7 +187,10 @@ async function TrainPanel({
         )}
         {/* Sample data has its own notice in the footer. */}
         {!trainSource().sample &&
-        (history || view.services.length > 0 || view.retired.length > 0) ? (
+        (history ||
+          view.services.length > 0 ||
+          (view.overnight?.length ?? 0) > 0 ||
+          view.retired.length > 0) ? (
           <AboutFigures />
         ) : null}
       </EarlierDaysProvider>
@@ -233,4 +239,13 @@ function panelKey(query: ParsedQuery): string {
     query.serviceKey,
     query.calculate,
   ].join("|");
+}
+
+/** The day type a train's calendar marks: its own when it is a train after midnight from the next night's list. */
+function historyDays(
+  days: readonly ServiceDay[],
+  searched: DayPattern,
+): DayPattern {
+  const own = ownDays(days, searched);
+  return own?.length === 1 ? own[0]! : searched;
 }
