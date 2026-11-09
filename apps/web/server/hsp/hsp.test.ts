@@ -424,7 +424,7 @@ describe("listTasks", () => {
   const elizabeth = train("xr", "XR", "0731");
 
   it("gives an Elizabeth line train its own list at the stations HSP names", () => {
-    const route = { fromCrs: "PAD", toCrs: "RDG" };
+    const route = { fromCrs: "PAD", toCrs: "RDG", days: "weekdays" as const };
     const tasks = listTasks(
       route,
       [greatWestern, elizabeth],
@@ -442,7 +442,7 @@ describe("listTasks", () => {
   });
 
   it("shares one list where both operators use the same codes", () => {
-    const route = { fromCrs: "RDG", toCrs: "TWY" };
+    const route = { fromCrs: "RDG", toCrs: "TWY", days: "all" as const };
     const tasks = listTasks(
       route,
       [greatWestern, elizabeth],
@@ -454,5 +454,22 @@ describe("listTasks", () => {
       "RDG|TWY|saturday|0730|2026-10-06|2026-11-03",
     ]);
     expect(tasksOf(route, elizabeth, tasks)).toEqual(tasks);
+  });
+
+  it("asks about a train after midnight on its own day type", () => {
+    const route = { fromCrs: "VIC", toCrs: "BTN", days: "saturday" as const };
+    const late = { ...train("sat", "SN", "0005"), key: "sat" };
+    const sunday = { ...train("sun", "SN", "0002"), days: ["sunday" as const] };
+    const tasks = listTasks(route, [late, sunday], ["saturday"], span);
+    expect(tasks.map((task) => task.key)).toEqual([
+      "VIC|BTN|saturday|0000|2026-10-06|2026-11-03",
+      "VIC|BTN|sunday|0000|2026-10-06|2026-11-03",
+    ]);
+    expect(tasksOf(route, late, tasks).map((task) => task.day)).toEqual([
+      "saturday",
+    ]);
+    expect(tasksOf(route, sunday, tasks).map((task) => task.day)).toEqual([
+      "sunday",
+    ]);
   });
 });

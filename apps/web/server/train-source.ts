@@ -31,6 +31,12 @@ export type ServiceSearch = {
   readonly services: readonly ScheduledService[];
   /** Trains that ran early in the period and no longer do. */
   readonly retired: readonly ScheduledService[];
+  /**
+   * Trains after midnight that end the day: its own trains that board after midnight, then the
+   * next night's early trains, counted on that night's day type. Absent when the list stops
+   * before the end of the day, or the source has none.
+   */
+  readonly overnight?: readonly ScheduledService[];
   /** Dates the figures cover. Without HSP, starts at the first counted Darwin day when that is later. */
   readonly period: DateSpan;
   /** Days before Darwin that HSP fills in after the list is shown. Absent once Darwin covers the period. */
@@ -39,6 +45,8 @@ export type ServiceSearch = {
   readonly earlier?: string;
   /** Searched time, HHMM, that lists the trains just after these. None at the end of the day. */
   readonly later?: string;
+  /** Day type of the list `later` opens, when it is the next night's rather than the searched one. */
+  readonly laterDays?: DayPattern;
   /** Reliability of one of the trains found, from the runs this search read. */
   calculate(service: ScheduledService): ServiceCalculation;
 };

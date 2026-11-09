@@ -8,7 +8,7 @@ import {
 } from "@railscore/core";
 import { dayTypeOf, dayTypesOf, type DayPattern } from "@/shared/day-type";
 import { listServices } from "../services/fold";
-import { type ScheduledService } from "@/shared/scheduled-service";
+import { serviceKey, type ScheduledService } from "@/shared/scheduled-service";
 import { historicalRunFromDarwin, type DarwinRun } from "./run";
 
 export type DarwinSearch = {
@@ -28,13 +28,31 @@ export type DarwinServiceList = {
   timetableDate: string;
 };
 
-/** Departure times a list covers, HHMM, both inclusive. */
-export type ClockWindow = { from: string; to: string };
+/**
+ * Departure times a list covers, HHMM, both inclusive. A run's times belong to its service
+ * date, the day it starts. A train that boards after midnight, on the day after its service
+ * date, is only in a window marked `afterMidnight`, so it is never listed among the trains
+ * of the early morning of its own service date.
+ */
+export type ClockWindow = { from: string; to: string; afterMidnight?: boolean };
 
 export const WHOLE_DAY: ClockWindow = { from: "0000", to: "2359" };
 
+/** The trains of a day that board after midnight, on the next day. */
+export const AFTER_MIDNIGHT: ClockWindow = {
+  from: "0000",
+  to: "2359",
+  afterMidnight: true,
+};
+
+/**
+ * The early trains of the next day's list that a list goes on with after its last train:
+ * those before 04:00. The first trains of the morning start around then.
+ */
+export const NIGHT: ClockWindow = { from: "0000", to: "0359" };
+
 /** Trains a list shows from the searched time. */
-const LIST_SIZE = 6;
+export const LIST_SIZE = 6;
 
 export type TrainPage = {
   services: ScheduledService[];
@@ -79,6 +97,29 @@ export function trainPage(
   };
 }
 
+/**
+ * The trains after midnight that end a list: the day's own trains that board after midnight,
+ * then the next day's early trains, in clock order. A train already listed is not repeated,
+ * as when the next day's list is the same timetable as this one.
+ */
+export function overnightList(
+  listed: readonly ScheduledService[],
+  afterMidnight: readonly ScheduledService[],
+  nextDay: readonly ScheduledService[],
+): ScheduledService[] {
+  const seen = new Set(listed.map(serviceKey));
+  const night: ScheduledService[] = [];
+  for (const service of [...afterMidnight, ...nextDay]) {
+    if (!seen.has(serviceKey(service))) {
+      seen.add(serviceKey(service));
+      night.push(service);
+    }
+  }
+  return night.sort((left, right) =>
+    left.publicDeparture.localeCompare(right.publicDeparture),
+  );
+}
+
 /** Schedule UIDs of the runs that board in `window` on this search. */
 export function uidsLeaving(
   runs: readonly DarwinRun[],
@@ -87,7 +128,7 @@ export function uidsLeaving(
 ): string[] {
   const uids = runs.flatMap((run) => {
     const leg = legOf(run, search.fromCrs, search.toCrs);
-    return leg && run.uid && inWindow(leg.departure, window) ? [run.uid] : [];
+    return leg && run.uid && inWindow(leg, window) ? [run.uid] : [];
   });
   return [...new Set(uids)];
 }
@@ -122,7 +163,7 @@ export function servicesFromRuns(
       !day ||
       !leg ||
       !dayTypes.includes(day) ||
-      !inWindow(leg.departure, window) ||
+      !inWindow(leg, window) ||
       run.serviceDate > input.today ||
       (run.serviceDate === input.today && !input.todayTimetable)
     ) {
@@ -203,7 +244,12 @@ function legOf(
   fromCrs: string,
   toCrs: string,
 ):
-  | { departure: string; arrival: string; passedDestination: boolean }
+  | {
+      departure: string;
+      arrival: string;
+      passedDestination: boolean;
+      afterMidnight: boolean;
+    }
   | undefined {
   const leg = passengerLeg(run.calls, {
     boardingCrs: fromCrs,
@@ -222,8 +268,35 @@ function legOf(
     passedDestination: run.calls
       .slice(0, leg.boarding)
       .some((call) => call.crs === toCrs),
+    afterMidnight: crossesMidnight(run.calls.slice(0, leg.boarding! + 1)),
   };
 }
+
+/**
+ * True when the public times run past midnight by the last of these calls: a time more than
+ * twelve hours before the one before it is on the next day. A run's times are on its service
+ * date until then.
+ */
+export function crossesMidnight(
+  calls: readonly { pta?: string; ptd?: string }[],
+): boolean {
+  let previous: number | undefined;
+  for (const call of calls) {
+    for (const time of [call.pta, call.ptd]) {
+      if (!time) {
+        continue;
+      }
+      const minute = clockMinutes(time);
+      if (previous !== undefined && minute < previous - HALF_DAY) {
+        return true;
+      }
+      previous = minute;
+    }
+  }
+  return false;
+}
+
+const HALF_DAY = 12 * 60;
 
 /** The list's counts for one run. A run with no known outcome is not counted. */
 function punctualityOf(run: DarwinRun, search: DarwinSearch): PunctualityTally {
@@ -267,8 +340,14 @@ function countedOnly(counted: (date: string) => boolean) {
   });
 }
 
-function inWindow(hhmm: string, window: ClockWindow): boolean {
-  const minute = clockMinutes(hhmm);
+function inWindow(
+  leg: { departure: string; afterMidnight: boolean },
+  window: ClockWindow,
+): boolean {
+  if (leg.afterMidnight !== Boolean(window.afterMidnight)) {
+    return false;
+  }
+  const minute = clockMinutes(leg.departure);
   const from = clockMinutes(window.from);
   const to = clockMinutes(window.to);
   return from <= to

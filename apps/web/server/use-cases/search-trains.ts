@@ -33,9 +33,13 @@ export type TrainSearch = {
 export type TrainSearchView = {
   readonly services: readonly ScheduledService[];
   readonly retired: readonly ScheduledService[];
+  /** Trains after midnight that end the day. Absent when the list stops before it. */
+  readonly overnight?: readonly ScheduledService[];
   readonly period: DateSpan;
   readonly earlier?: string;
   readonly later?: string;
+  /** Day type of the list `later` opens, when it is not the searched one. */
+  readonly laterDays?: DayPattern;
   /** Why a history was asked for and none is shown. */
   readonly notice?: "choose-train" | "train-not-found";
   /** The chosen train's arrival history from Darwin. */
@@ -71,8 +75,8 @@ export async function searchTrains(
   });
   const key = search.serviceKey;
   const selected = key
-    ? [...found.services, ...found.retired].find((service) =>
-        matchesServiceKey(service, key),
+    ? [...found.services, ...(found.overnight ?? []), ...found.retired].find(
+        (service) => matchesServiceKey(service, key),
       )
     : undefined;
   const calculation =
@@ -86,7 +90,7 @@ export async function searchTrains(
           ...(found.hsp ? { hspDays: found.hsp } : {}),
         }
       : undefined;
-  const listed = [...found.services];
+  const listed = [...found.services, ...(found.overnight ?? [])];
   if (history && !listed.includes(history.service)) {
     listed.unshift(history.service);
   }
@@ -97,7 +101,9 @@ export async function searchTrains(
           toCrs: search.toCrs,
           days: search.days,
           periodDays: search.periodDays,
-          trains: listed.map(earlierDaysTrain),
+          trains: listed.map((service) =>
+            earlierDaysTrain(service, search.days),
+          ),
           ...(history ? { runsOf: serviceKey(history.service) } : {}),
         }
       : undefined;
@@ -111,9 +117,11 @@ export async function searchTrains(
   return {
     services: found.services,
     retired: found.retired,
+    ...(found.overnight ? { overnight: found.overnight } : {}),
     period: found.period,
     ...(found.earlier ? { earlier: found.earlier } : {}),
     ...(found.later ? { later: found.later } : {}),
+    ...(found.laterDays ? { laterDays: found.laterDays } : {}),
     ...(notice ? { notice } : {}),
     ...(history ? { history } : {}),
     ...(earlierDays ? { earlierDays } : {}),
