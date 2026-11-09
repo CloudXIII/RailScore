@@ -1,25 +1,29 @@
 import { describe, expect, it } from "vitest";
+import type { ScheduledService } from "@/shared/scheduled-service";
 import { earlierDaysTrain, parseEarlierDaysQuery } from "./earlier-days-query";
 
-const train = earlierDaysTrain({
-  originCrs: "LIV",
-  destinationCrs: "MIA",
-  publicDeparture: "1000",
-  publicArrival: "1058",
-  operatorCode: "NT",
-  rids: [],
-  days: ["weekdays"],
-  variants: [
-    {
-      originCrs: "LIV",
-      destinationCrs: "MAN",
-      publicDeparture: "1002",
-      publicArrival: "1050",
-      runCount: 1,
-      rids: [],
-    },
-  ],
-});
+const train = earlierDaysTrain(
+  {
+    originCrs: "LIV",
+    destinationCrs: "MIA",
+    publicDeparture: "1000",
+    publicArrival: "1058",
+    operatorCode: "NT",
+    rids: [],
+    days: ["weekdays"],
+    variants: [
+      {
+        originCrs: "LIV",
+        destinationCrs: "MAN",
+        publicDeparture: "1002",
+        publicArrival: "1050",
+        runCount: 1,
+        rids: [],
+      },
+    ],
+  },
+  "weekdays",
+);
 
 const body = {
   fromCrs: "LIV",
@@ -91,5 +95,33 @@ describe("parseEarlierDaysQuery", () => {
         ],
       }),
     ).toBeUndefined();
+  });
+
+  it("gives a train after midnight from the next night's list its own day types", () => {
+    const service: ScheduledService = {
+      originCrs: "VIC",
+      destinationCrs: "LIT",
+      publicDeparture: "0002",
+      publicArrival: "0135",
+      operatorCode: "SN",
+      rids: [],
+      days: ["sunday"],
+    };
+    const sunday = earlierDaysTrain(service, "saturday");
+    expect(sunday.days).toEqual(["sunday"]);
+    expect(
+      parseEarlierDaysQuery({ ...body, days: "saturday", trains: [sunday] })
+        ?.trains[0]?.days,
+    ).toEqual(["sunday"]);
+    expect(
+      parseEarlierDaysQuery({
+        ...body,
+        trains: [{ ...sunday, days: ["friday"] }],
+      }),
+    ).toBeUndefined();
+    expect(
+      earlierDaysTrain({ ...service, days: ["saturday"] }, "saturday").days,
+    ).toBeUndefined();
+    expect(earlierDaysTrain(service, "all").days).toBeUndefined();
   });
 });

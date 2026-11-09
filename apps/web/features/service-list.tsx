@@ -6,7 +6,10 @@ import {
   formatDuration,
   formatServiceFacts,
   formatSevereJourneys,
+  emptyTrains,
+  inEarlyHours,
   listIntro,
+  nightNote,
   listScore,
   olderJourneysNote,
   olderJourneysRowNote,
@@ -15,6 +18,7 @@ import {
   throughServiceLabel,
   trainListHeading,
 } from "@/features/format";
+import type { DayPattern } from "@/shared/day-type";
 import { stationName, type Station } from "@/shared/stations";
 import { scheduleNotes, usualDays } from "@/features/timetable-changes";
 import { listHref } from "@/features/search-href";
@@ -35,15 +39,19 @@ import styles from "./service-list.module.css";
 export function ServiceList({
   query,
   services,
+  overnight,
   retired = [],
   listed,
   earlier,
   later,
+  laterDays,
   darwinFrom,
   stations,
 }: {
   query: ParsedQuery;
   services: readonly ScheduledService[];
+  /** Trains after midnight that end the day. Absent when the list stops before it. */
+  overnight?: readonly ScheduledService[];
   retired?: readonly ScheduledService[];
   /** Dates the listed runs cover. */
   listed?: { from: string; to: string };
@@ -51,6 +59,8 @@ export function ServiceList({
   earlier?: string;
   /** HHMM time that lists the trains after these. None at the end of the day. */
   later?: string;
+  /** Day type of the list `later` opens, when it is the next night's. */
+  laterDays?: DayPattern;
   /** First day Darwin counts: the figures of a train whose older journeys did not load start here. */
   darwinFrom?: string;
   stations: readonly Station[];
@@ -59,14 +69,15 @@ export function ServiceList({
   const [chosen, setChosen] = useState(() => {
     const linked = query.serviceKey;
     const match = linked
-      ? [...services, ...retired].find((service) =>
+      ? [...services, ...(overnight ?? []), ...retired].find((service) =>
           matchesServiceKey(service, linked),
         )
       : undefined;
     if (match) {
       return serviceKey(match);
     }
-    const only = services.length === 1 ? services[0] : undefined;
+    const shown = [...services, ...(overnight ?? [])];
+    const only = shown.length === 1 ? shown[0] : undefined;
     return only ? serviceKey(only) : undefined;
   });
   const earlierDays = useEarlierDaysState();
@@ -75,26 +86,31 @@ export function ServiceList({
   }
   const from = query.from;
   const to = query.to;
+  const night = overnight ?? [];
+  const listedTrains = [...services, ...night];
   const waiting = (service: ScheduledService) =>
     earlierDays !== undefined &&
     !earlierDays.done &&
-    services.includes(service) &&
+    listedTrains.includes(service) &&
     !earlierDays.trains.has(serviceKey(service));
-  const loading = services.some(waiting);
+  const loading = listedTrains.some(waiting);
   /** Listed trains still without older journeys once HSP has stopped trying. */
   const notLoaded = (service: ScheduledService) =>
     earlierDays !== undefined &&
     earlierDays.done &&
     earlierDays.missing.has(serviceKey(service));
-  const notLoadedCount = services.filter(notLoaded).length;
+  const notLoadedCount = listedTrains.filter(notLoaded).length;
   const notLoadedNote = olderJourneysNote({
     missing: notLoadedCount,
-    listed: services.length,
+    listed: listedTrains.length,
     ...(darwinFrom ? { since: darwinFrom } : {}),
   });
   // Rows are marked only when some trains have their older journeys: the line above covers all.
-  const markRows = notLoadedCount < services.length;
-  const row = (service: ScheduledService) => (
+  const markRows = notLoadedCount < listedTrains.length;
+  const row = (
+    service: ScheduledService,
+    nightPart?: "early" | "overnight",
+  ) => (
     <ServiceRow
       key={serviceKey(service)}
       service={service}
@@ -109,6 +125,7 @@ export function ServiceList({
           ? olderJourneysRowNote(darwinFrom)
           : undefined
       }
+      night={nightPart ? nightNote(nightPart, query.days) : undefined}
       chosen={chosen === serviceKey(service)}
       onChoose={() => setChosen(serviceKey(service))}
     />
@@ -132,7 +149,7 @@ export function ServiceList({
       <h2 id="trains-heading" className="visually-hidden" tabIndex={-1}>
         {trainListHeading(
           query.time,
-          services.map((service) => service.publicDeparture),
+          listedTrains.map((service) => service.publicDeparture),
         )}
       </h2>
       <p>
@@ -163,15 +180,27 @@ export function ServiceList({
           Earlier trains
         </TimeShift>
       ) : null}
-      {services.length === 0 ? (
+      {listedTrains.length === 0 ? (
         <p className="card" role="status">
-          {emptyTrains(from.name, to.name, query.time, Boolean(earlier))}
+          {emptyTrains({
+            from: from.name,
+            to: to.name,
+            time: query.time,
+            earlier: Boolean(earlier),
+            overnight: overnight !== undefined,
+          })}
         </p>
       ) : null}
-      {services.length > 0 || retired.length > 0 ? (
+      {listedTrains.length > 0 || retired.length > 0 ? (
         <fieldset>
           <legend className="visually-hidden">Choose one train</legend>
-          {services.map(row)}
+          {services.map((service) =>
+            row(
+              service,
+              inEarlyHours(service.publicDeparture) ? "early" : undefined,
+            ),
+          )}
+          {night.map((service) => row(service, "overnight"))}
           {retired.length > 0 ? (
             <details
               className={`${styles.serviceGroup} ${styles.retiredServices}`}
@@ -183,17 +212,20 @@ export function ServiceList({
                   ? "train no longer runs"
                   : "trains no longer run"}
               </summary>
-              {retired.map(row)}
+              {retired.map((service) => row(service))}
             </details>
           ) : null}
         </fieldset>
       ) : null}
       {later ? (
-        <TimeShift href={listHref(query, formatClock(later))} direction="later">
+        <TimeShift
+          href={listHref(query, formatClock(later), laterDays)}
+          direction="later"
+        >
           Later trains
         </TimeShift>
       ) : null}
-      {services.length > 0 || retired.length > 0 ? (
+      {listedTrains.length > 0 || retired.length > 0 ? (
         <div className={styles.calculateBar}>
           <button
             type="submit"
@@ -215,6 +247,7 @@ function ServiceRow({
   earlierDays,
   waiting,
   notLoaded,
+  night,
   chosen,
   onChoose,
 }: {
@@ -227,6 +260,8 @@ function ServiceRow({
   waiting: boolean;
   /** Note on a train whose older journeys did not load. */
   notLoaded: string | undefined;
+  /** Note on a train in the small hours: which night it belongs to. */
+  night: string | undefined;
   chosen: boolean;
   onChoose: () => void;
 }) {
@@ -285,6 +320,9 @@ function ServiceRow({
           .filter(Boolean)
           .join(" · ")}
       </span>
+      {night ? (
+        <span className={`meta ${styles.serviceDetail}`}>{night}</span>
+      ) : null}
       {notLoaded ? (
         <span className={`meta ${styles.serviceDetail}`}>{notLoaded}</span>
       ) : null}
@@ -334,15 +372,4 @@ function TimeShift({
       <span>{children}</span>
     </a>
   );
-}
-
-function emptyTrains(
-  from: string,
-  to: string,
-  time: string,
-  earlier: boolean,
-): string {
-  return earlier
-    ? `No more direct trains from ${from} to ${to} after ${time}. Journeys with a change are not included.`
-    : `No direct trains from ${from} to ${to} in the recorded timetable. Journeys with a change are not included.`;
 }

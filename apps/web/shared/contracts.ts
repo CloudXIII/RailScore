@@ -21,6 +21,11 @@ export type EarlierDaysTrain = {
   /** The list's service key. */
   readonly key: string;
   readonly operatorCode: string;
+  /**
+   * Day types the train is counted on, when they are not the searched ones: a train after
+   * midnight from the next night's list, such as a Sunday train in a Saturday list.
+   */
+  readonly days?: readonly ServiceDay[];
   readonly legs: readonly EarlierDaysLeg[];
 };
 

@@ -214,17 +214,78 @@ export function departureWindowHint(): string {
  */
 export function trainListHeading(
   time: string,
+  /** In list order: trains after midnight come last. */
   departures: readonly string[],
 ): string {
-  const sorted = [...departures].sort();
-  const first = sorted[0];
-  const last = sorted.at(-1);
+  const first = departures[0];
+  const last = departures.at(-1);
   if (!first || !last) {
     return `Trains from ${time}`;
   }
   return first === last
     ? `Train at ${formatClock(first)}`
     : `Trains from ${formatClock(first)} to ${formatClock(last)}`;
+}
+
+const NIGHT_BEFORE: Partial<Record<DayPattern, string>> = {
+  saturday: "Friday",
+  sunday: "Saturday",
+};
+
+const NIGHT_OF: Partial<Record<DayPattern, string>> = {
+  saturday: "Saturday",
+  sunday: "Sunday",
+};
+
+/**
+ * The note on a train in the small hours. Lists run by the day a train leaves, so one at the
+ * top of the list, before 04:00, ends the night before; one after the day's last train is on
+ * the night after, past midnight.
+ */
+export function nightNote(
+  part: "early" | "overnight",
+  searched: DayPattern,
+): string {
+  if (part === "early") {
+    const night = NIGHT_BEFORE[searched];
+    return night
+      ? `${night} night, after midnight`
+      : "The night before, after midnight";
+  }
+  const night = NIGHT_OF[searched];
+  return night
+    ? `${night} night, after midnight`
+    : "Late night, after midnight";
+}
+
+/** Departures before this, HHMM, at the top of a list are the end of the night before. */
+const EARLY_HOURS_END = "0400";
+
+/** True for a departure in the small hours, HHMM. */
+export function inEarlyHours(hhmm: string): boolean {
+  return hhmm < EARLY_HOURS_END;
+}
+
+/**
+ * The line shown when the list has no trains. After a searched time, it says whether the
+ * trains after midnight were looked at too.
+ */
+export function emptyTrains(input: {
+  from: string;
+  to: string;
+  time: string;
+  /** The day has trains before the searched time. */
+  earlier: boolean;
+  /** The trains after midnight were looked for, and there are none either. */
+  overnight: boolean;
+}): string {
+  const change = "Journeys with a change are not included.";
+  if (!input.earlier) {
+    return `No direct trains from ${input.from} to ${input.to} in the recorded timetable. ${change}`;
+  }
+  return input.overnight
+    ? `No more direct trains from ${input.from} to ${input.to} after ${input.time}, nor after midnight before 04:00. ${change}`
+    : `No more direct trains from ${input.from} to ${input.to} after ${input.time}. ${change}`;
 }
 
 /**

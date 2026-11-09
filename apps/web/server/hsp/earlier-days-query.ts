@@ -1,4 +1,10 @@
-import { isDayPattern } from "@/shared/day-type";
+import {
+  DAY_TYPES,
+  isDayPattern,
+  ownDays,
+  type DayPattern,
+  type ServiceDay,
+} from "@/shared/day-type";
 import { PERIOD_LENGTHS } from "@/shared/search-query";
 import { record } from "../payload";
 import type { ScheduledService } from "@/shared/scheduled-service";
@@ -12,11 +18,19 @@ const MAX_LEGS = 8;
 /** Quarter-hours one request may ask HSP about. Eight trains every half hour need eight. */
 const MAX_QUARTERS = 16;
 
-/** What the page sends for its trains: each train with the schedules folded into it. */
-export function earlierDaysTrain(service: ScheduledService): EarlierDaysTrain {
+/**
+ * What the page sends for its trains: each train with the schedules folded into it, and its
+ * own day types when it is counted on others than the searched ones.
+ */
+export function earlierDaysTrain(
+  service: ScheduledService,
+  searched: DayPattern,
+): EarlierDaysTrain {
+  const days = ownDays(service.days, searched);
   return {
     key: serviceKey(service),
     operatorCode: service.operatorCode,
+    ...(days ? { days } : {}),
     legs: [service, ...(service.variants ?? [])].map((leg) => ({
       originCrs: leg.originCrs,
       destinationCrs: leg.destinationCrs,
@@ -75,7 +89,8 @@ function parseTrain(value: unknown): EarlierDaysTrain | undefined {
     !/^[A-Z0-9]{2}$/.test(train.operatorCode) ||
     !Array.isArray(train.legs) ||
     train.legs.length === 0 ||
-    train.legs.length > MAX_LEGS
+    train.legs.length > MAX_LEGS ||
+    (train.days !== undefined && !isDayList(train.days))
   ) {
     return undefined;
   }
@@ -102,8 +117,18 @@ function parseTrain(value: unknown): EarlierDaysTrain | undefined {
   return {
     key: train.key,
     operatorCode: train.operatorCode,
+    ...(train.days === undefined ? {} : { days: train.days }),
     legs: legs as EarlierDaysTrain["legs"],
   };
+}
+
+function isDayList(value: unknown): value is ServiceDay[] {
+  return (
+    Array.isArray(value) &&
+    value.length > 0 &&
+    value.length <= DAY_TYPES.length &&
+    value.every((day) => (DAY_TYPES as readonly unknown[]).includes(day))
+  );
 }
 
 function isCrs(value: unknown): value is string {
