@@ -247,6 +247,36 @@ export function listIntro(input: {
   return meaning;
 }
 
+/**
+ * The list's line once HSP has stopped trying and some listed trains still have no older
+ * journeys. Their figures are Darwin's alone, from `since`. Empty when nothing is missing.
+ */
+export function olderJourneysNote(input: {
+  missing: number;
+  listed: number;
+  /** First day of the figures the missing trains still have, YYYY-MM-DD. */
+  since?: string;
+}): string {
+  if (input.missing === 0) {
+    return "";
+  }
+  const range = input.since
+    ? `journeys since ${formatDate(input.since)}`
+    : "recent journeys";
+  const retry = "Reload later to try again.";
+  if (input.missing >= input.listed) {
+    return `Older journeys could not be loaded because the data provider is busy, so these figures count only ${range}. ${retry}`;
+  }
+  return `Older journeys could not be loaded for ${input.missing} of these ${input.listed} trains because the data provider is busy. Their figures count only ${range}. ${retry}`;
+}
+
+/** The note on a listed train whose older journeys did not load. */
+export function olderJourneysRowNote(since?: string): string {
+  return since
+    ? `Only journeys since ${formatDate(since)}`
+    : "Older journeys not loaded";
+}
+
 export function formatClock(hhmm: string): string {
   return `${hhmm.slice(0, 2)}:${hhmm.slice(2, 4)}`;
 }

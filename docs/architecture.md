@@ -67,7 +67,7 @@ Until Darwin covers the whole period (30 days from about 4 December 2026, 90 day
 - **Arrival history.** The figures come from those tallies at once: `calculateReliability` takes the Darwin runs and HSP's tallies together. The calendar then fills from `serviceDetails`, one run at a time, newest first. A run is stored in `hsp_backlog_runs` in the `darwin_runs` text form and classified by the same rules, with one difference described in [data rules](data-rules.md). Once every run is in, the figures come from the runs.
 - **Storage.** List answers depend on the day the period starts, so they are deleted after two days by the maintenance step. Runs never change, so a second visit makes no HSP call; they age out with `DARWIN_KEEP_DAYS`. A run is about 0.6 KB.
 
-If HSP is down or refuses after its retries, the trains keep Darwin's figures and the history says the earlier journeys could not be loaded.
+If HSP is down or refuses after its retries, the trains keep Darwin's figures. The list says so and names the first Darwin day the figures count from, marking the trains affected when only some are, and the history says the earlier journeys could not be loaded.
 
 ### HSP pacing
 
