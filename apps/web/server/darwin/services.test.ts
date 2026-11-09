@@ -4,8 +4,10 @@ import type { StoredCall } from "../call-text";
 import type { DarwinRun } from "./run";
 import {
   servicesFromRuns,
+  legPattern,
+  legsLeaving,
+  sameTrainLookup,
   trainPage,
-  uidsLeaving,
   type DarwinSearch,
 } from "./services";
 import type { ScheduledService } from "@/shared/scheduled-service";
@@ -377,15 +379,89 @@ describe("trainPage", () => {
   });
 });
 
-describe("uidsLeaving", () => {
-  it("names only the trains that board in the window", () => {
+describe("legsLeaving", () => {
+  it("names only the trains that board in the window, once per UID", () => {
     const runs = [
       run(today, "0000001", { uid: "W00001", departure: "0812" }),
       run(today, "0000002", { uid: "W00002", departure: "0912" }),
       run("2026-11-03", "0000003", { uid: "W00001", departure: "0812" }),
     ];
-    expect(uidsLeaving(runs, search, { from: "0800", to: "0830" })).toEqual([
-      "W00001",
+    expect(legsLeaving(runs, search, { from: "0800", to: "0830" })).toEqual([
+      { uid: "W00001", toc: "SW", departure: "0812", arrival: "0823" },
     ]);
+  });
+});
+
+describe("sameTrainLookup", () => {
+  const weekdays = ["2026-11-02", "2026-11-03", today];
+  const leg = { uid: "W00001", toc: "SW", departure: "0812", arrival: "0823" };
+
+  it("asks nothing when the train ran on every open day", () => {
+    const runs = weekdays.map((date, index) =>
+      run(date, `000000${index}`, { uid: "W00001" }),
+    );
+    expect(sameTrainLookup([leg], runs, search, weekdays)).toBeUndefined();
+  });
+
+  it("counts a run under another UID with the same times as the train's", () => {
+    const runs = [
+      run("2026-11-02", "0000001", { uid: "W00009" }),
+      run("2026-11-03", "0000002", { uid: "W00001" }),
+      run(today, "0000003", { uid: "W00001" }),
+    ];
+    expect(sameTrainLookup([leg], runs, search, weekdays)).toBeUndefined();
+  });
+
+  it("looks up the days a train has no run, by operator and public times", () => {
+    const runs = [
+      run(today, "0000001", { uid: "W00001" }),
+      run("2026-11-03", "0000002", { uid: "W00001", departure: "0815" }),
+    ];
+    expect(sameTrainLookup([leg], runs, search, weekdays)).toEqual({
+      dates: ["2026-11-02", "2026-11-03"],
+      trains: [{ toc: "SW", pattern: legPattern(search, "0812", "0823") }],
+    });
+  });
+});
+
+describe("legPattern", () => {
+  const pattern = new RegExp(legPattern(search, "0812", "0823"));
+
+  it("matches calls that board and arrive at these public times", () => {
+    expect(
+      pattern.test(
+        "WOK,,0750,,0750,,;CLJ,0812,0812,,0813,,9;WAT,0823,,0824,,,",
+      ),
+    ).toBe(true);
+    expect(pattern.test("CLJ,,0812,,,,;WAT,0823,,,,,")).toBe(true);
+  });
+
+  it("does not match other times, other stations or the wrong way round", () => {
+    expect(pattern.test("CLJ,0812,0814,,,,;WAT,0823,,,,,")).toBe(false);
+    expect(pattern.test("CLJ,0812,0812,,,,;WAT,0825,,,,,")).toBe(false);
+    expect(pattern.test("XCLJ,,0812,,,,;WAT,0823,,,,,")).toBe(false);
+    expect(pattern.test("WAT,0823,,,,,;CLJ,,0812,,,,")).toBe(false);
+  });
+});
+
+describe("a train with a different UID each day", () => {
+  it("pools the runs into one train by its public times", () => {
+    const runs = [
+      run("2026-11-02", "0000001", { uid: "W00001", actualArrival: "0823" }),
+      run("2026-11-03", "0000002", { uid: "W00002", actualArrival: "0840" }),
+      run(today, "0000003", { uid: "W00003" }),
+    ];
+    const list = listOf(runs, search, {
+      today,
+      todayTimetable: true,
+      oldest: "2026-11-02",
+    });
+    expect(list?.services).toHaveLength(1);
+    expect(list?.services[0]?.rids).toEqual([
+      "202611020000001",
+      "202611030000002",
+    ]);
+    expect(list?.services[0]?.punctuality?.runs).toBe(2);
+    expect(list?.services[0]?.punctuality?.within5).toBe(1);
   });
 });
