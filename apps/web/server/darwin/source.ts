@@ -23,9 +23,11 @@ export const darwinSource: TrainSource = {
     return {
       services: found.services,
       retired: found.retired,
+      ...(found.overnight ? { overnight: found.overnight } : {}),
       period: found.period,
       ...(found.earlier ? { earlier: found.earlier } : {}),
       ...(found.later ? { later: found.later } : {}),
+      ...(found.laterDays ? { laterDays: found.laterDays } : {}),
       ...(found.hsp ? { hsp: found.hsp } : {}),
       calculate: (service) =>
         calculateFromDarwin(service, stations, found.runs, now),
