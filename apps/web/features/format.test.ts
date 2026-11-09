@@ -12,15 +12,21 @@ import {
   departureWindowHint,
   timeSearchLabel,
   trainListHeading,
+  emptyTrains,
+  inEarlyHours,
+  nightNote,
 } from "./format";
 
 describe("train list copy", () => {
   it("names the listed departures in the heading and explains on time briefly", () => {
-    expect(trainListHeading("07:00", ["0742", "0712", "0905"])).toBe(
+    expect(trainListHeading("07:00", ["0712", "0742", "0905"])).toBe(
       "Trains from 07:12 to 09:05",
     );
     expect(trainListHeading("07:00", ["0712"])).toBe("Train at 07:12");
     expect(trainListHeading("23:30", [])).toBe("Trains from 23:30");
+    expect(trainListHeading("23:00", ["2325", "0002", "0108"])).toBe(
+      "Trains from 23:25 to 01:08",
+    );
     expect(
       listIntro({
         periodDays: 30,
@@ -255,5 +261,41 @@ describe("throughServiceLabel", () => {
         nameOf,
       ),
     ).toBe("");
+  });
+});
+
+describe("trains in the small hours", () => {
+  it("names the night a train after midnight belongs to", () => {
+    expect(nightNote("overnight", "saturday")).toBe(
+      "Saturday night, after midnight",
+    );
+    expect(nightNote("early", "saturday")).toBe("Friday night, after midnight");
+    expect(nightNote("overnight", "sunday")).toBe(
+      "Sunday night, after midnight",
+    );
+    expect(nightNote("early", "weekdays")).toBe(
+      "The night before, after midnight",
+    );
+    expect(nightNote("overnight", "all")).toBe("Late night, after midnight");
+    expect(inEarlyHours("0002")).toBe(true);
+    expect(inEarlyHours("0400")).toBe(false);
+  });
+
+  it("says there are no more trains only after looking past midnight", () => {
+    const route = {
+      from: "London Victoria",
+      to: "Brighton",
+      time: "23:30",
+      earlier: true,
+    };
+    expect(emptyTrains({ ...route, overnight: true })).toBe(
+      "No more direct trains from London Victoria to Brighton after 23:30, nor after midnight before 04:00. Journeys with a change are not included.",
+    );
+    expect(emptyTrains({ ...route, overnight: false })).toBe(
+      "No more direct trains from London Victoria to Brighton after 23:30. Journeys with a change are not included.",
+    );
+    expect(emptyTrains({ ...route, earlier: false, overnight: true })).toBe(
+      "No direct trains from London Victoria to Brighton in the recorded timetable. Journeys with a change are not included.",
+    );
   });
 });
