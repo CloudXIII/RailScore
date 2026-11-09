@@ -3,9 +3,15 @@ import { describe, expect, it } from "vitest";
 import type { StoredCall } from "../call-text";
 import type { DarwinRun } from "./run";
 import {
+  AFTER_MIDNIGHT,
+  crossesMidnight,
+  NIGHT,
+  overnightList,
   servicesFromRuns,
   trainPage,
   uidsLeaving,
+  WHOLE_DAY,
+  type ClockWindow,
   type DarwinSearch,
 } from "./services";
 import type { ScheduledService } from "@/shared/scheduled-service";
@@ -31,12 +37,18 @@ function run(
     arrival?: string;
     actualArrival?: string;
     cancelled?: boolean;
+    /** Public departure from the first stop. */
+    origin?: string;
   } = {},
 ): DarwinRun {
   const departure = options.departure ?? "0812";
   const arrival = options.arrival ?? "0823";
   const calls: StoredCall[] = [
-    { crs: "WOK", ptd: "0750", ...(options.cancelled ? {} : { atd: "0750" }) },
+    {
+      crs: "WOK",
+      ptd: options.origin ?? "0750",
+      ...(options.cancelled ? {} : { atd: options.origin ?? "0750" }),
+    },
     {
       crs: "CLJ",
       pta: departure,
@@ -369,6 +381,13 @@ describe("trainPage", () => {
     expect(page.later).toBeUndefined();
   });
 
+  it("links to the next train when there is no room left on the page", () => {
+    const page = trainPage(["0002", "0108"].map(train), "0000", 0);
+    expect(page.services).toEqual([]);
+    expect(page.window).toBeUndefined();
+    expect(page.later).toBe("0002");
+  });
+
   it("lists nothing after the last train, but links back to it", () => {
     const page = trainPage(["0600", "0700"].map(train), "2300", 8);
     expect(page.services).toEqual([]);
@@ -386,6 +405,126 @@ describe("uidsLeaving", () => {
     ];
     expect(uidsLeaving(runs, search, { from: "0800", to: "0830" })).toEqual([
       "W00001",
+    ]);
+  });
+});
+
+describe("trains after midnight", () => {
+  /** Saturday 31 October 2026, with Sunday 1 November after it. */
+  const saturday = "2026-10-31";
+  const sunday = "2026-11-01";
+  const late = { ...search, days: "saturday" as const, timeHhmm: "2330" };
+  const input = {
+    today,
+    todayTimetable: true,
+    countedFrom: "2026-10-01",
+    period: { from: "2026-10-06", to: "2026-11-03" },
+  };
+  const departures = (
+    runs: readonly DarwinRun[],
+    days: DarwinSearch,
+    window: ClockWindow,
+  ) =>
+    servicesFromRuns(runs, days, input, window)?.services.map(
+      (service) => service.publicDeparture,
+    ) ?? [];
+
+  it("reads a time more than twelve hours back as the next day", () => {
+    expect(
+      crossesMidnight([{ ptd: "2350" }, { pta: "0005", ptd: "0006" }]),
+    ).toBe(true);
+    expect(
+      crossesMidnight([{ ptd: "0002" }, { pta: "0009", ptd: "0010" }]),
+    ).toBe(false);
+    expect(crossesMidnight([{ ptd: "0750" }, { pta: "0812" }])).toBe(false);
+    expect(crossesMidnight([{ ptd: "2115" }, { pta: "0730" }])).toBe(true);
+  });
+
+  it("keeps a train that boards after midnight out of the early morning of its own day", () => {
+    const runs = [
+      // Leaves Woking at 23:50 on Saturday and Clapham Junction at 00:05 on Sunday.
+      run(saturday, "0000001", {
+        uid: "W00001",
+        origin: "2350",
+        departure: "0005",
+        arrival: "0015",
+      }),
+      // Starts at 00:02 on Saturday: the end of Friday night.
+      run(saturday, "0000002", {
+        uid: "W00002",
+        origin: "0002",
+        departure: "0009",
+        arrival: "0019",
+      }),
+    ];
+    expect(departures(runs, late, WHOLE_DAY)).toEqual(["0009"]);
+    expect(departures(runs, late, AFTER_MIDNIGHT)).toEqual(["0005"]);
+    expect(uidsLeaving(runs, late, AFTER_MIDNIGHT)).toEqual(["W00001"]);
+    expect(uidsLeaving(runs, late, WHOLE_DAY)).toEqual(["W00002"]);
+  });
+
+  it("counts the next night's trains on that night's day type", () => {
+    const runs = [
+      run(saturday, "0000001", {
+        uid: "W00001",
+        origin: "0002",
+        departure: "0009",
+        arrival: "0019",
+        actualArrival: "0019",
+      }),
+      run(sunday, "0000002", {
+        uid: "W00002",
+        origin: "0002",
+        departure: "0009",
+        arrival: "0019",
+        actualArrival: "0040",
+      }),
+      run(sunday, "0000003", {
+        uid: "W00003",
+        origin: "0450",
+        departure: "0505",
+        arrival: "0515",
+      }),
+    ];
+    const night = servicesFromRuns(
+      runs,
+      { ...late, days: "sunday" },
+      input,
+      NIGHT,
+    );
+    expect(night?.services).toHaveLength(1);
+    expect(night?.services[0]).toMatchObject({
+      publicDeparture: "0009",
+      days: ["sunday"],
+      rids: ["202611010000002"],
+      punctuality: { runs: 1, within5: 0, within14: 0, within29: 1 },
+    });
+  });
+
+  it("ends a list with the trains after midnight in clock order, each once", () => {
+    const train = (departure: string, days: ScheduledService["days"]) => ({
+      originCrs: "VIC",
+      destinationCrs: "BTN",
+      publicDeparture: departure,
+      publicArrival: departure,
+      operatorCode: "SN",
+      rids: [],
+      days,
+    });
+    const listed = [train("2316", ["saturday"]), train("2325", ["saturday"])];
+    const night = overnightList(
+      listed,
+      [train("0005", ["saturday"])],
+      [
+        train("0108", ["sunday"]),
+        train("0002", ["sunday"]),
+        train("2325", ["saturday"]),
+      ],
+    );
+    expect(night.map((service) => service.publicDeparture)).toEqual([
+      "0002",
+      "0005",
+      "0108",
     ]);
   });
 });
