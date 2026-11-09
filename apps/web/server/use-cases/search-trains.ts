@@ -1,5 +1,9 @@
 import "server-only";
-import type { HistoricalRun, ReliabilityResult } from "@railscore/core";
+import {
+  addCalendarDays,
+  type HistoricalRun,
+  type ReliabilityResult,
+} from "@railscore/core";
 import type { EarlierDaysRequest } from "@/shared/contracts";
 import type { DayPattern } from "@/shared/day-type";
 import { earlierDaysTrain } from "../hsp/earlier-days-query";
@@ -44,6 +48,8 @@ export type TrainSearchView = {
   };
   /** What the page asks HSP about once it is shown. Absent once Darwin covers the period. */
   readonly earlierDays?: EarlierDaysRequest;
+  /** First day Darwin counts, when HSP fills the days before it. */
+  readonly darwinFrom?: string;
 };
 
 /**
@@ -111,5 +117,6 @@ export async function searchTrains(
     ...(notice ? { notice } : {}),
     ...(history ? { history } : {}),
     ...(earlierDays ? { earlierDays } : {}),
+    ...(found.hsp ? { darwinFrom: addCalendarDays(found.hsp.to, 1) } : {}),
   };
 }

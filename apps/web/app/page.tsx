@@ -143,6 +143,7 @@ async function TrainPanel({
         listed={view.period}
         earlier={view.earlier}
         later={view.later}
+        {...(view.darwinFrom ? { darwinFrom: view.darwinFrom } : {})}
         stations={stations}
       />
     );

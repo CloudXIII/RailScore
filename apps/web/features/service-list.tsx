@@ -8,6 +8,8 @@ import {
   formatSevereJourneys,
   listIntro,
   listScore,
+  olderJourneysNote,
+  olderJourneysRowNote,
   scoreTier,
   operatorName,
   throughServiceLabel,
@@ -37,6 +39,7 @@ export function ServiceList({
   listed,
   earlier,
   later,
+  darwinFrom,
   stations,
 }: {
   query: ParsedQuery;
@@ -48,6 +51,8 @@ export function ServiceList({
   earlier?: string;
   /** HHMM time that lists the trains after these. None at the end of the day. */
   later?: string;
+  /** First day Darwin counts: the figures of a train whose older journeys did not load start here. */
+  darwinFrom?: string;
   stations: readonly Station[];
 }) {
   const [pending, setPending] = useState(false);
@@ -76,6 +81,19 @@ export function ServiceList({
     services.includes(service) &&
     !earlierDays.trains.has(serviceKey(service));
   const loading = services.some(waiting);
+  /** Listed trains still without older journeys once HSP has stopped trying. */
+  const notLoaded = (service: ScheduledService) =>
+    earlierDays !== undefined &&
+    earlierDays.done &&
+    earlierDays.missing.has(serviceKey(service));
+  const notLoadedCount = services.filter(notLoaded).length;
+  const notLoadedNote = olderJourneysNote({
+    missing: notLoadedCount,
+    listed: services.length,
+    ...(darwinFrom ? { since: darwinFrom } : {}),
+  });
+  // Rows are marked only when some trains have their older journeys: the line above covers all.
+  const markRows = notLoadedCount < services.length;
   const row = (service: ScheduledService) => (
     <ServiceRow
       key={serviceKey(service)}
@@ -86,6 +104,11 @@ export function ServiceList({
       searched={query.days}
       earlierDays={earlierDays?.trains.get(serviceKey(service))}
       waiting={waiting(service)}
+      notLoaded={
+        markRows && notLoaded(service)
+          ? olderJourneysRowNote(darwinFrom)
+          : undefined
+      }
       chosen={chosen === serviceKey(service)}
       onChoose={() => setChosen(serviceKey(service))}
     />
@@ -125,6 +148,11 @@ export function ServiceList({
           {earlierDays?.busy
             ? " The data provider is busy, so this may take a few minutes."
             : ""}
+        </p>
+      ) : null}
+      {notLoadedNote ? (
+        <p className="meta" role="status">
+          {notLoadedNote}
         </p>
       ) : null}
       {earlier ? (
@@ -186,6 +214,7 @@ function ServiceRow({
   searched,
   earlierDays,
   waiting,
+  notLoaded,
   chosen,
   onChoose,
 }: {
@@ -196,6 +225,8 @@ function ServiceRow({
   earlierDays: TrainEarlierDays | undefined;
   /** HSP has not answered for this train yet. */
   waiting: boolean;
+  /** Note on a train whose older journeys did not load. */
+  notLoaded: string | undefined;
   chosen: boolean;
   onChoose: () => void;
 }) {
@@ -254,6 +285,9 @@ function ServiceRow({
           .filter(Boolean)
           .join(" · ")}
       </span>
+      {notLoaded ? (
+        <span className={`meta ${styles.serviceDetail}`}>{notLoaded}</span>
+      ) : null}
       {through ? (
         <span className={`meta ${styles.serviceDetail}`}>{through}</span>
       ) : null}

@@ -4,6 +4,8 @@ import {
   formatSevereJourneys,
   listIntro,
   listScore,
+  olderJourneysNote,
+  olderJourneysRowNote,
   scoreTier,
   serviceDayNote,
   throughServiceLabel,
@@ -35,6 +37,38 @@ describe("train list copy", () => {
     );
     expect(listIntro({ periodDays: 30 })).toBe(
       "On time means no more than 5 minutes late.",
+    );
+  });
+});
+
+describe("older journeys that did not load", () => {
+  it("says nothing when every train has its older journeys", () => {
+    expect(olderJourneysNote({ missing: 0, listed: 6 })).toBe("");
+  });
+
+  it("names the first day when every listed train is missing them", () => {
+    expect(
+      olderJourneysNote({ missing: 6, listed: 6, since: "2026-11-04" }),
+    ).toBe(
+      "Older journeys could not be loaded because the data provider is busy, so these figures count only journeys since 04/11/2026. Reload later to try again.",
+    );
+  });
+
+  it("counts the trains when only some are missing them", () => {
+    expect(
+      olderJourneysNote({ missing: 2, listed: 6, since: "2026-11-04" }),
+    ).toBe(
+      "Older journeys could not be loaded for 2 of these 6 trains because the data provider is busy. Their figures count only journeys since 04/11/2026. Reload later to try again.",
+    );
+  });
+
+  it("falls back to recent journeys without a first day", () => {
+    expect(olderJourneysNote({ missing: 1, listed: 1 })).toBe(
+      "Older journeys could not be loaded because the data provider is busy, so these figures count only recent journeys. Reload later to try again.",
+    );
+    expect(olderJourneysRowNote()).toBe("Older journeys not loaded");
+    expect(olderJourneysRowNote("2026-11-04")).toBe(
+      "Only journeys since 04/11/2026",
     );
   });
 });
