@@ -34,6 +34,8 @@ Below 5 runs with a known outcome, the page says there are too few journeys, sti
 
 The list shows a figure for each train from the same rules: the share that reached the destination within 5 minutes, and how many were cancelled or 30 or more minutes late. A run with no actual departure at the boarding stop is outside every tolerance, as in the full calculation.
 
+A train's past runs are found by its schedule UID. About 1% of trains get a different UID on some days, such as the Caledonian Sleeper from Euston at 23:45 (one UID on Mondays, another Tuesday to Thursday, a third on Fridays). When a listed train has no run on an open day of the searched day type (the last 8 days), runs on those days with the same operator and the same public departure and arrival are looked for, and their UIDs read too. They pool into the train by the rules below.
+
 The list folds schedules into one train (`server/services/fold.ts`):
 
 - Identical schedules are pooled across day types.
@@ -44,7 +46,7 @@ The list folds schedules into one train (`server/services/fold.ts`):
 
 ## Known limits
 
-Darwin history covers only the days the import has run, at most 90; HSP fills the days before it while a period reaches back that far. At the 13 December 2026 timetable change some trains may no longer match their HSP rows, and keep Darwin's figures. HSP is often slow at the UK peak and sometimes refuses most calls for a while. The last week (about 13 MB a day) and the packed days (well under 1 MB a day) fit in Neon Free (0.5 GB). If the import stops, the figures stop at the last day stored.
+Darwin history covers only the days the import has run, at most 90; HSP fills the days before it while a period reaches back that far. At the 13 December 2026 timetable change some trains may no longer match their HSP rows, and keep Darwin's figures. HSP is often slow at the UK peak and sometimes refuses most calls for a while. The last week (about 13 MB a day) and the packed days (well under 1 MB a day) fit in Neon Free (0.5 GB). If the import stops, the figures stop at the last day stored. A train whose UID changes on some days is found under the UIDs it had in the last 8 days, so packed days under a UID it has not used since are missed; a weekly pattern of UIDs is found whole.
 
 The 05:00 snapshot holds about nine in ten of the day's trains. A train added to the timetable later in the day appears once Kafka brings it.
 

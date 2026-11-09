@@ -197,6 +197,37 @@ export async function runsOnDay(
   return rows.map(runOf);
 }
 
+/**
+ * Schedule UIDs of the open runs on `dates` that call at both stations, have one of these
+ * operators and match its pattern (`sameTrainLookup`). It reads those days of the route
+ * through the service date index, so it is asked only when a listed train is missing a day.
+ */
+export async function uidsOfSameTrains(
+  sql: Sql,
+  input: {
+    fromCrs: string;
+    toCrs: string;
+    dates: readonly string[];
+    trains: readonly { toc: string; pattern: string }[];
+  },
+): Promise<string[]> {
+  if (input.dates.length === 0 || input.trains.length === 0) {
+    return [];
+  }
+  const rows = await sql<{ uid: string }[]>`
+    select distinct r.uid
+    from darwin_runs r
+    join unnest(
+      ${input.trains.map((train) => train.toc)}::text[],
+      ${input.trains.map((train) => train.pattern)}::text[]
+    ) as t(toc, pattern) on r.toc = t.toc and r.calls ~ t.pattern
+    where r.service_date = any(${[...input.dates]}::date[])
+      and r.calls like ${`%${input.fromCrs},%`}
+      and r.calls like ${`%${input.toCrs},%`}
+  `;
+  return rows.map((row) => row.uid);
+}
+
 /** Runs of these schedule UIDs between two dates, both inclusive, open and packed. */
 export async function runsOfTrains(
   sql: Sql,

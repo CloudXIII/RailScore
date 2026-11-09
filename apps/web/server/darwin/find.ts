@@ -6,15 +6,22 @@ import { darwinFirstDay, hspConnection } from "../env";
 import { laterDate, searchPeriods, type DateSpan } from "../periods";
 import {
   servicesFromRuns,
+  legsLeaving,
+  sameTrainLookup,
   trainPage,
-  uidsLeaving,
   WHOLE_DAY,
   type DarwinSearch,
   type DarwinServiceList,
 } from "./services";
 import type { DarwinRun } from "./run";
 import { timetableDate } from "./import-state";
-import { oldestRunDate, openFrom, runsOfTrains, runsOnDay } from "./store";
+import {
+  oldestRunDate,
+  openFrom,
+  runsOfTrains,
+  runsOnDay,
+  uidsOfSameTrains,
+} from "./store";
 
 /** Days of the chosen type tried, newest first, for one with a timetable on this route. */
 const TIMETABLE_DAYS_TRIED = 3;
@@ -23,7 +30,9 @@ const TIMETABLE_DAYS_TRIED = 3;
  * The service list from stored Darwin runs. The trains come from the latest timetable of
  * the chosen day type: today's once the morning snapshot is read. The list is the next few
  * trains from the searched time, and only their runs in the period are read, by schedule
- * UID, so a busy route costs no more than a quiet one. Darwin counts from the first day it
+ * UID, so a busy route costs no more than a quiet one. A train missing from an open day of
+ * the day type may run under another UID that day: those UIDs are looked up by operator and
+ * public times, and their runs read too (`sameTrainLookup`). Darwin counts from the first day it
  * saw whole; the days before it are HSP's, filled in by the page after the list is shown
  * (`hsp`). Without HSP the period starts at that first Darwin day, so the dates shown are the
  * ones the counts cover. The runs read are returned too, so a calculation for one of the
@@ -88,14 +97,33 @@ export async function findDarwinServices(
     if (!page.window) {
       return { ...empty, ...links };
     }
-    const history = await runsOfTrains(sql, {
-      uids: uidsLeaving(day, search, page.window),
+    const legs = legsLeaving(day, search, page.window);
+    const span = {
       fromDate: laterDate(period.from, countedFrom),
       toDate: today,
-    });
+    };
     const runs = new Map(day.map((run) => [run.rid, run]));
-    for (const run of history) {
+    const known = new Set(legs.map((leg) => leg.uid));
+    for (const run of await runsOfTrains(sql, { uids: [...known], ...span })) {
       runs.set(run.rid, run);
+    }
+    const lookup = sameTrainLookup(
+      legs,
+      [...runs.values()],
+      search,
+      openDays(
+        search,
+        laterDate(span.fromDate, earliest),
+        today,
+        todayTimetable,
+      ),
+    );
+    if (lookup) {
+      const found = await uidsOfSameTrains(sql, { ...search, ...lookup });
+      const uids = found.filter((uid) => !known.has(uid));
+      for (const run of await runsOfTrains(sql, { uids, ...span })) {
+        runs.set(run.rid, run);
+      }
     }
     const list = servicesFromRuns(
       [...runs.values()],
@@ -128,6 +156,26 @@ function timetableDays(
     date >= earliest && dates.length < TIMETABLE_DAYS_TRIED;
     date = addCalendarDays(date, -1)
   ) {
+    if (search.days === "all" || dayTypeOf(date) === search.days) {
+      dates.push(date);
+    }
+  }
+  return dates;
+}
+
+/**
+ * Open dates of the chosen day type from `from` to today. Today only when its timetable is
+ * loaded: before that its runs are partial.
+ */
+function openDays(
+  search: DarwinSearch,
+  from: string,
+  today: string,
+  todayTimetable: boolean,
+): string[] {
+  const dates: string[] = [];
+  const last = todayTimetable ? today : addCalendarDays(today, -1);
+  for (let date = from; date <= last; date = addCalendarDays(date, 1)) {
     if (search.days === "all" || dayTypeOf(date) === search.days) {
       dates.push(date);
     }

@@ -79,17 +79,106 @@ export function trainPage(
   };
 }
 
-/** Schedule UIDs of the runs that board in `window` on this search. */
-export function uidsLeaving(
+/** A train of a list as its runs are found again: its schedule UID, operator and public times. */
+export type TrainLeg = {
+  uid: string;
+  toc: string;
+  /** Public departure from the boarding station, HHMM. */
+  departure: string;
+  /** Public arrival at the destination, HHMM. */
+  arrival: string;
+};
+
+/** The trains of the runs that board in `window` on this search, one per schedule UID. */
+export function legsLeaving(
   runs: readonly DarwinRun[],
   search: Pick<DarwinSearch, "fromCrs" | "toCrs">,
   window: ClockWindow,
-): string[] {
-  const uids = runs.flatMap((run) => {
+): TrainLeg[] {
+  const legs = new Map<string, TrainLeg>();
+  for (const run of runs) {
     const leg = legOf(run, search.fromCrs, search.toCrs);
-    return leg && run.uid && inWindow(leg.departure, window) ? [run.uid] : [];
-  });
-  return [...new Set(uids)];
+    if (leg && run.uid && inWindow(leg.departure, window)) {
+      legs.set(run.uid, {
+        uid: run.uid,
+        toc: run.toc,
+        departure: leg.departure,
+        arrival: leg.arrival,
+      });
+    }
+  }
+  return [...legs.values()];
+}
+
+/** What to look up to find a train's runs under other schedule UIDs. */
+export type SameTrainLookup = {
+  /** Open days on which some listed train has no run. */
+  dates: string[];
+  /** Per train missing a day: its operator and a pattern its stored calls match. */
+  trains: { toc: string; pattern: string }[];
+};
+
+/**
+ * Some trains get a new schedule UID on some days, such as the Caledonian Sleeper from
+ * Euston at 23:45: one UID on Mondays, another Tuesday to Thursday, a third on Fridays. Its
+ * runs read by UID then miss the other days. A train that has no run on one of `dates`, the
+ * open days of the searched day types, is looked up on those days by operator and public
+ * times. A day with no train at all also asks once, and finds nothing. Undefined when every
+ * train ran on every date.
+ */
+export function sameTrainLookup(
+  legs: readonly TrainLeg[],
+  runs: readonly DarwinRun[],
+  search: Pick<DarwinSearch, "fromCrs" | "toCrs">,
+  dates: readonly string[],
+): SameTrainLookup | undefined {
+  const seen = new Map<string, Set<string>>();
+  for (const run of runs) {
+    const leg = legOf(run, search.fromCrs, search.toCrs);
+    if (leg) {
+      const key = trainKey(run.toc, leg.departure, leg.arrival);
+      seen.set(key, (seen.get(key) ?? new Set()).add(run.serviceDate));
+    }
+  }
+  const missing = new Set<string>();
+  const trains = new Map<string, { toc: string; pattern: string }>();
+  for (const leg of legs) {
+    const key = trainKey(leg.toc, leg.departure, leg.arrival);
+    const ran = seen.get(key) ?? new Set<string>();
+    const absent = dates.filter((date) => !ran.has(date));
+    if (absent.length === 0) {
+      continue;
+    }
+    absent.forEach((date) => missing.add(date));
+    trains.set(key, {
+      toc: leg.toc,
+      pattern: legPattern(search, leg.departure, leg.arrival),
+    });
+  }
+  if (trains.size === 0) {
+    return undefined;
+  }
+  return { dates: [...missing].sort(), trains: [...trains.values()] };
+}
+
+function trainKey(toc: string, departure: string, arrival: string): string {
+  return `${toc} ${departure} ${arrival}`;
+}
+
+/**
+ * A Postgres regular expression for stored calls (`server/call-text.ts`) that board at
+ * `fromCrs` with this public departure and later reach `toCrs` with this public arrival.
+ */
+export function legPattern(
+  search: Pick<DarwinSearch, "fromCrs" | "toCrs">,
+  departure: string,
+  arrival: string,
+): string {
+  return `(^|;)${quoted(search.fromCrs)},[^,;]*,${quoted(departure)},.*;${quoted(search.toCrs)},${quoted(arrival)},`;
+}
+
+function quoted(text: string): string {
+  return text.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&");
 }
 
 /**
