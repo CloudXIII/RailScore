@@ -13,6 +13,6 @@ Show the page from Darwin first, then fill the days of the period before `DARWIN
 ## Consequences
 
 - The page is never held up by HSP, and a train keeps Darwin's figures if HSP is down or refuses.
-- HSP is asked only while a period of up to 90 days reaches before Darwin's first day. The 180- and 365-day periods added later would cost hundreds of `serviceDetails` calls a train, so they count Darwin's days alone. Sunset: 30-day periods stop asking from about 4 December 2026, 90-day periods from about 2 February 2027. After that HSP is no longer called, its rows age out, and the `hsp_*` tables, the `HSP_*` variables and `apps/web/server/hsp/` can be removed.
+- HSP is asked only while a period of up to 90 days reaches before Darwin's first day. A longer period, if one is offered, would cost hundreds of `serviceDetails` calls a train, so it would count Darwin's days alone. Sunset: 30-day periods stop asking from about 4 December 2026, 90-day periods from about 2 February 2027. After that HSP is no longer called, its rows age out, and the `hsp_*` tables, the `HSP_*` variables and `apps/web/server/hsp/` can be removed.
 - At the 13 December 2026 timetable change some trains may no longer match their HSP rows, and keep Darwin's figures.
 - One rule differs: HSP records a run with no actual time anywhere as cancelled, where Darwin only knows no movement was seen.
