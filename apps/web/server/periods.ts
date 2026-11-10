@@ -10,11 +10,18 @@ export type SearchPeriods = {
 };
 
 /**
+ * Longest period HSP fills. HSP asks one call per run, so a longer period would cost hundreds
+ * of calls a train; 180 and 365 days count Darwin's days alone and fill up as it records them.
+ */
+const HSP_LONGEST_PERIOD = 90;
+
+/**
  * Splits the last `periodDays` finished days between HSP and Darwin. Darwin counts from
  * `darwinFrom`; HSP covers the days before it, so the period is whole from the first search.
  * Once the period starts on or after `darwinFrom` HSP is no longer asked: from early December
- * for 30 days, from early February 2027 for 90. Without HSP the period starts at `darwinFrom`,
- * so the dates shown are the ones the counts cover.
+ * for 30 days, from early February 2027 for 90. Without HSP, or for a period longer than
+ * `HSP_LONGEST_PERIOD`, the period starts at `darwinFrom`, so the dates shown are the ones the
+ * counts cover.
  */
 export function searchPeriods(
   periodDays: number,
@@ -25,7 +32,9 @@ export function searchPeriods(
   const trailing = trailingDays(periodDays, now);
   const before = addCalendarDays(darwinFrom, -1);
   const hsp =
-    hspAvailable && trailing.from < darwinFrom
+    hspAvailable &&
+    periodDays <= HSP_LONGEST_PERIOD &&
+    trailing.from < darwinFrom
       ? { from: trailing.from, to: before < trailing.to ? before : trailing.to }
       : undefined;
   return {
