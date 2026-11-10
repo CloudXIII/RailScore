@@ -13,14 +13,28 @@ const WRITE_ROWS = 2_000;
 const MONTH_ROWS = 500;
 
 /**
- * Days kept as one row per run: today and the 7 before it, so the latest day of every day type
- * is there for a search to start from. Older days are packed into `darwin_months`.
+ * Days kept as one row per run: today and the 14 before it, so the two latest days of every day
+ * type are there for a search to choose its timetable from (`find.ts`). Older days are packed
+ * into `darwin_months`.
  */
-const OPEN_DAYS = 8;
+const OPEN_DAYS = 15;
 
-/** First day still kept as one row per run. Earlier days are packed and no longer change. */
-export function openFrom(now: Date): string {
+/** First day kept as one row per run once the window is full. Earlier days are packed. */
+function openFrom(now: Date): string {
   return addCalendarDays(londonIsoDate(now), 1 - OPEN_DAYS);
+}
+
+/**
+ * First day still held as one row per run: `openFrom`, or a later day while days inside the
+ * window are already packed. That happens for a week after the window grows, since packing
+ * takes the oldest day first and never gives one back. A packed day no longer changes.
+ */
+export async function firstOpenDay(sql: Sql, now: Date): Promise<string> {
+  const [row] = await sql<{ oldest: string | null }[]>`
+    select min(service_date)::text as oldest from darwin_runs
+  `;
+  const from = openFrom(now);
+  return row?.oldest && row.oldest > from ? row.oldest : from;
 }
 
 /**
@@ -33,7 +47,12 @@ export async function applyUpdates(
   now = new Date(),
 ): Promise<number> {
   const from = openFrom(now);
-  const updates = received.filter((update) => update.serviceDate >= from);
+  const open = received.filter((update) => update.serviceDate >= from);
+  if (open.length === 0) {
+    return 0;
+  }
+  const first = await firstOpenDay(sql, now);
+  const updates = open.filter((update) => update.serviceDate >= first);
   if (updates.length === 0) {
     return 0;
   }

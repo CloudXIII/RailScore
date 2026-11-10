@@ -4,6 +4,8 @@
  * bake the value into the build. Empty and blank values count as unset.
  */
 
+import { LONGEST_PERIOD } from "@/shared/search-query";
+
 export class MissingEnvironmentError extends Error {
   constructor(variables: string) {
     super(`Missing required environment variable: ${variables}`);
@@ -120,12 +122,12 @@ export function darwinSnapshot(): { url: string; apiKey: string } {
 }
 
 /**
- * Days of Darwin runs kept. An unset or unusable value stays at 90, the longest search period.
- * Packed into month rows, a day of the whole network is under 1 MB; the last 8 open days are
- * about 13 MB each.
+ * Days of Darwin runs kept. An unset or unusable value stays at 365, the longest search period.
+ * Packed into month rows, a day of the whole network is under 1 MB; the last 15 open days are
+ * about 12 MB each. Darwin's history cannot be fetched again, so a day deleted is lost.
  */
 export function darwinKeepDays(): number {
-  return positiveInteger("DARWIN_KEEP_DAYS", 90);
+  return positiveInteger("DARWIN_KEEP_DAYS", LONGEST_PERIOD);
 }
 
 /** Secret a scheduler sends as `Authorization: Bearer …` to start an import. Undefined turns the route off. */

@@ -30,6 +30,15 @@ describe("searchPeriods", () => {
     ).toBeUndefined();
   });
 
+  it("counts Darwin's days alone for periods longer than 90 days", () => {
+    expect(searchPeriods(365, at("2026-11-10"), "2026-11-04", true)).toEqual({
+      period: { from: "2026-11-04", to: "2026-11-09" },
+    });
+    expect(
+      searchPeriods(180, at("2027-06-01"), "2026-11-04", true).period,
+    ).toEqual({ from: "2026-12-03", to: "2027-05-31" });
+  });
+
   it("covers the whole period from HSP on Darwin's first day", () => {
     expect(searchPeriods(7, at("2026-11-04"), "2026-11-04", true)).toEqual({
       period: { from: "2026-10-28", to: "2026-11-03" },

@@ -23,7 +23,7 @@ On a phone: search, trains, arrival history.
 - Punctuality rules live in `packages/core`, a TypeScript package with no framework or database, covered by unit tests.
 - A scheduled import of the Darwin Push Port feed (Kafka) into Postgres, so a search and a calculation are a few database reads with no call to an outside API. Days before the import began are filled from HSP after the page is shown, and stored.
 - Train lists start from today's Darwin timetable and pool each train's past runs by schedule UID.
-- Runs on free tiers only: Vercel Hobby, Neon Free (0.5 GB: 90 days of the whole network, packed into month rows), and cron-job.org.
+- Runs on free tiers only: Vercel Hobby, Neon Free (1 GB per project: a year of the whole network, packed into month rows), and cron-job.org.
 
 Built with AI-assisted development (Cursor, Claude Code).
 
@@ -33,7 +33,7 @@ How it is built is in [docs/architecture.md](docs/architecture.md), the classifi
 
 Train performance is from Darwin Real Time Train Information (the Push Port, read over Kafka, and its hourly snapshots) on the Rail Data Marketplace. Station names and CRS codes are from the [Knowledgebase Stations data feed](https://raildata.org.uk/dashboard/dataProduct/P-88ffe920-471c-4fd9-8e0d-95d5b9b7a257/overview).
 
-Darwin history starts on the first day the import saw whole, 4 November 2026 (`DARWIN_FIRST_DAY`), and reaches back at most `DARWIN_KEEP_DAYS` (90). The days of a period before that come from [Historic Service Performance](https://raildata.org.uk) (HSP) on the Rail Data Marketplace, asked after the page is shown and stored (see [architecture](docs/architecture.md#days-before-darwin-hsp)). Without HSP, the list names the days it covers. If the import stops, no new runs arrive.
+Darwin history starts on the first day the import saw whole, 4 November 2026 (`DARWIN_FIRST_DAY`), and reaches back at most `DARWIN_KEEP_DAYS` (365). The days of a period of up to 90 days before that come from [Historic Service Performance](https://raildata.org.uk) (HSP) on the Rail Data Marketplace, asked after the page is shown and stored (see [architecture](docs/architecture.md#days-before-darwin-hsp)). Without HSP, and for 180 and 365 days, the list names the days it covers. If the import stops, no new runs arrive.
 
 Credit the data publisher when showing this data. This project is not approved by, and is not affiliated with, the publisher or the Rail Data Marketplace.
 
@@ -60,7 +60,7 @@ Every variable is server-only. Do not add a `NEXT_PUBLIC_` prefix.
 | `PORT`                                                | Optional. `npm run dev` uses 3000.                                                                                                                                                                                        |
 | `DARWIN_KAFKA_*`                                      | Darwin Push Port on Kafka, for the import below. Required for live data. Bootstrap, topic, group, username and password, as the Rail Data Marketplace Pub/Sub tab shows them. The import always uses SASL PLAIN over SSL. |
 | `DARWIN_SNAPSHOT_URL`, `DARWIN_SNAPSHOT_CONSUMER_KEY` | Hourly Darwin snapshots, read for each day's timetable and when Kafka dropped messages. Required for live data.                                                                                                           |
-| `DARWIN_KEEP_DAYS`                                    | Optional. Days of Darwin runs kept. Default 90.                                                                                                                                                                           |
+| `DARWIN_KEEP_DAYS`                                    | Optional. Days of Darwin runs kept. Default 365.                                                                                                                                                                          |
 | `DARWIN_FIRST_DAY`                                    | Optional. First day the Darwin import saw whole, `YYYY-MM-DD`. Default `2026-11-04`. Earlier stored days are not counted.                                                                                                 |
 | `HSP_BASE_URL`, `HSP_API_KEY_HEADER`, `HSP_API_KEY`   | Optional. Historic Service Performance, for the days of a period before `DARWIN_FIRST_DAY`. Without them the period starts at that day.                                                                                   |
 | `HSP_DAILY_CALL_LIMIT`                                | Optional. HSP calls a day across every visitor. Default 5000. Past it the figures are Darwin's alone until midnight.                                                                                                      |
@@ -78,11 +78,11 @@ npm run db:migrate
 npm run dev
 ```
 
-Open <http://localhost:3000>. Choose two stations, a departing-after time, the days, and 30, 60, or 90 days. The defaults before a search are 06:30, weekdays, and 30 days. **Find trains** loads the list. Pick one service and press **Calculate reliability**.
+Open <http://localhost:3000>. Choose two stations, a departing-after time, the days, and 30, 60, 90, 180 or 365 days. The defaults before a search are 06:30, weekdays, and 30 days. **Find trains** loads the list. Pick one service and press **Calculate reliability**.
 
 Leave `RAILSCORE_DATA` unset for live trains from the stored Darwin runs. Set it to `mock` for made-up trains, with no database. The station list is still the live feed in both cases.
 
-The same choices are the URL query: `from`, `to`, `time`, `days` (`weekdays`, `saturday`, `sunday`, `all`), `period` (`30`, `60`, `90`), `service`, and `calculate=1`.
+The same choices are the URL query: `from`, `to`, `time`, `days` (`weekdays`, `saturday`, `sunday`, `all`), `period` (`30`, `60`, `90`, `180`, `365`), `service`, and `calculate=1`.
 
 ```bash
 npm test
