@@ -33,7 +33,7 @@ How it is built is in [docs/architecture.md](docs/architecture.md), the classifi
 
 Train performance is from Darwin Real Time Train Information (the Push Port, read over Kafka, and its hourly snapshots) on the Rail Data Marketplace. Station names and CRS codes are from the [Knowledgebase Stations data feed](https://raildata.org.uk/dashboard/dataProduct/P-88ffe920-471c-4fd9-8e0d-95d5b9b7a257/overview).
 
-Darwin history starts on the first day the import saw whole, 4 November 2026 (`DARWIN_FIRST_DAY`), and reaches back at most `DARWIN_KEEP_DAYS` (365). The days of a period of up to 90 days before that come from [Historic Service Performance](https://raildata.org.uk) (HSP) on the Rail Data Marketplace, asked after the page is shown and stored (see [architecture](docs/architecture.md#days-before-darwin-hsp)). Without HSP, and for 180 and 365 days, the list names the days it covers. If the import stops, no new runs arrive.
+Darwin history starts on the first day the import saw whole, 4 November 2026 (`DARWIN_FIRST_DAY`), and reaches back at most `DARWIN_KEEP_DAYS` (365, a year kept although searches go back 90 days, so longer periods can be offered later). The days of a period of up to 90 days before that come from [Historic Service Performance](https://raildata.org.uk) (HSP) on the Rail Data Marketplace, asked after the page is shown and stored (see [architecture](docs/architecture.md#days-before-darwin-hsp)). Without HSP, the list names the days it covers. If the import stops, no new runs arrive.
 
 Credit the data publisher when showing this data. This project is not approved by, and is not affiliated with, the publisher or the Rail Data Marketplace.
 
@@ -78,11 +78,11 @@ npm run db:migrate
 npm run dev
 ```
 
-Open <http://localhost:3000>. Choose two stations, a departing-after time, the days, and 30, 60, 90, 180 or 365 days. The defaults before a search are 06:30, weekdays, and 30 days. **Find trains** loads the list. Pick one service and press **Calculate reliability**.
+Open <http://localhost:3000>. Choose two stations, a departing-after time, the days, and 30, 60, or 90 days. The defaults before a search are 06:30, weekdays, and 30 days. **Find trains** loads the list. Pick one service and press **Calculate reliability**.
 
 Leave `RAILSCORE_DATA` unset for live trains from the stored Darwin runs. Set it to `mock` for made-up trains, with no database. The station list is still the live feed in both cases.
 
-The same choices are the URL query: `from`, `to`, `time`, `days` (`weekdays`, `saturday`, `sunday`, `all`), `period` (`30`, `60`, `90`, `180`, `365`), `service`, and `calculate=1`.
+The same choices are the URL query: `from`, `to`, `time`, `days` (`weekdays`, `saturday`, `sunday`, `all`), `period` (`30`, `60`, `90`), `service`, and `calculate=1`.
 
 ```bash
 npm test
