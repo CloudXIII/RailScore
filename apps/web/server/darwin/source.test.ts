@@ -9,6 +9,8 @@ import { oldestRunDate, runsOfTrains, runsOnDay } from "./store";
 vi.mock("../db", () => ({ database: vi.fn() }));
 vi.mock("./store", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./store")>()),
+  // The two weeks before NOW are all open.
+  firstOpenDay: vi.fn(async () => "2026-10-21"),
   oldestRunDate: vi.fn(),
   runsOfTrains: vi.fn(),
   runsOnDay: vi.fn(),

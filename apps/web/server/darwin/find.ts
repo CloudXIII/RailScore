@@ -21,9 +21,10 @@ import {
 } from "./services";
 import type { DarwinRun } from "./run";
 import { timetableDate } from "./import-state";
+import { listedTimetable } from "./timetable-day";
 import {
+  firstOpenDay,
   oldestRunDate,
-  openFrom,
   runsOfTrains,
   runsOnDay,
   uidsOfSameTrains,
@@ -89,13 +90,21 @@ export async function findDarwinServices(
   }
   const today = londonIsoDate(now);
   const todayTimetable = (await timetableDate(sql)) === today;
-  const earliest = oldest > openFrom(now) ? oldest : openFrom(now);
+  const earliest = laterDate(oldest, await firstOpenDay(sql, now));
   const input = { today, todayTimetable, countedFrom, period };
-  /** The latest timetable of a day type on this route, newest first. */
+  /**
+   * The timetable of a day type on this route: the latest day's, unless it is a reduced one
+   * (`listedTimetable`) and the day before it of the same type had the usual trains.
+   */
   const latestTimetable = async (
     days: DayPattern,
     known?: { date: string; runs: DarwinRun[] },
   ) => {
+    const found: {
+      date: string;
+      runs: DarwinRun[];
+      timetable: NonNullable<ReturnType<typeof servicesFromRuns>>;
+    }[] = [];
     for (const date of timetableDays(days, today, todayTimetable, earliest)) {
       const runs =
         known?.date === date
@@ -110,10 +119,15 @@ export async function findDarwinServices(
           ? servicesFromRuns(runs, { ...search, days }, input, WHOLE_DAY)
           : undefined;
       if (timetable && timetable.services.length > 0) {
-        return { date, runs, timetable };
+        found.push({ date, runs, timetable });
+        // "All days" compares unlike days (a Saturday with the Friday before it), so it
+        // keeps the latest.
+        if (found.length === (days === "all" ? 1 : 2)) {
+          break;
+        }
       }
     }
-    return undefined;
+    return listedTimetable(found, (day) => day.timetable.services.length);
   };
 
   const found = await latestTimetable(search.days);
