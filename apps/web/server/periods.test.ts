@@ -30,7 +30,7 @@ describe("searchPeriods", () => {
     ).toBeUndefined();
   });
 
-  it("counts Darwin's days alone for periods longer than 90 days", () => {
+  it("would count Darwin's days alone for periods longer than 90 days", () => {
     expect(searchPeriods(365, at("2026-11-10"), "2026-11-04", true)).toEqual({
       period: { from: "2026-11-04", to: "2026-11-09" },
     });

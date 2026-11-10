@@ -10,8 +10,8 @@ export type SearchPeriods = {
 };
 
 /**
- * Longest period HSP fills. HSP asks one call per run, so a longer period would cost hundreds
- * of calls a train; 180 and 365 days count Darwin's days alone and fill up as it records them.
+ * Longest period HSP fills. HSP asks one call per run, so a longer period, if one is offered,
+ * would cost hundreds of calls a train; it counts Darwin's days alone.
  */
 const HSP_LONGEST_PERIOD = 90;
 

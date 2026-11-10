@@ -19,8 +19,6 @@ const PERIOD_OPTIONS = [
   { value: 30, label: "30 days" },
   { value: 60, label: "60 days" },
   { value: 90, label: "90 days" },
-  { value: 180, label: "180 days" },
-  { value: 365, label: "365 days" },
 ] as const;
 
 export function SearchForm({
