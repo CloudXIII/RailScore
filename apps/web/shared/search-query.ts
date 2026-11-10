@@ -2,13 +2,10 @@ import type { DayPattern } from "./day-type";
 import type { Station } from "./stations";
 
 /**
- * Days of history. Finished days are packed into month rows, well under 1 MB a day, so a year
- * fits in Neon Free (1 GB per project). A rolling year is 365 days, leap years included.
+ * Days of history offered. A year of runs is kept (`darwinKeepDays`), so longer periods can be
+ * offered once Darwin has recorded them.
  */
-export const PERIOD_LENGTHS = [30, 60, 90, 180, 365] as const;
-
-/** The longest period, and so the days of runs kept. */
-export const LONGEST_PERIOD = Math.max(...PERIOD_LENGTHS);
+export const PERIOD_LENGTHS = [30, 60, 90] as const;
 export type PeriodLength = (typeof PERIOD_LENGTHS)[number];
 
 /** The search in the page's address, as read by the server and shown by the form. */
