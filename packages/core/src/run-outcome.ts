@@ -95,7 +95,9 @@ export function passengerLeg(
  *
  * - **Arrived** when the destination has an actual arrival, unless the passenger could not
  *   board: a public departure from the boarding station with no actual departure, including a
- *   train that ran through and left only a passing time. That is a missed call.
+ *   train that ran through and left only a passing time. That is a missed call when the
+ *   boarding call was cancelled, has a reason code or a passing time; with none of these it
+ *   was only not recorded, and the outcome is unknown.
  * - **Cancelled** when no call has an actual time.
  * - **Did not call** when some call has an actual time and the destination was cancelled or
  *   has a reason code.
@@ -129,7 +131,10 @@ export function classifyRun(
     return { ...base, outcome: "missing_actual" };
   }
   if (boarding && !departedFrom(boarding)) {
-    return { ...base, outcome: "did_not_call" };
+    return {
+      ...base,
+      outcome: missedAt(boarding) ? "did_not_call" : "missing_actual",
+    };
   }
   try {
     return {
@@ -163,6 +168,15 @@ function departedFrom(call: Call): boolean {
     return Boolean(call.atd);
   }
   return hasActual(call) || !isFlagged(call);
+}
+
+/**
+ * Whether a boarding call with no actual departure shows the train did not stop there: it was
+ * cancelled or has a reason code, or it left a passing time. A call with none of these was
+ * simply not recorded, as when HSP has no times at all for the stretch before boarding.
+ */
+function missedAt(call: Call): boolean {
+  return isFlagged(call) || Boolean(call.ata);
 }
 
 function hasActual(call: Call): boolean {
