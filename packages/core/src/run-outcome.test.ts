@@ -156,6 +156,30 @@ describe("classifyRun", () => {
     });
   });
 
+  it("reads a boarding stop with no record at all as unknown, not a missed call", () => {
+    // Merseyrail 06:25 Liverpool Central to West Kirby on 2026-08-25: HSP has no times from
+    // the start to Birkenhead North and no reason code, then the train arrives early.
+    const calls: Call[] = [
+      { crs: "WKI", ptd: "0551" },
+      { crs: "BKN", pta: "0608", ptd: "0609" },
+      { crs: "LVC", pta: "0625", ptd: "0625" },
+      { crs: "BKN", pta: "0637", ptd: "0637" },
+      { crs: "BID", pta: "0640", ptd: "0640", atd: "0640" },
+      { crs: "HYK", pta: "0653", ptd: "0653", ata: "0651", atd: "0651" },
+      { crs: "WKI", pta: "0657", ata: "0655" },
+    ];
+    expect(
+      classifyRun(run("202608256762814", calls, "2026-08-25"), {
+        boardingCrs: "LVC",
+        destinationCrs: "WKI",
+      }),
+    ).toEqual({
+      id: "202608256762814",
+      serviceDate: "2026-08-25",
+      outcome: "missing_actual",
+    });
+  });
+
   it("reads a boarding stop that has an actual departure as an arrival", () => {
     const calls: Call[] = [
       {
