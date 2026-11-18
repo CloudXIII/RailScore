@@ -78,7 +78,7 @@ npm run db:migrate
 npm run dev
 ```
 
-Open <http://localhost:3000>. Choose two stations, a departing-after time, the days, and 30, 60, or 90 days. The defaults before a search are 06:30, weekdays, and 30 days. **Find trains** loads the list. Pick one service and press **Calculate reliability**.
+Open <http://localhost:3000>. Choose two stations, a departing-after time, the days, and 14, 30, 60, or 90 days. The defaults before a search are 06:30, weekdays, and 14 days, the quickest: from 30 days a search may read HSP or the packed months, and the form says it can take longer. **Find trains** loads the list. Pick one service and press **Calculate reliability**.
 
 Leave `RAILSCORE_DATA` unset for live trains from the stored Darwin runs. Set it to `mock` for made-up trains, with no database. The station list is still the live feed in both cases.
 
