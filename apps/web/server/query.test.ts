@@ -42,3 +42,12 @@ describe("parseQuery time", () => {
     expect(search(undefined).time).toBe("06:30");
   });
 });
+
+describe("parseQuery period", () => {
+  it("defaults to 14 days and keeps an offered period", () => {
+    expect(search("07:00").period).toBe(14);
+    expect(search("07:00", { period: "7" }).period).toBe(14);
+    expect(search("07:00", { period: "30" }).period).toBe(30);
+    expect(search("07:00", { period: "90" }).period).toBe(90);
+  });
+});
