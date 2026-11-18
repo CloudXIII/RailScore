@@ -1,5 +1,6 @@
 import { isDayPattern, type DayPattern } from "@/shared/day-type";
 import {
+  DEFAULT_PERIOD,
   PERIOD_LENGTHS,
   type ParsedQuery,
   type PeriodLength,
@@ -62,7 +63,7 @@ function parsePeriod(value: string): PeriodLength {
   const parsed = Number(value);
   return PERIOD_LENGTHS.includes(parsed as PeriodLength)
     ? (parsed as PeriodLength)
-    : 30;
+    : DEFAULT_PERIOD;
 }
 
 function validClock(time: string): boolean {

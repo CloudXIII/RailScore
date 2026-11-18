@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { departureWindowHint, timeSearchLabel } from "@/features/format";
 import { keepFieldInView } from "@/features/keep-field-in-view";
-import type { ParsedQuery } from "@/shared/search-query";
+import { SLOWER_PERIOD, type ParsedQuery } from "@/shared/search-query";
 import type { Station } from "@/shared/stations";
 import { StationField } from "@/features/station-field";
 import styles from "./search-form.module.css";
@@ -16,6 +16,7 @@ const DAY_OPTIONS = [
 ] as const;
 
 const PERIOD_OPTIONS = [
+  { value: 14, label: "14 days" },
   { value: 30, label: "30 days" },
   { value: 60, label: "60 days" },
   { value: 90, label: "90 days" },
@@ -36,6 +37,7 @@ export function SearchForm({
   const [from, setFrom] = useState(query.fromText);
   const [to, setTo] = useState(query.toText);
   const [time, setTime] = useState(query.time);
+  const [period, setPeriod] = useState<number>(query.period);
   const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
@@ -148,7 +150,7 @@ export function SearchForm({
           ))}
         </div>
       </fieldset>
-      <fieldset className="days">
+      <fieldset className="days" aria-describedby="period-hint">
         <legend>History</legend>
         <div className={styles.pills}>
           {PERIOD_OPTIONS.map((option) => (
@@ -158,11 +160,26 @@ export function SearchForm({
                 name="period"
                 value={option.value}
                 defaultChecked={query.period === option.value}
+                onChange={() => setPeriod(option.value)}
               />
               <span>{option.label}</span>
             </label>
           ))}
         </div>
+        <p
+          className={`meta ${styles.periodHint}`}
+          id="period-hint"
+          aria-live="polite"
+        >
+          {period >= SLOWER_PERIOD ? (
+            <>
+              <span className={styles.infoMark} aria-hidden="true">
+                i
+              </span>
+              Longer periods can take a few seconds more to calculate.
+            </>
+          ) : null}
+        </p>
       </fieldset>
       {query.errors.length > 0 ? (
         <ul className="errors" role="alert">
