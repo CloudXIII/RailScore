@@ -53,7 +53,7 @@ Every variable is server-only. Do not add a `NEXT_PUBLIC_` prefix.
 
 | Variable                                              | Role                                                                                                                                                                                                                      |
 | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `STATIONS_BASE_URL`, `STATIONS_API_KEY`               | Station names and CRS codes. Required, including when `RAILSCORE_DATA=mock`. The server sends the key as `x-apikey`.                                                                                                      |
+| `STATIONS_BASE_URL`, `STATIONS_API_KEY`               | Optional. Only for `npm run stations:refresh -w @railscore/web`, which rewrites the station list the app ships with ([architecture](docs/architecture.md#stations)). The script sends the key as `x-apikey`.              |
 | `DATABASE_URL`                                        | Postgres holding the Darwin runs. Required for live data; without it no train is listed. The running app should use a pooled URL. `npm run db:migrate` should use the direct URL.                                         |
 | `DATABASE_POOL_MAX`                                   | Optional. Postgres connections in this process. Default 3.                                                                                                                                                                |
 | `RAILSCORE_DATA`                                      | Leave unset for the live feed. `mock` serves made-up trains.                                                                                                                                                              |
@@ -80,7 +80,7 @@ npm run dev
 
 Open <http://localhost:3000>. Choose two stations, a departing-after time, the days, and 14, 30, 60, or 90 days. The defaults before a search are 06:30, weekdays, and 14 days, the quickest: from 30 days a search may read HSP or the packed months, and the form says it can take longer. **Find trains** loads the list. Pick one service and press **Calculate reliability**.
 
-Leave `RAILSCORE_DATA` unset for live trains from the stored Darwin runs. Set it to `mock` for made-up trains, with no database. The station list is still the live feed in both cases.
+Leave `RAILSCORE_DATA` unset for live trains from the stored Darwin runs. Set it to `mock` for made-up trains, with no database. Both use the station list in `apps/web/server/stations.json`.
 
 The same choices are the URL query: `from`, `to`, `time`, `days` (`weekdays`, `saturday`, `sunday`, `all`), `period` (`30`, `60`, `90`), `service`, and `calculate=1`.
 
@@ -113,8 +113,6 @@ npm start
 That serves the production build. `PORT` overrides 3000. `npm run dev` is the development server, not this command.
 
 Set the variables from the table above in the host's environment. They stay on the server. For Postgres, give the app the pooled URL and run `npm run db:migrate` once with the direct URL.
-
-On a host whose filesystem is read-only, the station file under `apps/web/.data/` is not kept. The list stays in the memory of that process and is fetched again when the process is new.
 
 Postgres holds every run, so instances share nothing else. A search and a calculation each finish in one request.
 

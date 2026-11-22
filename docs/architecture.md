@@ -75,6 +75,6 @@ At busy times HSP refuses a second call beside a list call, list or detail alike
 
 ## Stations
 
-Station names and CRS codes come from the Knowledgebase feed (`server/station-feed.ts`), cached in memory, and in `apps/web/.data/stations.json` when the process can write that file, for up to 24 hours. Only name and CRS are kept. The lookup the search form uses is in `shared/stations.ts`.
+Station names and CRS codes ship with the app in `apps/web/server/stations.json`. They come from the Knowledgebase feed, which is about 55 MB for some 2,600 stations: too much to download on a page view, and in the development server a download that size overflows the stack. `npm run stations:refresh -w @railscore/web` rewrites the file from the feed (`server/station-feed.ts` keeps name and CRS only) and prints the stations added and removed; run it when stations open, close or are renamed, and commit the file. The lookup the search form uses is in `shared/stations.ts`.
 
 `apps/web/server/darwin/tiploc-crs.json` maps Darwin's TIPLOCs to CRS codes. Rebuild it from a Darwin reference file (`PPTimetable_*_ref_v*.xml.gz`, from "Darwin Timetable Files") with `node apps/web/scripts/tiploc-crs.mjs <file>`.
