@@ -201,6 +201,31 @@ describe("servicesFromRuns", () => {
     ]);
   });
 
+  it("keeps a Sunday train on an All days list while the latest day is a weekday", () => {
+    const list = listOf(
+      [
+        run("2026-11-01", "0000001", {
+          uid: "W33253",
+          departure: "0834",
+          arrival: "0845",
+          actualArrival: "0845",
+        }),
+        run("2026-11-03", "0000002", { actualArrival: "0823" }),
+        run(today, "0000002"),
+      ],
+      { ...search, days: "all" },
+      { today, todayTimetable: true, oldest: "2026-10-30" },
+    );
+    expect(list?.timetableDate).toBe(today);
+    expect(
+      list?.services.map((service) => [service.publicDeparture, service.days]),
+    ).toEqual([
+      ["0812", ["weekdays"]],
+      ["0834", ["sunday"]],
+    ]);
+    expect(list?.retired).toEqual([]);
+  });
+
   it("keeps to the departure window and the chosen day type", () => {
     const list = listOf(
       [
