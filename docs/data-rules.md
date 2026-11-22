@@ -30,9 +30,9 @@ Below 5 runs with a known outcome, the page says there are too few journeys, sti
 
 ## The search and the list
 
-The list is the timetable of today, or of the latest day of the searched type. When that day has under three quarters of the trains on the route of the day of its type before it, as on a weekend of engineering works, the earlier day's timetable is listed (`listedTimetable` in `server/darwin/timetable-day.ts`). A timetable change that cuts a route's trains by a quarter keeps listing the old trains for one more week of that day type. "All days" always lists the latest day.
+The list is the timetable of today, or of the latest day of the searched type. When that day has under three quarters of the trains on the route of the day of its type before it, as on a weekend of engineering works, the earlier day's timetable is listed (`listedTimetable` in `server/darwin/timetable-day.ts`). A timetable change that cuts a route's trains by a quarter keeps listing the old trains for one more week of that day type.
 
-"All days" lists weekday, Saturday and Sunday trains together. Departing after a time covers that minute and the following 59. The period ends yesterday in `Europe/London`, and Darwin counts only days from `DARWIN_FIRST_DAY`.
+"All days" lists weekday, Saturday and Sunday trains together: the latest timetable of each day type, each chosen by the rule above, so a search on a Sunday still lists the weekday trains. A train no longer runs when it missed the latest listed day of its own day type: a Sunday-only train that ran last Sunday stays on a Monday's list. Departing after a time covers that minute and the following 59. The period ends yesterday in `Europe/London`, and Darwin counts only days from `DARWIN_FIRST_DAY`.
 
 A day's list runs by the day a train leaves the boarding station, in clock order. Darwin files every run under its service date, the day it starts, so the list reads each run's public times from its first stop and moves a train whose boarding time has passed midnight to the end of the day (`crossesMidnight` in `server/darwin/services.ts`). Trains before 04:00 at the top of a list are the end of the night before, and say so ("Friday night, after midnight" on a Saturday).
 

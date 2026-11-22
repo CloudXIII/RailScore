@@ -1,7 +1,13 @@
 import "server-only";
 import { addCalendarDays, londonIsoDate } from "@railscore/core";
 import { database } from "../db";
-import { dayTypeOf, nightAfter, type DayPattern } from "@/shared/day-type";
+import {
+  DAY_TYPES,
+  dayTypeOf,
+  nightAfter,
+  type DayPattern,
+  type ServiceDay,
+} from "@/shared/day-type";
 import type { ScheduledService } from "@/shared/scheduled-service";
 import { darwinFirstDay, hspConnection } from "../env";
 import { laterDate, searchPeriods, type DateSpan } from "../periods";
@@ -30,14 +36,16 @@ import {
   uidsOfSameTrains,
 } from "./store";
 
-/** Days of the chosen type tried, newest first, for one with a timetable on this route. */
+/** Days of a day type tried, newest first, for one with a timetable on this route. */
 const TIMETABLE_DAYS_TRIED = 3;
 
 /**
  * The service list from stored Darwin runs. The trains come from the latest timetable of
- * the chosen day type: today's once the morning snapshot is read. The list is the next few
- * trains from the searched time, and only their runs in the period are read, by schedule
- * UID, so a busy route costs no more than a quiet one. A train missing from an open day of
+ * the chosen day type: today's once the morning snapshot is read. "All days" lists the
+ * latest timetable of each day type together, so a search on a Sunday still lists the
+ * weekday trains. The list is the next few trains from the searched time, and only their
+ * runs in the period are read, by schedule UID, so a busy route costs no more than a quiet
+ * one. A train missing from an open day of
  * the day type may run under another UID that day: those UIDs are looked up by operator and
  * public times, and their runs read too (`sameTrainLookup`). Darwin counts from the first day it
  * saw whole; the days before it are HSP's, filled in by the page after the list is shown
@@ -97,7 +105,7 @@ export async function findDarwinServices(
    * (`listedTimetable`) and the day before it of the same type had the usual trains.
    */
   const latestTimetable = async (
-    days: DayPattern,
+    days: ServiceDay,
     known?: { date: string; runs: DarwinRun[] },
   ) => {
     const found: {
@@ -120,17 +128,45 @@ export async function findDarwinServices(
           : undefined;
       if (timetable && timetable.services.length > 0) {
         found.push({ date, runs, timetable });
-        // "All days" compares unlike days (a Saturday with the Friday before it), so it
-        // keeps the latest.
-        if (found.length === (days === "all" ? 1 : 2)) {
+        if (found.length === 2) {
           break;
         }
       }
     }
     return listedTimetable(found, (day) => day.timetable.services.length);
   };
+  /**
+   * The listed timetable of a search's days. For "All days", every day type's together: the
+   * latest day alone would list only Sunday's trains on a Sunday, each run once a week.
+   */
+  const timetableOf = async (days: DayPattern) => {
+    if (days !== "all") {
+      return latestTimetable(days);
+    }
+    const runs: DarwinRun[] = [];
+    let date: string | undefined;
+    for (const type of DAY_TYPES) {
+      const latest = await latestTimetable(type);
+      if (latest) {
+        runs.push(...latest.runs);
+        date = date && date > latest.date ? date : latest.date;
+      }
+    }
+    if (!date) {
+      return undefined;
+    }
+    const timetable = servicesFromRuns(
+      runs,
+      { ...search, days },
+      input,
+      WHOLE_DAY,
+    );
+    return timetable && timetable.services.length > 0
+      ? { date, runs, timetable }
+      : undefined;
+  };
 
-  const found = await latestTimetable(search.days);
+  const found = await timetableOf(search.days);
   if (!found) {
     return empty;
   }
@@ -148,10 +184,13 @@ export async function findDarwinServices(
       servicesFromRuns(day, search, input, AFTER_MIDNIGHT)?.services ?? [];
     parts.push({ search, runs: day, window: AFTER_MIDNIGHT });
     const nightDays = nightAfter(search.days);
-    const next = await latestTimetable(nightDays, {
-      date: found.date,
-      runs: day,
-    });
+    const next =
+      nightDays === search.days
+        ? found
+        : await latestTimetable(nightDays as ServiceDay, {
+            date: found.date,
+            runs: day,
+          });
     const nightSearch = { ...search, days: nightDays };
     const nightTrains = next
       ? (servicesFromRuns(next.runs, nightSearch, input, NIGHT)?.services ?? [])
@@ -239,9 +278,9 @@ export async function findDarwinServices(
   };
 }
 
-/** Latest open dates of the chosen day type, today first when its timetable is loaded. */
+/** Latest open dates of a day type, today first when its timetable is loaded. */
 function timetableDays(
-  days: DayPattern,
+  days: ServiceDay,
   today: string,
   todayTimetable: boolean,
   earliest: string,
@@ -252,7 +291,7 @@ function timetableDays(
     date >= earliest && dates.length < TIMETABLE_DAYS_TRIED;
     date = addCalendarDays(date, -1)
   ) {
-    if (days === "all" || dayTypeOf(date) === days) {
+    if (dayTypeOf(date) === days) {
       dates.push(date);
     }
   }

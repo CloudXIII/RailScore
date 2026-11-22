@@ -6,7 +6,12 @@ import {
   passengerLeg,
   type PunctualityTally,
 } from "@railscore/core";
-import { dayTypeOf, dayTypesOf, type DayPattern } from "@/shared/day-type";
+import {
+  dayTypeOf,
+  dayTypesOf,
+  type DayPattern,
+  type ServiceDay,
+} from "@/shared/day-type";
 import { listServices } from "../services/fold";
 import { serviceKey, type ScheduledService } from "@/shared/scheduled-service";
 import { historicalRunFromDarwin, type DarwinRun } from "./run";
@@ -24,7 +29,10 @@ export type DarwinServiceList = {
   /** Trains that ran in the period but are not in the timetable the list starts from. */
   retired: ScheduledService[];
   period: { from: string; to: string };
-  /** Day whose timetable the list shows. Today once its timetable is loaded. */
+  /**
+   * Day whose timetable the list shows. Today once its timetable is loaded. For "All days",
+   * the latest of the day types' timetable days.
+   */
   timetableDate: string;
 };
 
@@ -226,7 +234,9 @@ function quoted(text: string): string {
  * The trains of the latest timetable for the chosen day type, each with its runs in the
  * period. Runs are pooled into trains by the shared folding rules, so a train is the
  * same schedule seen on several days. A train in the period that is not in that timetable
- * no longer runs, and is set apart. Today's runs pick the trains but are not counted,
+ * no longer runs, and is set apart. "All days" has one latest timetable per day type: a
+ * Sunday train that ran on the latest Sunday still runs, even when the latest day is a
+ * Monday. Today's runs pick the trains but are not counted,
  * since a run of today may still be under way. Nor are runs before `countedFrom`, the first
  * day Darwin saw whole: they can pick the trains, but their times are partial.
  */
@@ -274,10 +284,13 @@ export function servicesFromRuns(
         LONG_WAY_ROUND_FACTOR * fastest
       ),
   );
-  const timetableDate = direct
-    .map((leg) => leg.run.serviceDate)
-    .sort()
-    .at(-1);
+  const latestOf = new Map<ServiceDay, string>();
+  for (const leg of direct) {
+    if (leg.run.serviceDate > (latestOf.get(leg.day) ?? "")) {
+      latestOf.set(leg.day, leg.run.serviceDate);
+    }
+  }
+  const timetableDate = [...latestOf.values()].sort().at(-1);
   if (!timetableDate) {
     return undefined;
   }
@@ -300,7 +313,11 @@ export function servicesFromRuns(
   );
   const listed = listServices(groups, period.to);
   const runsOn = (service: ScheduledService) =>
-    service.rids.some((rid) => dateOfRid(rid) === timetableDate);
+    service.rids.some((rid) => {
+      const date = dateOfRid(rid);
+      const day = date ? dayTypeOf(date) : undefined;
+      return day !== undefined && latestOf.get(day) === date;
+    });
   return {
     services: listed.services.filter(runsOn).map(countedOnly(counted)),
     retired: [

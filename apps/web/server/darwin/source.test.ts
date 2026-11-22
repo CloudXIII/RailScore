@@ -14,6 +14,7 @@ vi.mock("./store", async (importOriginal) => ({
   oldestRunDate: vi.fn(),
   runsOfTrains: vi.fn(),
   runsOnDay: vi.fn(),
+  uidsOfSameTrains: vi.fn(async () => []),
 }));
 vi.mock("./import-state", () => ({ timetableDate: vi.fn() }));
 
@@ -133,6 +134,47 @@ describe("darwinSource.findServices", () => {
     expect(
       found.calculate(found.services[0]!).runs.map((run) => run.outcome),
     ).toEqual(["arrived", "arrived"]);
+  });
+
+  it("lists every day type's latest timetable for All days, on a Sunday too", async () => {
+    vi.mocked(database).mockReturnValue({} as ReturnType<typeof database>);
+    vi.mocked(oldestRunDate).mockResolvedValue("2026-10-21");
+    // Sunday 8 November, after the morning timetable is read.
+    vi.mocked(timetableDate).mockResolvedValue("2026-11-08");
+    const sunday = (date: string, id: string): DarwinRun => ({
+      ...run(date, id, "0845"),
+      uid: "W33253",
+      calls: [
+        { crs: "CLJ", pta: "0834", ptd: "0834", atd: "0834" },
+        { crs: "WAT", pta: "0845", ata: "0845" },
+      ],
+    });
+    vi.mocked(runsOnDay).mockImplementation(async (_sql, { date }) =>
+      date === "2026-11-08"
+        ? [sunday(date, "0000008")]
+        : date === "2026-11-06" || date === "2026-11-05"
+          ? [run(date, "0000006")]
+          : [],
+    );
+    vi.mocked(runsOfTrains).mockResolvedValue([
+      run("2026-11-05", "0000005", "0823"),
+      run("2026-11-06", "0000006", "0823"),
+      sunday("2026-11-01", "0000001"),
+    ]);
+
+    const found = await darwinSource.findServices({
+      ...search,
+      days: "all",
+      now: new Date("2026-11-08T12:00:00Z"),
+    });
+
+    expect(
+      found.services.map((service) => [service.publicDeparture, service.days]),
+    ).toEqual([
+      ["0812", ["weekdays"]],
+      ["0834", ["sunday"]],
+    ]);
+    expect(found.retired).toEqual([]);
   });
 
   it("lists nothing when no timetable day has a train on the route", async () => {
