@@ -1,15 +1,6 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { parseStationFeed } from "@/server/station-feed";
-
-const fsMock = vi.hoisted(() => ({
-  mkdir: vi.fn(async () => undefined),
-  readFile: vi.fn(async () => {
-    throw new Error("missing");
-  }),
-  writeFile: vi.fn(async () => undefined),
-}));
-
-vi.mock("node:fs/promises", () => fsMock);
+import { STATIONS } from "@/server/station-directory";
 
 describe("parseStationFeed", () => {
   it("keeps name and CRS and drops facilities", () => {
@@ -33,67 +24,28 @@ describe("parseStationFeed", () => {
   });
 });
 
-describe("loadStationDirectory", () => {
-  const previous = {
-    STATIONS_BASE_URL: process.env.STATIONS_BASE_URL,
-    STATIONS_API_KEY: process.env.STATIONS_API_KEY,
-  };
-
-  afterEach(() => {
-    for (const [name, value] of Object.entries(previous)) {
-      if (value === undefined) {
-        delete process.env[name];
-      } else {
-        process.env[name] = value;
-      }
-    }
-    fsMock.mkdir.mockReset();
-    fsMock.mkdir.mockResolvedValue(undefined);
-    fsMock.readFile.mockReset();
-    fsMock.readFile.mockRejectedValue(new Error("missing"));
-    fsMock.writeFile.mockReset();
-    fsMock.writeFile.mockResolvedValue(undefined);
-    vi.unstubAllGlobals();
-    vi.resetModules();
+describe("STATIONS", () => {
+  it("holds each CRS once, in the order the feed parser sorts them", () => {
+    const codes = STATIONS.map((station) => station.crs);
+    expect(STATIONS.length).toBeGreaterThan(2_500);
+    expect(new Set(codes).size).toBe(codes.length);
+    expect(codes.every((crs) => /^[A-Z]{3}$/.test(crs))).toBe(true);
+    expect(STATIONS.every((station) => station.name.length > 0)).toBe(true);
+    expect(
+      parseStationFeed({
+        stations: STATIONS.map((station) => ({
+          crsCode: station.crs,
+          name: station.name,
+        })),
+      }),
+    ).toEqual(STATIONS);
   });
 
-  function stubFeed(): void {
-    process.env.STATIONS_BASE_URL = "https://stations.test";
-    process.env.STATIONS_API_KEY = "stations-key";
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(
-        async () =>
-          new Response(
-            JSON.stringify({
-              stations: [{ name: "Euston", crsCode: "EUS" }],
-            }),
-            { status: 200 },
-          ),
-      ),
-    );
-  }
-
-  it("keeps the list in memory when the disk write fails", async () => {
-    stubFeed();
-    fsMock.writeFile.mockRejectedValue(new Error("read-only file system"));
-    const { loadStationDirectory } = await import("./station-directory");
-
-    const first = await loadStationDirectory(1_000);
-    const second = await loadStationDirectory(2_000);
-
-    expect(first).toEqual([{ crs: "EUS", name: "Euston" }]);
-    expect(second).toEqual(first);
-    expect(fetch).toHaveBeenCalledTimes(1);
-    expect(fsMock.writeFile).toHaveBeenCalledTimes(1);
-  });
-
-  it("writes the list when the disk accepts it", async () => {
-    stubFeed();
-    const { loadStationDirectory } = await import("./station-directory");
-
-    await loadStationDirectory(1_000);
-
-    expect(fsMock.writeFile).toHaveBeenCalledTimes(1);
+  it("names the stations searches use", () => {
+    expect(STATIONS).toContainEqual({
+      crs: "LIV",
+      name: "Liverpool Lime Street",
+    });
+    expect(STATIONS).toContainEqual({ crs: "EUS", name: "London Euston" });
   });
 });

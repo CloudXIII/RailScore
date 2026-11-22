@@ -14,10 +14,7 @@ import { errorText } from "@/server/error-text";
 import { parseQuery, timeHhmm } from "@/server/query";
 import { type ParsedQuery } from "@/shared/search-query";
 import { ownDays, type DayPattern, type ServiceDay } from "@/shared/day-type";
-import {
-  loadStationDirectory,
-  StationDirectoryError,
-} from "@/server/station-directory";
+import { STATIONS } from "@/server/station-directory";
 import type { Station } from "@/shared/stations";
 import { trainSource } from "@/server/train-source";
 import { searchTrains } from "@/server/use-cases/search-trains";
@@ -32,14 +29,9 @@ export async function generateMetadata({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }): Promise<Metadata> {
-  try {
-    const stations = await loadStationDirectory();
-    const query = parseQuery(await searchParams, stations);
-    if (query.from && query.to && query.errors.length === 0) {
-      return { title: pageTitle(query.from.name, query.to.name) };
-    }
-  } catch {
-    // The page reports a missing station list. The tab keeps the app name.
+  const query = parseQuery(await searchParams, STATIONS);
+  if (query.from && query.to && query.errors.length === 0) {
+    return { title: pageTitle(query.from.name, query.to.name) };
   }
   return { title: "RailScore" };
 }
@@ -50,27 +42,7 @@ export default async function Home({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const sample = trainSource().sample;
-  let stations: readonly Station[];
-  try {
-    stations = await loadStationDirectory();
-  } catch (error) {
-    const message =
-      error instanceof StationDirectoryError
-        ? error.message
-        : "The station list could not be loaded.";
-    return (
-      <>
-        <SiteHeader />
-        <main>
-          <Intro />
-          <p className="errors" role="alert">
-            {message}
-          </p>
-        </main>
-        <DataNotice sample={sample} />
-      </>
-    );
-  }
+  const stations = STATIONS;
   const query = parseQuery(await searchParams, stations);
   const ready = Boolean(query.from && query.to && query.errors.length === 0);
   return (
