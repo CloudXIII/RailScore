@@ -14,7 +14,7 @@ export const preferredRegion = "lhr1";
 const IMPORT_BUDGET_MS = 240_000;
 
 /**
- * Starts a Darwin import. cron-job.org calls this every 20 minutes with
+ * Starts a Darwin import. cron-job.org calls this every 15 to 30 minutes with
  * `Authorization: Bearer $CRON_SECRET`. Without CRON_SECRET the route is off.
  *
  * cron-job.org closes the connection after 30 seconds, and a catch-up import takes longer,

@@ -118,10 +118,10 @@ Postgres holds every run, so instances share nothing else. A search and a calcul
 
 ### Darwin import
 
-Kafka keeps about an hour of messages, so a scheduler calls `/api/import/darwin` every 20 minutes. The deployment uses [cron-job.org](https://cron-job.org) (free); [ADR 3](docs/adr/0003-cron-job-org-every-15-minutes.md) says why, and [ADR 6](docs/adr/0006-import-every-20-minutes-for-neon-transfer.md) why not every 15 minutes.
+Kafka keeps about an hour of messages, so a scheduler calls `/api/import/darwin` every 15 to 30 minutes. The deployment uses [cron-job.org](https://cron-job.org) (free); [ADR 3](docs/adr/0003-cron-job-org-every-15-minutes.md) says why, and [ADR 6](docs/adr/0006-read-each-run-once-per-import.md) what each interval costs in Neon transfer and compute.
 
 1. Set `CRON_SECRET` (a long random string) and the `DARWIN_*` variables in the deployment, then redeploy.
-2. On cron-job.org, create a job for `https://<deployment>/api/import/darwin`, every 20 minutes, method GET.
+2. On cron-job.org, create a job for `https://<deployment>/api/import/darwin`, every 15 to 30 minutes (20 suits Neon Free), method GET.
 3. Under Advanced, add the header `Authorization` with the value `Bearer <CRON_SECRET>`.
 4. Turn on failure notifications, so a run of failures reaches you by email.
 

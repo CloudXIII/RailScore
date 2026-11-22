@@ -57,7 +57,7 @@ export type ImportResult =
 
 /**
  * Reads the Darwin Push Port messages since the last import and folds them into `darwin_runs`.
- * Kafka keeps about an hour of messages, so a scheduler runs this every 20 minutes.
+ * Kafka keeps about an hour of messages, so a scheduler runs this every 15 to 30 minutes.
  * Offsets are committed only after the runs they changed are written. Each run is read from
  * the database at most once per import (`KnownRuns`).
  */

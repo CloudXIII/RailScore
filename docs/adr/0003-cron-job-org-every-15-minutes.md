@@ -1,6 +1,6 @@
 # 3. Call the import from cron-job.org every 15 minutes
 
-Accepted, 3 November 2026. The interval became 20 minutes in [ADR 6](0006-import-every-20-minutes-for-neon-transfer.md).
+Accepted, 3 November 2026. The interval became the deployment's choice, 15 to 30 minutes, in [ADR 6](0006-read-each-run-once-per-import.md).
 
 ## Context
 
