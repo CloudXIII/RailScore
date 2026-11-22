@@ -19,7 +19,12 @@ import {
   releaseImport,
   timetableDate,
 } from "./import-state";
-import { applyUpdates, deleteOldRuns, packFinishedDays } from "./store";
+import {
+  applyUpdates,
+  deleteOldRuns,
+  packFinishedDays,
+  type KnownRuns,
+} from "./store";
 
 /** Messages folded into one database write and offset commit. */
 const FLUSH_MESSAGES = 5_000;
@@ -52,8 +57,9 @@ export type ImportResult =
 
 /**
  * Reads the Darwin Push Port messages since the last import and folds them into `darwin_runs`.
- * Kafka keeps about an hour of messages, so a scheduler runs this every 15 to 30 minutes.
- * Offsets are committed only after the runs they changed are written.
+ * Kafka keeps about an hour of messages, so a scheduler runs this every 20 minutes.
+ * Offsets are committed only after the runs they changed are written. Each run is read from
+ * the database at most once per import (`KnownRuns`).
  */
 export async function importDarwin(budgetMs: number): Promise<ImportResult> {
   const sql = database();
@@ -67,8 +73,9 @@ export async function importDarwin(budgetMs: number): Promise<ImportResult> {
   }
   try {
     const before = await importState(sql);
+    const known: KnownRuns = new Map();
     const kafka = await readKafka(deadline, async (updates, newestAt) => {
-      const written = await applyUpdates(sql, updates);
+      const written = await applyUpdates(sql, updates, known);
       await noteProgress(sql, newestAt);
       return written;
     });
@@ -76,10 +83,10 @@ export async function importDarwin(budgetMs: number): Promise<ImportResult> {
       await noteGap(sql, before.lastMessageAt, kafka.oldestAt);
     }
     const timetable = kafka.caughtUp
-      ? await loadTimetable(deadline)
+      ? await loadTimetable(deadline, known)
       : { runWrites: 0 };
     const filled = kafka.caughtUp
-      ? await fillGap(deadline)
+      ? await fillGap(deadline, known)
       : { hours: [], runWrites: 0 };
     const runsDeleted = await deleteOldRuns(sql, darwinKeepDays(), new Date());
     const daysPacked = await packFinishedDays(sql, new Date(), deadline);
@@ -278,6 +285,7 @@ function xmlOf(value: Buffer | null): string {
  */
 async function loadTimetable(
   deadline: number,
+  known: KnownRuns,
 ): Promise<{ date?: string; runWrites: number }> {
   const sql = database()!;
   const hour = new Date();
@@ -291,7 +299,11 @@ async function loadTimetable(
     return { runWrites: 0 };
   }
   try {
-    const runWrites = await applyUpdates(sql, await snapshotUpdates(hour));
+    const runWrites = await applyUpdates(
+      sql,
+      await snapshotUpdates(hour),
+      known,
+    );
     await noteTimetable(sql, date);
     return { date, runWrites };
   } catch (error) {
@@ -305,6 +317,7 @@ async function loadTimetable(
 /** Reads snapshot hours for a gap Kafka left, oldest first, while the budget lasts. */
 async function fillGap(
   deadline: number,
+  known: KnownRuns,
 ): Promise<{ hours: string[]; runWrites: number }> {
   const sql = database()!;
   const { gap } = await importState(sql);
@@ -321,7 +334,11 @@ async function fillGap(
       break;
     }
     try {
-      filled.runWrites += await applyUpdates(sql, await snapshotUpdates(hour));
+      filled.runWrites += await applyUpdates(
+        sql,
+        await snapshotUpdates(hour),
+        known,
+      );
       filled.hours.push(hour.toISOString());
     } catch (error) {
       if (!(error instanceof SnapshotMissingError)) {

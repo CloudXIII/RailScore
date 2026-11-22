@@ -3,6 +3,7 @@ import type { DarwinUpdate } from "./push-port";
 import { decodeCalls, encodeCalls } from "../call-text";
 import {
   foldRepeatedCalls,
+  foldUpdates,
   historicalRunFromDarwin,
   mergeUpdate,
   type DarwinRun,
@@ -77,6 +78,37 @@ describe("mergeUpdate", () => {
         calls: [{ tpl: "LNDNASJ", ptd: "0815" }],
       }),
     ).toBeUndefined();
+  });
+});
+
+describe("foldUpdates", () => {
+  it("folds a batch in order onto the stored run, as one merge after another", () => {
+    const stored = mergeUpdate(undefined, schedule)!;
+    const departed = arrived({ atd: "0813" });
+    const landed = arrived({ ata: "0826" });
+
+    const changed = foldUpdates(new Map([[rid, stored]]), [departed, landed]);
+
+    expect([...changed.keys()]).toEqual([rid]);
+    expect(changed.get(rid)).toEqual(
+      mergeUpdate(mergeUpdate(stored, departed), landed),
+    );
+  });
+
+  it("starts from nothing for a RID with no stored run, and leaves the stored runs as they are", () => {
+    const other = "202611027000001";
+    const known = new Map<string, DarwinRun | null>([[other, null]]);
+
+    const changed = foldUpdates(known, [
+      schedule,
+      { ...schedule, rid: other },
+      { ...schedule, rid: "202611027000002", calls: [] },
+    ]);
+
+    expect(changed.get(rid)).toEqual(mergeUpdate(undefined, schedule));
+    expect(changed.get(other)?.rid).toBe(other);
+    expect(changed.has("202611027000002")).toBe(false);
+    expect(known.get(other)).toBeNull();
   });
 });
 
