@@ -4,7 +4,7 @@ import { addCalendarDays, londonIsoDate } from "@railscore/core";
 import { decodeMonth, encodeMonthChunk, monthOf } from "./month";
 import type { DarwinUpdate } from "./push-port";
 import { decodeCalls, encodeCalls } from "../call-text";
-import { mergeUpdate, type DarwinRun } from "./run";
+import { foldUpdates, type DarwinRun } from "./run";
 
 /** Rows per statement. Postgres takes at most 65,535 parameters, seven per row here. */
 const WRITE_ROWS = 2_000;
@@ -38,12 +38,22 @@ export async function firstOpenDay(sql: Sql, now: Date): Promise<string> {
 }
 
 /**
+ * Stored runs by RID as one import has read or written them, `null` for a RID with none.
+ * While the import holds its lease nothing else writes these runs, so a run is read from the
+ * database once per import, not once per flush: a train in motion is updated by every flush,
+ * and reading it back each time was most of the project's Neon network transfer.
+ */
+export type KnownRuns = Map<string, DarwinRun | null>;
+
+/**
  * Folds updates into the stored runs. Returns how many runs changed. An update for a day that
  * is already packed is dropped: a lone late message would otherwise start a partial copy.
+ * Only RIDs not in `known` are read, and `known` takes every run read and written.
  */
 export async function applyUpdates(
   sql: Sql,
   received: readonly DarwinUpdate[],
+  known: KnownRuns = new Map(),
   now = new Date(),
 ): Promise<number> {
   const from = openFrom(now);
@@ -56,28 +66,25 @@ export async function applyUpdates(
   if (updates.length === 0) {
     return 0;
   }
-  const rids = [...new Set(updates.map((update) => update.rid))];
-  const runs = await loadRuns(sql, rids);
-  const changed = new Set<string>();
-  for (const update of updates) {
-    const merged = mergeUpdate(runs.get(update.rid), update);
-    if (merged) {
-      runs.set(update.rid, merged);
-      changed.add(update.rid);
-    }
+  const unread = [
+    ...new Set(
+      updates.map((update) => update.rid).filter((rid) => !known.has(rid)),
+    ),
+  ];
+  const read = await loadRuns(sql, unread);
+  for (const rid of unread) {
+    known.set(rid, read.get(rid) ?? null);
   }
-  const rows = [...changed].map((rid) => {
-    const run = runs.get(rid)!;
-    return {
-      rid,
-      service_date: run.serviceDate,
-      uid: run.uid,
-      toc: run.toc,
-      calls: encodeCalls(run.calls),
-      late_reason: run.lateReason ?? "",
-      cancel_reason: run.cancelReason ?? "",
-    };
-  });
+  const changed = foldUpdates(known, updates);
+  const rows = [...changed.values()].map((run) => ({
+    rid: run.rid,
+    service_date: run.serviceDate,
+    uid: run.uid,
+    toc: run.toc,
+    calls: encodeCalls(run.calls),
+    late_reason: run.lateReason ?? "",
+    cancel_reason: run.cancelReason ?? "",
+  }));
   for (let start = 0; start < rows.length; start += WRITE_ROWS) {
     const slice = rows.slice(start, start + WRITE_ROWS);
     await sql`
@@ -87,6 +94,9 @@ export async function applyUpdates(
         calls = excluded.calls, late_reason = excluded.late_reason,
         cancel_reason = excluded.cancel_reason, updated_at = now()
     `;
+  }
+  for (const [rid, run] of changed) {
+    known.set(rid, run);
   }
   return rows.length;
 }

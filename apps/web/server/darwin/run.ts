@@ -79,6 +79,25 @@ export function mergeUpdate(
   };
 }
 
+/**
+ * Folds updates, in order, onto the stored runs they name (`null` or missing: none stored).
+ * Returns the runs they change, by RID, and leaves `stored` as it is.
+ */
+export function foldUpdates(
+  stored: ReadonlyMap<string, DarwinRun | null>,
+  updates: readonly DarwinUpdate[],
+): Map<string, DarwinRun> {
+  const changed = new Map<string, DarwinRun>();
+  for (const update of updates) {
+    const run = changed.get(update.rid) ?? stored.get(update.rid) ?? undefined;
+    const merged = mergeUpdate(run, update);
+    if (merged) {
+      changed.set(update.rid, merged);
+    }
+  }
+  return changed;
+}
+
 function toStoredCall(call: DarwinCall): StoredCall | undefined {
   const crs = crsOf(call.tpl);
   if (!crs) {
