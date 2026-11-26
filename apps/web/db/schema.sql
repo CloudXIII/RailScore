@@ -60,6 +60,41 @@ create table if not exists darwin_import_state (
 
 insert into darwin_import_state (id) values (1) on conflict (id) do nothing;
 
+-- Darwin outages, for the TRUST backup (server/trust/). last_actual_at is the newest Darwin
+-- message carrying an actual time. An outage holds from outage_from (the last actual time before
+-- it) until outage_closed_at; outage_ok_since is the first import that found actual times back.
+-- trust_read_to is how far the backup has read TRUST; trust_canary_date the London date of the
+-- last daily check of TRUST against Darwin.
+alter table darwin_import_state add column if not exists last_actual_at timestamptz;
+alter table darwin_import_state add column if not exists outage_from timestamptz;
+alter table darwin_import_state add column if not exists outage_closed_at timestamptz;
+alter table darwin_import_state add column if not exists outage_ok_since timestamptz;
+alter table darwin_import_state add column if not exists trust_read_to timestamptz;
+alter table darwin_import_state add column if not exists trust_canary_date date;
+
+-- TRUST (Network Rail Train Movements) read during a Darwin outage: one row per import, `data`
+-- the activations and public movements read, as gzipped JSON (server/trust/backup.ts). Deleted
+-- once the outage is filled, or after 14 days, before its days are packed into months.
+create table if not exists trust_captures (
+  id bigint generated always as identity primary key,
+  outage_from timestamptz not null,
+  read_from timestamptz not null,
+  read_to timestamptz not null,
+  movements integer not null,
+  data bytea not null,
+  captured_at timestamptz not null default now()
+);
+
+-- Every run a TRUST fill changed, with its calls before and after, so the fill can be undone
+-- (npm run db:trust-fill -- --revert). Kept 14 days.
+create table if not exists trust_fills (
+  rid text not null,
+  filled_at timestamptz not null,
+  old_calls text not null,
+  new_calls text not null,
+  primary key (rid, filled_at)
+);
+
 -- HSP, for the days before Darwin -----------------------------------------------------------
 
 -- HSP (Historic Service Performance) for the days before Darwin's first whole day, 2026-11-04.

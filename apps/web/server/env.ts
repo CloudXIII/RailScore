@@ -105,6 +105,39 @@ export function darwinKafka(): DarwinKafka {
   };
 }
 
+/**
+ * Network Rail Train Movements (TRUST) on the Rail Data Marketplace, from the product's Pub/Sub
+ * tab, read only while Darwin sends no actual times. Undefined when none is set: the import then
+ * runs without the backup. Some set and some missing is an error.
+ */
+export function nwrMovementsKafka(): DarwinKafka | undefined {
+  const values = {
+    NWR_MOVEMENTS_KAFKA_BOOTSTRAP: read("NWR_MOVEMENTS_KAFKA_BOOTSTRAP"),
+    NWR_MOVEMENTS_KAFKA_USERNAME: read("NWR_MOVEMENTS_KAFKA_USERNAME"),
+    NWR_MOVEMENTS_KAFKA_PASSWORD: read("NWR_MOVEMENTS_KAFKA_PASSWORD"),
+    NWR_MOVEMENTS_KAFKA_GROUP: read("NWR_MOVEMENTS_KAFKA_GROUP"),
+    NWR_MOVEMENTS_KAFKA_TOPIC: read("NWR_MOVEMENTS_KAFKA_TOPIC"),
+  };
+  const absent = Object.entries(values)
+    .filter(([, value]) => value === undefined)
+    .map(([name]) => name);
+  if (absent.length === Object.keys(values).length) {
+    return undefined;
+  }
+  if (absent.length > 0) {
+    throw new MissingEnvironmentError(absent.join(", "));
+  }
+  return {
+    brokers: values
+      .NWR_MOVEMENTS_KAFKA_BOOTSTRAP!.split(",")
+      .map((broker) => broker.trim()),
+    username: values.NWR_MOVEMENTS_KAFKA_USERNAME!,
+    password: values.NWR_MOVEMENTS_KAFKA_PASSWORD!,
+    groupId: values.NWR_MOVEMENTS_KAFKA_GROUP!,
+    topic: values.NWR_MOVEMENTS_KAFKA_TOPIC!,
+  };
+}
+
 /** Hourly Darwin snapshot files, for hours Kafka dropped before an import read them. */
 export function darwinSnapshot(): { url: string; apiKey: string } {
   const url = read("DARWIN_SNAPSHOT_URL");

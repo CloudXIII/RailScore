@@ -3,6 +3,7 @@ import { Kafka, logLevel, type Consumer } from "kafkajs";
 import { database } from "../db";
 import { darwinKafka, darwinKeepDays } from "../env";
 import { errorText } from "../error-text";
+import { trustBackup, type TrustOutcome } from "../trust/backup";
 import { parsePushPort, type DarwinUpdate } from "./push-port";
 import {
   snapshotHours,
@@ -48,6 +49,11 @@ export type ImportResult =
       timetableLoaded?: string;
       /** Kafka had dropped messages this import never read. */
       gapFound: boolean;
+      /** Kafka messages carrying an actual time, and the newest of them. */
+      actualMessages: number;
+      lastActualAt?: string;
+      /** Darwin outage and TRUST backup (server/trust/backup.ts). */
+      trust: TrustOutcome;
       snapshotHours: string[];
       runsDeleted: number;
       /** Days moved into month rows by this import. */
@@ -74,14 +80,26 @@ export async function importDarwin(budgetMs: number): Promise<ImportResult> {
   try {
     const before = await importState(sql);
     const known: KnownRuns = new Map();
-    const kafka = await readKafka(deadline, async (updates, newestAt) => {
-      const written = await applyUpdates(sql, updates, known);
-      await noteProgress(sql, newestAt);
-      return written;
-    });
+    const kafka = await readKafka(
+      deadline,
+      async (updates, newestAt, lastActualAt) => {
+        const written = await applyUpdates(sql, updates, known);
+        await noteProgress(sql, newestAt, lastActualAt);
+        return written;
+      },
+    );
     if (kafka.gapFound && before.lastMessageAt && kafka.oldestAt) {
       await noteGap(sql, before.lastMessageAt, kafka.oldestAt);
     }
+    // TRUST keeps as little as 80 minutes, so it goes before the timetable and snapshots.
+    const trust = await trustBackup(
+      sql,
+      before,
+      kafka.lastActualAt,
+      kafka.caughtUp,
+      known,
+      deadline - SNAPSHOT_RESERVE_MS,
+    );
     const timetable = kafka.caughtUp
       ? await loadTimetable(deadline, known)
       : { runWrites: 0 };
@@ -100,6 +118,11 @@ export async function importDarwin(budgetMs: number): Promise<ImportResult> {
         ? { newestMessageAt: kafka.newestAt.toISOString() }
         : {}),
       gapFound: kafka.gapFound,
+      actualMessages: kafka.actualMessages,
+      ...(kafka.lastActualAt
+        ? { lastActualAt: kafka.lastActualAt.toISOString() }
+        : {}),
+      trust,
       snapshotHours: filled.hours,
       runsDeleted,
       daysPacked,
@@ -117,15 +140,18 @@ type KafkaRead = {
   gapFound: boolean;
   oldestAt?: Date;
   newestAt?: Date;
+  actualMessages: number;
+  /** Newest message carrying an actual time. */
+  lastActualAt?: Date;
 };
 
-async function readKafka(
-  deadline: number,
-  flush: (
-    updates: DarwinUpdate[],
-    newestAt: Date | undefined,
-  ) => Promise<number>,
-): Promise<KafkaRead> {
+type Flush = (
+  updates: DarwinUpdate[],
+  newestAt: Date | undefined,
+  lastActualAt: Date | undefined,
+) => Promise<number>;
+
+async function readKafka(deadline: number, flush: Flush): Promise<KafkaRead> {
   const config = darwinKafka();
   const kafka = new Kafka({
     clientId: "railscore-import",
@@ -171,6 +197,7 @@ async function readKafka(
     runWrites: 0,
     caughtUp: ends.size === 0,
     gapFound,
+    actualMessages: 0,
   };
   if (ends.size === 0) {
     return result;
@@ -203,10 +230,7 @@ function consumeUntilCaughtUp(
   topic: string,
   ends: Map<number, number>,
   deadline: number,
-  flush: (
-    updates: DarwinUpdate[],
-    newestAt: Date | undefined,
-  ) => Promise<number>,
+  flush: Flush,
   result: KafkaRead,
 ): Promise<void> {
   let pending: DarwinUpdate[] = [];
@@ -236,7 +260,14 @@ function consumeUntilCaughtUp(
             if (!result.newestAt || at > result.newestAt) {
               result.newestAt = at;
             }
-            pending.push(...parsePushPort(xmlOf(message.value)));
+            const updates = parsePushPort(xmlOf(message.value));
+            if (updates.some(carriesActual)) {
+              result.actualMessages += 1;
+              if (!result.lastActualAt || at > result.lastActualAt) {
+                result.lastActualAt = at;
+              }
+            }
+            pending.push(...updates);
             pendingMessages += 1;
           }
           result.messages += batch.messages.length;
@@ -247,7 +278,11 @@ function consumeUntilCaughtUp(
           }
           const outOfTime = Date.now() > deadline - SNAPSHOT_RESERVE_MS;
           if (pendingMessages >= FLUSH_MESSAGES || reached || outOfTime) {
-            result.runWrites += await flush(pending, result.newestAt);
+            result.runWrites += await flush(
+              pending,
+              result.newestAt,
+              result.lastActualAt,
+            );
             await consumer.commitOffsets([
               { topic, partition: batch.partition, offset: String(next) },
             ]);
@@ -263,6 +298,16 @@ function consumeUntilCaughtUp(
       })
       .catch(reject);
   });
+}
+
+/** A train status with an actual time: what stops coming in a Darwin outage. */
+function carriesActual(update: DarwinUpdate): boolean {
+  return (
+    update.kind === "status" &&
+    update.calls.some(
+      (call) => call.ata !== undefined || call.atd !== undefined,
+    )
+  );
 }
 
 /** Message values are JSON with the Push Port XML in `bytes`. */

@@ -14,6 +14,7 @@ apps/web/server/use-cases/  what a page asks for, as a view model: searching tra
 apps/web/server/            the train source port (Darwin or sample), search periods, call text,
                             maintenance, the station feed and directory, environment
 apps/web/server/darwin/     Push Port parsing, run merge, run store, month packing, import state, import
+apps/web/server/trust/      TRUST backup for Darwin outages: outage rule, TRUST reading, matching, fill
 apps/web/server/hsp/        HSP for the days before Darwin: list counts, matching, runs, store
 apps/web/server/mock/       sample trains for RAILSCORE_DATA=mock
 apps/web/server/services/   train folding for the lists
@@ -28,6 +29,7 @@ features/      ──► shared/, packages/core
 shared/        ──► packages/core
 use cases      ──► packages/core, the TrainSource port (server/train-source.ts)
 darwin/, hsp/  ──► packages/core, shared/, server/ helpers (periods, call text)
+trust/         ──► packages/core, server/ helpers, darwin/ import state and run store
 packages/core  ──► nothing
 ```
 
@@ -48,6 +50,18 @@ Kafka keeps about an hour of messages, so a scheduler calls the route every 15 t
 Offsets are committed only after the runs are written. A second import that starts while one is running finds the lease taken (`darwin_import_state`) and stops. When Kafka dropped messages before an import read them, later imports fill those hours from the hourly snapshot files, which are kept for 2 to 3 days. A snapshot holds a run until about 30 minutes after it arrives, so a filled hour can miss some arrivals. Runs older than `DARWIN_KEEP_DAYS` are deleted. After each import the route runs the maintenance step, which also deletes old HSP list answers.
 
 Never run the import from a development machine that shares the production Kafka consumer group (`DARWIN_KAFKA_GROUP`): its offsets would move on, and production would miss those messages.
+
+## TRUST backup
+
+Darwin sometimes stops sending actual times for hours with no gap in Kafka, as on 12 and 25 November 2026, so the snapshot fill cannot help. The import then fills them from Network Rail's Train Movements feed (TRUST) ([ADR 0007](adr/0007-trust-backup-during-darwin-outages.md)). It all runs inside the Darwin import, after Kafka and before the timetable and snapshots, since Kafka keeps TRUST for as little as 80 minutes:
+
+- **Outage** (`server/trust/outage.ts`). The import notes the newest Darwin message carrying an actual time (`last_actual_at` in `darwin_import_state`). In an import that has caught up, 20 minutes without one between 05:00 and 01:00 London starts an outage. It ends once actual times have been back for 30 minutes, never between 01:00 and 05:00, and after 8 hours at most.
+- **Capture** (`kafka.ts`, `movements.ts`). While an outage holds, each import reads TRUST from where it stopped (`trust_read_to`), starting 15 minutes before the outage, without committing offsets, and stores the activations and public movements as gzipped JSON in `trust_captures`.
+- **Fill** (`match.ts`, `fill.ts`, `backup.ts`). When the outage ends, the import reads the captures and the runs with a public time in the outage's hours, matches each TRUST train to a run (activation by schedule UID and day; else two calls by station and public time, on the day the train ID ends with), and fills only the actual times Darwin lacks, never at a cancelled call. Where both sources have a time, mostly in the 15 minutes before the outage, they must agree within a minute at 90% of at least 100 calls, or nothing is written. Each run is written only while its calls are still the text read, and kept with its old calls in `trust_fills` for 14 days. `npm run db:trust-fill` lists captures and fills, forces a refused fill and undoes one.
+- **Stations.** TRUST names places by STANOX; `server/trust/stanox-crs.json` maps them to CRS codes. `scripts/stanox-crs.mjs` writes it from Network Rail's location file (CORPUS), taking Darwin's CRS for each TIPLOC and, where a STANOX also carries a non-rail code (VIC and XVR), the station's.
+- **Daily check.** Once a day, after 12:00 London and outside an outage, the import reads 10 minutes of TRUST and compares them with the runs it already holds in memory, logged as `[trust-canary]`. It reads nothing from Neon.
+
+Without the `NWR_MOVEMENTS_KAFKA_*` variables the import still notes outages and reads no TRUST. A TRUST failure is logged under `[trust-backup]` and never stops the Darwin import.
 
 ## Month packing
 

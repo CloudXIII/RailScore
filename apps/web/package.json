@@ -11,6 +11,7 @@
     "start": "next start",
     "db:migrate": "node --env-file-if-exists=.env.local ./scripts/migrate.mjs",
     "db:fold-calls": "vite-node --config vitest.config.ts scripts/fold-repeated-calls.ts --",
+    "db:trust-fill": "vite-node --config vitest.config.ts scripts/trust-fill.ts --",
     "stations:refresh": "vite-node --config vitest.config.ts scripts/refresh-stations.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"

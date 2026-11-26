@@ -54,6 +54,8 @@ The list folds schedules into one train (`server/services/fold.ts`):
 
 Darwin history covers only the days the import has run; a year is kept, and searches reach back at most 90 days. HSP fills the days before it while a period reaches back that far. At the 13 December 2026 timetable change some trains may no longer match their HSP rows, and keep Darwin's figures. HSP is often slow at the UK peak and sometimes refuses most calls for a while. The last two weeks (about 12 MB a day) and the packed days (well under 1 MB a day) fit in Neon Free (1 GB per project). If the import stops, the figures stop at the last day stored. A train whose UID changes on some days is found under the UIDs it had in the last 15 days, so packed days under a UID it has not used since are missed; a weekly pattern of UIDs is found whole.
 
+When Darwin sends no actual times for a while, as during its maintenance on 25 November 2026, the times it lacks are filled from Network Rail's TRUST feed once it is back ([ADR 7](adr/0007-trust-backup-during-darwin-outages.md)). TRUST agrees with Darwin within a minute about 98% of the time. A run counts the same whichever source gave a time, and Darwin's own times are never replaced. An outage shorter than 20 minutes, or one only between 01:00 and 05:00, is not filled.
+
 The 05:00 snapshot holds about nine in ten of the day's trains. A train added to the timetable later in the day appears once Kafka brings it.
 
 ## Assumptions
