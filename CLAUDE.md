@@ -25,7 +25,8 @@ apps/web/
   features/         UI components with their *.module.css, formatting (format.ts)
   shared/           types and helpers used by client and server (contracts, day type, stations)
   server/           server-only: env.ts (ALL config), db.ts, darwin/ (parser, runs, month
-                    packing, store, import), hsp/ (days before Darwin), services/, use-cases/,
+                    packing, store, import), trust/ (TRUST backup for Darwin outages),
+                    hsp/ (days before Darwin), services/, use-cases/,
                     mock/, stations.json (station list shipped with the app)
   db/schema.sql     the tables; scripts/migrate.mjs applies it
   scripts/          migrate, refresh-stations, fold-repeated-calls, tiploc-crs

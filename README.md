@@ -31,7 +31,7 @@ How it is built is in [docs/architecture.md](docs/architecture.md), the classifi
 
 ## Data
 
-Train performance is from Darwin Real Time Train Information (the Push Port, read over Kafka, and its hourly snapshots) on the Rail Data Marketplace. Station names and CRS codes are from the [Knowledgebase Stations data feed](https://raildata.org.uk/dashboard/dataProduct/P-88ffe920-471c-4fd9-8e0d-95d5b9b7a257/overview).
+Train performance is from Darwin Real Time Train Information (the Push Port, read over Kafka, and its hourly snapshots) on the Rail Data Marketplace. When Darwin stops sending actual times for a while, they are filled from Network Rail's Train Movements feed (TRUST), whose locations Network Rail's location file (CORPUS) maps to stations. Station names and CRS codes are from the [Knowledgebase Stations data feed](https://raildata.org.uk/dashboard/dataProduct/P-88ffe920-471c-4fd9-8e0d-95d5b9b7a257/overview).
 
 Darwin history starts on the first day the import saw whole, 4 November 2026 (`DARWIN_FIRST_DAY`), and reaches back at most `DARWIN_KEEP_DAYS` (365, a year kept although searches go back 90 days, so longer periods can be offered later). The days of a period of up to 90 days before that come from [Historic Service Performance](https://raildata.org.uk) (HSP) on the Rail Data Marketplace, asked after the page is shown and stored (see [architecture](docs/architecture.md#days-before-darwin-hsp)). Without HSP, the list names the days it covers. If the import stops, no new runs arrive.
 
@@ -51,20 +51,21 @@ Copy `.env.example` to `apps/web/.env.local` and replace the placeholders. Next.
 
 Every variable is server-only. Do not add a `NEXT_PUBLIC_` prefix.
 
-| Variable                                              | Role                                                                                                                                                                                                                      |
-| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `STATIONS_BASE_URL`, `STATIONS_API_KEY`               | Optional. Only for `npm run stations:refresh -w @railscore/web`, which rewrites the station list the app ships with ([architecture](docs/architecture.md#stations)). The script sends the key as `x-apikey`.              |
-| `DATABASE_URL`                                        | Postgres holding the Darwin runs. Required for live data; without it no train is listed. The running app should use a pooled URL. `npm run db:migrate` should use the direct URL.                                         |
-| `DATABASE_POOL_MAX`                                   | Optional. Postgres connections in this process. Default 3.                                                                                                                                                                |
-| `RAILSCORE_DATA`                                      | Leave unset for the live feed. `mock` serves made-up trains.                                                                                                                                                              |
-| `PORT`                                                | Optional. `npm run dev` uses 3000.                                                                                                                                                                                        |
-| `DARWIN_KAFKA_*`                                      | Darwin Push Port on Kafka, for the import below. Required for live data. Bootstrap, topic, group, username and password, as the Rail Data Marketplace Pub/Sub tab shows them. The import always uses SASL PLAIN over SSL. |
-| `DARWIN_SNAPSHOT_URL`, `DARWIN_SNAPSHOT_CONSUMER_KEY` | Hourly Darwin snapshots, read for each day's timetable and when Kafka dropped messages. Required for live data.                                                                                                           |
-| `DARWIN_KEEP_DAYS`                                    | Optional. Days of Darwin runs kept. Default 365.                                                                                                                                                                          |
-| `DARWIN_FIRST_DAY`                                    | Optional. First day the Darwin import saw whole, `YYYY-MM-DD`. Default `2026-11-04`. Earlier stored days are not counted.                                                                                                 |
-| `HSP_BASE_URL`, `HSP_API_KEY_HEADER`, `HSP_API_KEY`   | Optional. Historic Service Performance, for the days of a period before `DARWIN_FIRST_DAY`. Without them the period starts at that day.                                                                                   |
-| `HSP_DAILY_CALL_LIMIT`                                | Optional. HSP calls a day across every visitor. Default 5000. Past it the figures are Darwin's alone until midnight.                                                                                                      |
-| `CRON_SECRET`                                         | Optional. Turns on `/api/import/darwin`, which needs `Authorization: Bearer <CRON_SECRET>`.                                                                                                                               |
+| Variable                                              | Role                                                                                                                                                                                                                        |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `STATIONS_BASE_URL`, `STATIONS_API_KEY`               | Optional. Only for `npm run stations:refresh -w @railscore/web`, which rewrites the station list the app ships with ([architecture](docs/architecture.md#stations)). The script sends the key as `x-apikey`.                |
+| `DATABASE_URL`                                        | Postgres holding the Darwin runs. Required for live data; without it no train is listed. The running app should use a pooled URL. `npm run db:migrate` should use the direct URL.                                           |
+| `DATABASE_POOL_MAX`                                   | Optional. Postgres connections in this process. Default 3.                                                                                                                                                                  |
+| `RAILSCORE_DATA`                                      | Leave unset for the live feed. `mock` serves made-up trains.                                                                                                                                                                |
+| `PORT`                                                | Optional. `npm run dev` uses 3000.                                                                                                                                                                                          |
+| `DARWIN_KAFKA_*`                                      | Darwin Push Port on Kafka, for the import below. Required for live data. Bootstrap, topic, group, username and password, as the Rail Data Marketplace Pub/Sub tab shows them. The import always uses SASL PLAIN over SSL.   |
+| `DARWIN_SNAPSHOT_URL`, `DARWIN_SNAPSHOT_CONSUMER_KEY` | Hourly Darwin snapshots, read for each day's timetable and when Kafka dropped messages. Required for live data.                                                                                                             |
+| `DARWIN_KEEP_DAYS`                                    | Optional. Days of Darwin runs kept. Default 365.                                                                                                                                                                            |
+| `DARWIN_FIRST_DAY`                                    | Optional. First day the Darwin import saw whole, `YYYY-MM-DD`. Default `2026-11-04`. Earlier stored days are not counted.                                                                                                   |
+| `HSP_BASE_URL`, `HSP_API_KEY_HEADER`, `HSP_API_KEY`   | Optional. Historic Service Performance, for the days of a period before `DARWIN_FIRST_DAY`. Without them the period starts at that day.                                                                                     |
+| `HSP_DAILY_CALL_LIMIT`                                | Optional. HSP calls a day across every visitor. Default 5000. Past it the figures are Darwin's alone until midnight.                                                                                                        |
+| `NWR_MOVEMENTS_KAFKA_*`                               | Optional. Network Rail Train Movements (TRUST) on Kafka, read only while Darwin sends no actual times. Bootstrap, topic (`TRAIN_MVT_ALL_TOC`), group, username and password. Without them outages are noted but not filled. |
+| `CRON_SECRET`                                         | Optional. Turns on `/api/import/darwin`, which needs `Authorization: Bearer <CRON_SECRET>`.                                                                                                                                 |
 
 Create the tables when `DATABASE_URL` is set. Point that command at the direct URL, then point the running app at the pooled URL.
 
@@ -112,7 +113,7 @@ npm start
 
 That serves the production build. `PORT` overrides 3000. `npm run dev` is the development server, not this command.
 
-Set the variables from the table above in the host's environment. They stay on the server. For Postgres, give the app the pooled URL and run `npm run db:migrate` once with the direct URL.
+Set the variables from the table above in the host's environment. They stay on the server. For Postgres, give the app the pooled URL and run `npm run db:migrate` once with the direct URL. A release that changes `apps/web/db/schema.sql` needs `npm run db:migrate` before it is deployed, since the import reads the new columns; the changes only add, so the running release is unaffected.
 
 Postgres holds every run, so instances share nothing else. A search and a calculation each finish in one request.
 
@@ -126,6 +127,16 @@ Kafka keeps about an hour of messages, so a scheduler calls `/api/import/darwin`
 4. Turn on failure notifications, so a run of failures reaches you by email.
 
 The route answers `202` at once and imports after the response. The result is in the deployment's log under `[darwin-import]`. `?wait=1` imports first and answers with the result, for a run by hand. Do not run the import from a machine that shares the production `DARWIN_KAFKA_GROUP`: production would miss those messages.
+
+When Darwin sends no actual times for 20 minutes by day, the import reads TRUST until they are back, then fills the times Darwin lacks, if the two agree where both have one ([ADR 7](docs/adr/0007-trust-backup-during-darwin-outages.md)). Look for `[trust-backup]` and the daily `[trust-canary]` in the log. A refused fill waits 14 days. To list captures and fills, force a refused fill, or undo one (with the direct URL):
+
+```bash
+npm run db:trust-fill -w @railscore/web
+npm run db:trust-fill -w @railscore/web -- --write <outage start>
+npm run db:trust-fill -w @railscore/web -- --revert <fill time>
+```
+
+When Network Rail publishes a new location file (`NLC*.xml.gz`, the CORPUS product on the Rail Data Marketplace), refresh the STANOX map with `node apps/web/scripts/stanox-crs.mjs <file>`.
 
 After a release whose notes ask for it, run the one-off data fix once against each database, with the direct URL:
 

@@ -4,6 +4,7 @@ import {
   darwinKeepDays,
   darwinSnapshot,
   MissingEnvironmentError,
+  nwrMovementsKafka,
   requireEnv,
 } from "./env";
 
@@ -13,6 +14,11 @@ const NAMES = [
   "DATABASE_POOL_MAX",
   "DARWIN_KEEP_DAYS",
   "RAILSCORE_TEST_REQUIRED",
+  "NWR_MOVEMENTS_KAFKA_BOOTSTRAP",
+  "NWR_MOVEMENTS_KAFKA_USERNAME",
+  "NWR_MOVEMENTS_KAFKA_PASSWORD",
+  "NWR_MOVEMENTS_KAFKA_GROUP",
+  "NWR_MOVEMENTS_KAFKA_TOPIC",
 ] as const;
 
 const saved = new Map<string, string | undefined>();
@@ -60,6 +66,41 @@ describe("requireEnv", () => {
     expect(() => darwinSnapshot()).toThrow(
       "Missing required environment variable: DARWIN_SNAPSHOT_CONSUMER_KEY",
     );
+  });
+});
+
+describe("nwrMovementsKafka", () => {
+  it("is off when none of its variables is set", () => {
+    clear();
+
+    expect(nwrMovementsKafka()).toBeUndefined();
+  });
+
+  it("names the missing variables when only some are set", () => {
+    clear();
+    process.env.NWR_MOVEMENTS_KAFKA_BOOTSTRAP = "broker.test:9092";
+    process.env.NWR_MOVEMENTS_KAFKA_TOPIC = "TRAIN_MVT_ALL_TOC";
+
+    expect(() => nwrMovementsKafka()).toThrow(
+      "Missing required environment variable: NWR_MOVEMENTS_KAFKA_USERNAME, NWR_MOVEMENTS_KAFKA_PASSWORD, NWR_MOVEMENTS_KAFKA_GROUP",
+    );
+  });
+
+  it("splits the bootstrap servers", () => {
+    clear();
+    process.env.NWR_MOVEMENTS_KAFKA_BOOTSTRAP = "a.test:9092, b.test:9092";
+    process.env.NWR_MOVEMENTS_KAFKA_USERNAME = "user";
+    process.env.NWR_MOVEMENTS_KAFKA_PASSWORD = "secret";
+    process.env.NWR_MOVEMENTS_KAFKA_GROUP = "group";
+    process.env.NWR_MOVEMENTS_KAFKA_TOPIC = "TRAIN_MVT_ALL_TOC";
+
+    expect(nwrMovementsKafka()).toEqual({
+      brokers: ["a.test:9092", "b.test:9092"],
+      username: "user",
+      password: "secret",
+      groupId: "group",
+      topic: "TRAIN_MVT_ALL_TOC",
+    });
   });
 });
 
