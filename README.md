@@ -41,7 +41,7 @@ Both feeds need your own marketplace credentials. None are included here.
 
 ## Install
 
-Requires Node.js 22 or newer, and npm. The root `package.json` records that range.
+Requires Node.js 26 and npm. The `engines` field in `package.json` pins the major version (`26.x`), so Vercel never moves to a newer major on its own.
 
 ```bash
 npm install
@@ -94,7 +94,7 @@ Formatting is `npm run format`. `npm run lint` runs ESLint with Next's rules, Re
 
 ## Deployment
 
-Any Node host, including a serverless one, can run the production build. Node.js 22 or newer.
+Any Node host, including a serverless one, can run the production build. Node.js 26.
 
 From the repository root:
 

@@ -13,7 +13,7 @@ RailScore shows how a direct UK train has performed on its recent runs: arrivals
 
 ## Stack
 
-TypeScript (strict), npm workspaces, Node >= 22 (CI uses 24). Next.js 15 App Router + React 19, CSS Modules. Neon Postgres through `postgres` (postgres.js). Darwin Push Port via `kafkajs` + hourly snapshot files; HSP for the days before Darwin. Vitest, ESLint, Prettier, knip. Vercel (functions in London), GitHub Actions CI.
+TypeScript (strict), npm workspaces, Node 26.x (pinned in `engines`; CI and Vercel use 26). Next.js 15 App Router + React 19, CSS Modules. Neon Postgres through `postgres` (postgres.js). Darwin Push Port via `kafkajs` + hourly snapshot files; HSP for the days before Darwin. Vitest, ESLint, Prettier, knip. Vercel (functions in London), GitHub Actions CI.
 
 ## Structure
 
